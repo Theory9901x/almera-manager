@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-almera-600 text-white px-4 py-2 rounded-lg text-sm font-medium
+           hover:bg-almera-700 active:scale-95 transition-all duration-150 cursor-pointer;
+  }
+  .btn-secondary {
+    @apply bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium
+           hover:bg-slate-50 active:scale-95 transition-all duration-150 cursor-pointer;
+  }
+  .btn-danger {
+    @apply bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-medium
+           hover:bg-red-100 active:scale-95 transition-all duration-150 cursor-pointer;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-slate-100 shadow-sm;
+  }
+  .input {
+    @apply w-full border border-slate-200 rounded-lg px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-almera-500 focus:border-transparent
+           placeholder:text-slate-400 bg-white;
+  }
+  .label {
+    @apply text-xs font-medium text-slate-500 uppercase tracking-wide mb-1 block;
+  }
+  .badge-verde  { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700; }
+  .badge-amarillo { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700; }
+  .badge-rojo   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700; }
+  .badge-gris   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600; }
+  .badge-azul   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700; }
+}
