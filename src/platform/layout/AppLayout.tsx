@@ -28,8 +28,8 @@ export default function AppLayout() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const [contentTheme, setContentTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'dark'
-    return window.localStorage.getItem('sgimr-content-theme') === 'light' ? 'light' : 'dark'
+    if (typeof window === 'undefined') return 'light'
+    return window.localStorage.getItem('sgimr-content-theme') === 'dark' ? 'dark' : 'light'
   })
   if (!session) return null
   const currentModule = session.modules
@@ -50,35 +50,30 @@ export default function AppLayout() {
     <div className="app-shell lg:flex">
       {open && <button aria-label="Cerrar menu" className="fixed inset-0 z-30 bg-slate-950/55 lg:hidden" onClick={() => setOpen(false)} />}
       <aside className={`shell-sidebar fixed inset-y-0 left-0 z-40 flex w-80 flex-col overflow-hidden transition-transform lg:sticky lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_5%,rgba(179,38,58,.22),transparent_30%),radial-gradient(circle_at_100%_55%,rgba(86,214,201,.12),transparent_34%)]" />
-        <div className="relative flex h-24 items-center gap-3 border-b border-white/10 px-6">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#8B1E2D] text-white shadow-lg shadow-black/30"><HeartPulse size={22} /></div>
+        <div className="relative flex h-20 items-center gap-3 border-b border-white/10 px-5">
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-[#8B1E2D] text-white"><HeartPulse size={20} /></div>
           <div>
             <p className="text-sm font-black uppercase tracking-[.25em]">SGIMR</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400">ALMERA command</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">Gestion institucional</p>
           </div>
           <button className="ml-auto text-slate-400 lg:hidden" onClick={() => setOpen(false)}><X size={20} /></button>
         </div>
 
-        <div className="relative mx-4 mt-5 rounded-2xl border border-white/10 bg-[#070B10]/70 p-4 backdrop-blur">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#56D6C9]"><Building2 size={13} /> Entidad activa</div>
+        <div className="relative mx-3 mt-4 rounded-xl border border-white/10 bg-white/[.035] p-3">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400"><Building2 size={12} /> Entidad activa</div>
           <p className="mt-2 truncate text-sm font-black">{session.organization.name}</p>
           <p className="mt-1 truncate text-xs text-slate-400">{session.role.name}</p>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <span className="rounded-lg border border-white/10 bg-white/[.035] px-2 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-slate-400">RBAC activo</span>
-            <span className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-emerald-200">Online</span>
-          </div>
         </div>
 
-        <nav className="relative flex-1 space-y-1 overflow-y-auto px-4 py-5">
+        <nav className="relative flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <p className="px-3 pb-2 text-[10px] font-black uppercase tracking-[.22em] text-slate-500">Navegacion operativa</p>
           {session.modules.map(module => {
             const Icon = icons[module.icon as keyof typeof icons] || Blocks
             return (
               <NavLink key={module.id} to={module.route} end={['dashboard', 'admin'].includes(module.key)} onClick={() => setOpen(false)} className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm transition ${isActive ? 'border-[#B3263A]/70 bg-[#B3263A] text-white font-black shadow-lg shadow-black/25' : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/[.06] hover:text-white'}`
+                `group flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${isActive ? 'border-[#B3263A]/70 bg-[#8B1E2D] text-white font-black' : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/[.06] hover:text-white'}`
               }>
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[.06] text-[#56D6C9] transition group-hover:bg-[#56D6C9] group-hover:text-slate-950"><Icon size={17} /></span>
+                <span className="grid h-7 w-7 place-items-center rounded-md bg-white/[.06] text-slate-300 transition group-hover:text-white"><Icon size={16} /></span>
                 <span className="min-w-0 flex-1 truncate">{module.name}</span>
               </NavLink>
             )

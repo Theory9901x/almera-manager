@@ -1,190 +1,123 @@
-import {
-  Activity,
-  ArrowUpRight,
-  CheckCircle2,
-  FileText,
-  LockKeyhole,
-  Radar,
-  Route,
-  ShieldCheck,
-  Sparkles,
-  Users,
-  Zap,
-} from 'lucide-react'
+import { Download, FileText, Plus, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/platform/auth/AuthContext'
+import { ALMERA_STATUS_LABELS, ALMERA_TYPE_LABELS } from '@/modules/almera/constants'
+import { listAlmeraRecords } from '@/modules/almera/services/almeraService'
+import type { AlmeraRecord } from '@/modules/almera/types'
 import { recentActivities } from '@/shared/services/activityService'
-import { Badge, StatusBadge } from '@/shared/ui'
+import { Badge, Button, Card, PageHeader, StatusBadge } from '@/shared/ui'
 
 const executiveMetrics = [
-  ['Usuarios activos', '18', 'Acceso RBAC controlado', 'success'],
-  ['ALMERA mes', '24', 'Solicitudes documentales', 'accent'],
-  ['Pendientes', '7', 'Requieren revision', 'warning'],
-  ['Cerradas', '9', 'Con evidencia registrada', 'info'],
+  ['Usuarios activos', '18', 'Acceso institucional'],
+  ['Solicitudes ALMERA', '24', 'Registradas este mes'],
+  ['Pendientes', '7', 'Por revisar'],
+  ['Cerradas', '9', 'Con trazabilidad'],
 ] as const
-
-const operatingRoute = [
-  ['01', 'Registrar', 'Solicitud documental, proceso y responsable'],
-  ['02', 'Evidenciar', 'Soportes, observaciones y actividad realizada'],
-  ['03', 'Validar', 'Revision administrativa y trazabilidad'],
-  ['04', 'Cerrar', 'Informe y control institucional'],
-]
 
 export default function DashboardPage() {
   const { session } = useAuth()
+  const [records, setRecords] = useState<AlmeraRecord[]>([])
+
+  useEffect(() => { void listAlmeraRecords().then(setRecords) }, [])
+
+  const visibleRecords = useMemo(() => records.slice(0, 5), [records])
   if (!session) return null
 
-  const workModules = session.modules.filter(module => !['dashboard'].includes(module.key))
   const canAdmin = session.permissions.includes('admin.view') || session.modules.some(module => module.key === 'admin')
 
   return (
-    <div className="cyber-dashboard mx-auto max-w-7xl">
-      <section className="cyber-hero">
-        <div className="cyber-scanline" />
-        <div className="cyber-hero-copy">
-          <div className="cyber-kicker"><Radar size={14} /> {session.organization.name}</div>
-          <h1>Centro de mando SGIMR</h1>
-          <p>
-            Panel administrativo rojo/negro para controlar Gestion ALMERA, usuarios,
-            roles, evidencias y seguimiento operativo sin saturar la pantalla.
-          </p>
-          <div className="cyber-actions">
-            <Link to="/app/modulos/almera" className="cyber-button cyber-button-primary">
-              Abrir ALMERA <ArrowUpRight size={16} />
-            </Link>
-            {canAdmin && (
-              <Link to="/app/administracion/users" className="cyber-button cyber-button-secondary">
-                Usuarios y roles <Users size={16} />
-              </Link>
-            )}
-          </div>
-        </div>
+    <div className="dashboard-page mx-auto max-w-7xl space-y-5">
+      <PageHeader
+        eyebrow={session.organization.name}
+        title="Inicio"
+        description="Resumen operativo de usuarios, Gestion ALMERA, pendientes y actividad reciente."
+        actions={<Link to="/app/modulos/almera"><Button><Plus size={16} /> Nuevo registro</Button></Link>}
+      />
 
-        <div className="cyber-hero-status">
-          <div className="cyber-status-core">
-            <ShieldCheck size={34} />
-            <span>Online</span>
-            <strong>SGIMR</strong>
-          </div>
-          <div className="cyber-status-grid">
-            <span>Rol</span>
-            <strong>{session.role.name}</strong>
-            <span>Modulos</span>
-            <strong>{workModules.length}</strong>
-            <span>Permisos</span>
-            <strong>{session.permissions.length}</strong>
-          </div>
+      <section className="summary-strip">
+        <div>
+          <span>Entidad activa</span>
+          <strong>{session.organization.name}</strong>
+        </div>
+        <div>
+          <span>Estado</span>
+          <strong>Sistema operativo</strong>
+        </div>
+        <div>
+          <span>Rol actual</span>
+          <strong>{session.role.name}</strong>
+        </div>
+        <div>
+          <span>Usuario</span>
+          <strong>{session.user.fullName}</strong>
         </div>
       </section>
 
-      <section className="cyber-metrics">
-        {executiveMetrics.map(([label, value, detail, tone]) => (
-          <article key={label} className={`cyber-metric tone-${tone}`}>
-            <span>{label}</span>
+      <section className="metric-strip">
+        {executiveMetrics.map(([label, value, detail]) => (
+          <article key={label} className="stat-card">
+            <p>{label}</p>
             <strong>{value}</strong>
-            <p>{detail}</p>
+            <span>{detail}</span>
           </article>
         ))}
       </section>
 
-      <section className="cyber-grid">
-        <article className="cyber-panel cyber-panel-large">
-          <div className="cyber-panel-head">
-            <div>
-              <p className="eyebrow">Resumen principal</p>
-              <h2>Gestion institucional activa</h2>
-            </div>
-            <Badge tone="success">Sistema operativo</Badge>
-          </div>
-
-          <div className="cyber-summary">
-            <div>
-              <span>Solicitudes documentales</span>
-              <strong>12</strong>
-              <p>4 en revision administrativa</p>
-            </div>
-            <div>
-              <span>Evidencias registradas</span>
-              <strong>38</strong>
-              <p>9 pendientes por validar</p>
-            </div>
-            <div>
-              <span>Informes generados</span>
-              <strong>3</strong>
-              <p>Seguimiento inicial disponible</p>
-            </div>
-          </div>
-
-          <div className="cyber-route">
-            {operatingRoute.map(([index, title, text]) => (
-              <article key={index}>
-                <span>{index}</span>
-                <div>
-                  <strong>{title}</strong>
-                  <p>{text}</p>
-                </div>
-                <CheckCircle2 size={17} />
-              </article>
-            ))}
-          </div>
-        </article>
-
-        <article className="cyber-panel">
-          <div className="cyber-panel-head">
+      <section className="grid gap-5 xl:grid-cols-[1fr_360px]">
+        <Card className="overflow-hidden">
+          <div className="section-toolbar">
             <div>
               <p className="eyebrow">Gestion ALMERA</p>
-              <h2>Estado operativo</h2>
+              <h2>Solicitudes recientes</h2>
             </div>
-            <Activity className="cyber-panel-icon" size={22} />
-          </div>
-
-          <div className="cyber-almera-state">
-            <div>
-              <span>Flujo documental</span>
-              <strong>Activo</strong>
-            </div>
-            <div>
-              <span>Trazabilidad</span>
-              <strong>Preparada</strong>
-            </div>
-            <div>
-              <span>Riesgo</span>
-              <strong>Bajo</strong>
+            <div className="section-actions">
+              <Link to="/app/modulos/almera"><Button><Plus size={16} /> Nuevo registro</Button></Link>
+              <Button variant="secondary"><Download size={16} /> Exportar</Button>
             </div>
           </div>
 
-          <Link to="/app/modulos/almera" className="cyber-button cyber-button-wide cyber-button-primary">
-            Gestionar solicitudes <Zap size={16} />
-          </Link>
-        </article>
-      </section>
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[820px]">
+              <thead>
+                <tr>
+                  <th>Solicitud</th>
+                  <th>Proceso / documento</th>
+                  <th>Tipo</th>
+                  <th>Responsable</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRecords.map(record => (
+                  <tr key={record.id}>
+                    <td>
+                      <strong className="block">{record.id}</strong>
+                      <span className="text-sm text-slate-400">{record.request}</span>
+                    </td>
+                    <td>
+                      <strong className="block">{record.process}</strong>
+                      <span className="text-sm text-slate-400">{record.document}</span>
+                    </td>
+                    <td><Badge tone="accent">{ALMERA_TYPE_LABELS[record.managementType]}</Badge></td>
+                    <td>{record.responsible}</td>
+                    <td><StatusBadge status={ALMERA_STATUS_LABELS[record.status]} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
-      <section className="cyber-grid cyber-grid-bottom">
-        <article className="cyber-panel">
-          <div className="cyber-panel-head">
+        <Card className="p-5">
+          <div className="section-toolbar compact">
             <div>
-              <p className="eyebrow">Accesos rapidos</p>
-              <h2>Rutas clave</h2>
+              <p className="eyebrow">Actividad</p>
+              <h2>Reciente</h2>
             </div>
-            <Sparkles className="cyber-panel-icon" size={22} />
+            <Badge tone="info">{recentActivities.length}</Badge>
           </div>
-          <div className="cyber-link-list">
-            <QuickLink to="/app/modulos/almera" icon={<FileText size={18} />} title="Gestion ALMERA" text="Solicitudes, estados, evidencias y soportes" />
-            {canAdmin && <QuickLink to="/app/administracion/users" icon={<LockKeyhole size={18} />} title="Usuarios y permisos" text="Roles, accesos y entidad activa" />}
-            <QuickLink to="/app/modulos/reports" icon={<Route size={18} />} title="Informes" text="Seguimiento ejecutivo y trazabilidad" />
-          </div>
-        </article>
-
-        <article className="cyber-panel cyber-panel-large">
-          <div className="cyber-panel-head">
-            <div>
-              <p className="eyebrow">Bitacora reciente</p>
-              <h2>Ultimas actividades</h2>
-            </div>
-            <Badge tone="info">{recentActivities.length} eventos</Badge>
-          </div>
-
-          <div className="cyber-activity-list">
+          <div className="activity-list">
             {recentActivities.map(activity => (
               <article key={activity.id}>
                 <div>
@@ -196,21 +129,14 @@ export default function DashboardPage() {
               </article>
             ))}
           </div>
-        </article>
+        </Card>
+      </section>
+
+      <section className="quick-row">
+        <Link to="/app/modulos/almera" className="quick-card"><FileText size={18} /><span><strong>Gestion ALMERA</strong><small>Solicitudes y evidencias</small></span></Link>
+        {canAdmin && <Link to="/app/administracion/users" className="quick-card"><Users size={18} /><span><strong>Usuarios y roles</strong><small>Acceso y permisos</small></span></Link>}
+        <Link to="/app/modulos/reports" className="quick-card"><FileText size={18} /><span><strong>Informes</strong><small>Seguimiento institucional</small></span></Link>
       </section>
     </div>
-  )
-}
-
-function QuickLink({ to, icon, title, text }: { to: string; icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <Link to={to} className="cyber-quick-link">
-      <span>{icon}</span>
-      <div>
-        <strong>{title}</strong>
-        <p>{text}</p>
-      </div>
-      <ArrowUpRight size={16} />
-    </Link>
   )
 }
