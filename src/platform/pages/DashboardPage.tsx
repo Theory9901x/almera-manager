@@ -1,127 +1,202 @@
-import { ArrowUpRight, CheckCircle2, FileText, Route, ShieldCheck, Users } from 'lucide-react'
+import {
+  Activity,
+  ArrowUpRight,
+  CheckCircle2,
+  FileText,
+  LockKeyhole,
+  Radar,
+  Route,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  Zap,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { recentActivities } from '@/shared/services/activityService'
-import { Badge, Card, PageHeader, StatusBadge } from '@/shared/ui'
+import { Badge, StatusBadge } from '@/shared/ui'
 
 const executiveMetrics = [
-  ['Usuarios activos', '18', 'Roles y consulta controlados', 'success'],
-  ['Modulos activos', '7', 'Base inicial habilitada', 'info'],
-  ['ALMERA mes', '24', 'Actividades registradas', 'accent'],
+  ['Usuarios activos', '18', 'Acceso RBAC controlado', 'success'],
+  ['ALMERA mes', '24', 'Solicitudes documentales', 'accent'],
   ['Pendientes', '7', 'Requieren revision', 'warning'],
+  ['Cerradas', '9', 'Con evidencia registrada', 'info'],
 ] as const
 
 const operatingRoute = [
-  ['01', 'Registrar solicitud', 'Ingreso de necesidad documental, proceso y responsable'],
-  ['02', 'Gestionar evidencia', 'Carga de soporte, observaciones y estado operativo'],
-  ['03', 'Revisar cierre', 'Validacion administrativa y cierre con trazabilidad'],
-  ['04', 'Generar informe', 'Salida basica para seguimiento institucional'],
+  ['01', 'Registrar', 'Solicitud documental, proceso y responsable'],
+  ['02', 'Evidenciar', 'Soportes, observaciones y actividad realizada'],
+  ['03', 'Validar', 'Revision administrativa y trazabilidad'],
+  ['04', 'Cerrar', 'Informe y control institucional'],
 ]
 
 export default function DashboardPage() {
   const { session } = useAuth()
   if (!session) return null
+
   const workModules = session.modules.filter(module => !['dashboard'].includes(module.key))
   const canAdmin = session.permissions.includes('admin.view') || session.modules.some(module => module.key === 'admin')
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader
-        eyebrow={session.organization.name}
-        title="Centro de mando SGIMR"
-        description="Control administrativo, accesos, gestion ALMERA y trazabilidad operativa en una sola vista."
-        actions={<><Badge tone="success">Sistema operativo</Badge><Badge tone="accent">{session.role.name}</Badge></>}
-      />
+    <div className="cyber-dashboard mx-auto max-w-7xl">
+      <section className="cyber-hero">
+        <div className="cyber-scanline" />
+        <div className="cyber-hero-copy">
+          <div className="cyber-kicker"><Radar size={14} /> {session.organization.name}</div>
+          <h1>Centro de mando SGIMR</h1>
+          <p>
+            Panel administrativo rojo/negro para controlar Gestion ALMERA, usuarios,
+            roles, evidencias y seguimiento operativo sin saturar la pantalla.
+          </p>
+          <div className="cyber-actions">
+            <Link to="/app/modulos/almera" className="cyber-button cyber-button-primary">
+              Abrir ALMERA <ArrowUpRight size={16} />
+            </Link>
+            {canAdmin && (
+              <Link to="/app/administracion/users" className="cyber-button cyber-button-secondary">
+                Usuarios y roles <Users size={16} />
+              </Link>
+            )}
+          </div>
+        </div>
 
-      <section className="metric-strip">
+        <div className="cyber-hero-status">
+          <div className="cyber-status-core">
+            <ShieldCheck size={34} />
+            <span>Online</span>
+            <strong>SGIMR</strong>
+          </div>
+          <div className="cyber-status-grid">
+            <span>Rol</span>
+            <strong>{session.role.name}</strong>
+            <span>Modulos</span>
+            <strong>{workModules.length}</strong>
+            <span>Permisos</span>
+            <strong>{session.permissions.length}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="cyber-metrics">
         {executiveMetrics.map(([label, value, detail, tone]) => (
-          <article key={label} className={`stat-card tone-${tone}`}>
-            <p>{label}</p>
-            <strong>{label === 'Modulos activos' ? workModules.length : value}</strong>
-            <span>{detail}</span>
+          <article key={label} className={`cyber-metric tone-${tone}`}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <p>{detail}</p>
           </article>
         ))}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
-        <Card className="p-6">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <section className="cyber-grid">
+        <article className="cyber-panel cyber-panel-large">
+          <div className="cyber-panel-head">
             <div>
-              <p className="eyebrow">Estado general</p>
-              <h2 className="mt-1 text-2xl font-black">Gestion institucional activa</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">La consola concentra usuarios, modulos habilitados, solicitudes ALMERA, evidencias, pendientes e informes basicos.</p>
+              <p className="eyebrow">Resumen principal</p>
+              <h2>Gestion institucional activa</h2>
             </div>
-            <ShieldCheck className="text-[#56D6C9]" />
+            <Badge tone="success">Sistema operativo</Badge>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              ['Solicitudes documentales', '12', '4 en revision'],
-              ['Cerradas', '9', '75% con evidencia'],
-              ['Informes generados', '3', 'Seguimiento basico'],
-              ['Evidencias registradas', '38', '9 por validar'],
-              ['Estado sistema', 'Estable', 'Sin alertas criticas'],
-              ['Ruta operativa', '4 fases', 'Registro a informe'],
-            ].map(([label, value, detail]) => (
-              <div key={label} className="rounded-xl border border-white/10 bg-white/[.035] p-4">
-                <p className="font-mono text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</p>
-                <strong className="mt-3 block text-2xl font-black">{value}</strong>
-                <span className="mt-1 block text-sm text-slate-400">{detail}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
 
-        <Card className="p-6">
-          <p className="eyebrow">Ruta operativa</p>
-          <div className="route-line mt-5">
+          <div className="cyber-summary">
+            <div>
+              <span>Solicitudes documentales</span>
+              <strong>12</strong>
+              <p>4 en revision administrativa</p>
+            </div>
+            <div>
+              <span>Evidencias registradas</span>
+              <strong>38</strong>
+              <p>9 pendientes por validar</p>
+            </div>
+            <div>
+              <span>Informes generados</span>
+              <strong>3</strong>
+              <p>Seguimiento inicial disponible</p>
+            </div>
+          </div>
+
+          <div className="cyber-route">
             {operatingRoute.map(([index, title, text]) => (
               <article key={index}>
-                <span className="route-index">{index}</span>
-                <span>
-                  <strong className="block">{title}</strong>
-                  <small className="text-slate-400">{text}</small>
-                </span>
-                <CheckCircle2 className="text-[#56D6C9]" size={18} />
+                <span>{index}</span>
+                <div>
+                  <strong>{title}</strong>
+                  <p>{text}</p>
+                </div>
+                <CheckCircle2 size={17} />
               </article>
             ))}
           </div>
-        </Card>
+        </article>
+
+        <article className="cyber-panel">
+          <div className="cyber-panel-head">
+            <div>
+              <p className="eyebrow">Gestion ALMERA</p>
+              <h2>Estado operativo</h2>
+            </div>
+            <Activity className="cyber-panel-icon" size={22} />
+          </div>
+
+          <div className="cyber-almera-state">
+            <div>
+              <span>Flujo documental</span>
+              <strong>Activo</strong>
+            </div>
+            <div>
+              <span>Trazabilidad</span>
+              <strong>Preparada</strong>
+            </div>
+            <div>
+              <span>Riesgo</span>
+              <strong>Bajo</strong>
+            </div>
+          </div>
+
+          <Link to="/app/modulos/almera" className="cyber-button cyber-button-wide cyber-button-primary">
+            Gestionar solicitudes <Zap size={16} />
+          </Link>
+        </article>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
-        <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="eyebrow">Accesos rapidos</p>
-            <ArrowUpRight className="text-slate-500" size={18} />
-          </div>
-          <div className="grid gap-3">
-            <QuickLink to="/app/modulos/almera" icon={<FileText size={18} />} title="Gestion ALMERA" text="Solicitudes, documentos, estados y evidencias" />
-            {canAdmin && <QuickLink to="/app/administracion/users" icon={<Users size={18} />} title="Usuarios, roles y permisos" text="Control de acceso y entidad activa" />}
-            <QuickLink to="/app/modulos/reports" icon={<Route size={18} />} title="Informes basicos" text="Seguimiento inicial y trazabilidad" />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
+      <section className="cyber-grid cyber-grid-bottom">
+        <article className="cyber-panel">
+          <div className="cyber-panel-head">
             <div>
-              <p className="eyebrow">Bitacora</p>
-              <h2 className="mt-1 text-xl font-black">Ultimas actividades</h2>
+              <p className="eyebrow">Accesos rapidos</p>
+              <h2>Rutas clave</h2>
+            </div>
+            <Sparkles className="cyber-panel-icon" size={22} />
+          </div>
+          <div className="cyber-link-list">
+            <QuickLink to="/app/modulos/almera" icon={<FileText size={18} />} title="Gestion ALMERA" text="Solicitudes, estados, evidencias y soportes" />
+            {canAdmin && <QuickLink to="/app/administracion/users" icon={<LockKeyhole size={18} />} title="Usuarios y permisos" text="Roles, accesos y entidad activa" />}
+            <QuickLink to="/app/modulos/reports" icon={<Route size={18} />} title="Informes" text="Seguimiento ejecutivo y trazabilidad" />
+          </div>
+        </article>
+
+        <article className="cyber-panel cyber-panel-large">
+          <div className="cyber-panel-head">
+            <div>
+              <p className="eyebrow">Bitacora reciente</p>
+              <h2>Ultimas actividades</h2>
             </div>
             <Badge tone="info">{recentActivities.length} eventos</Badge>
           </div>
-          <div className="space-y-3">
+
+          <div className="cyber-activity-list">
             {recentActivities.map(activity => (
-              <article key={activity.id} className="rounded-xl border border-white/10 bg-[#070B10]/55 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <article key={activity.id}>
+                <div>
                   <strong>{activity.action}</strong>
-                  <StatusBadge status={activity.status} />
+                  <p>{activity.description}</p>
+                  <span>{activity.module} / {activity.user}</span>
                 </div>
-                <p className="mt-2 text-sm text-slate-400">{activity.description}</p>
-                <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-slate-500">{activity.module} / {activity.user}</p>
+                <StatusBadge status={activity.status} />
               </article>
             ))}
           </div>
-        </Card>
+        </article>
       </section>
     </div>
   )
@@ -129,13 +204,13 @@ export default function DashboardPage() {
 
 function QuickLink({ to, icon, title, text }: { to: string; icon: React.ReactNode; title: string; text: string }) {
   return (
-    <Link to={to} className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.035] p-4 transition hover:border-[#B3263A]/50 hover:bg-[#B3263A]/10">
-      <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#56D6C9]/10 text-[#56D6C9]">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <strong className="block">{title}</strong>
-        <span className="block truncate text-sm text-slate-400">{text}</span>
-      </span>
-      <ArrowUpRight className="text-slate-600 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#56D6C9]" size={17} />
+    <Link to={to} className="cyber-quick-link">
+      <span>{icon}</span>
+      <div>
+        <strong>{title}</strong>
+        <p>{text}</p>
+      </div>
+      <ArrowUpRight size={16} />
     </Link>
   )
 }
