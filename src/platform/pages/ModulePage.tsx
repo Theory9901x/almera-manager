@@ -1,0 +1,131 @@
+import { Download, FilePlus2, Filter, Plus } from 'lucide-react'
+import { Navigate, useParams } from 'react-router-dom'
+import { useAuth } from '@/platform/auth/AuthContext'
+import { ALMERA_STATUS_LABELS, ALMERA_TYPE_LABELS } from '@/modules/almera/constants'
+import { listAlmeraRecords } from '@/modules/almera/services/almeraService'
+import type { AlmeraRecord } from '@/modules/almera/types'
+import { Badge, Button, Card, Field, PageHeader, SearchBox, StatCard, StatusBadge } from '@/shared/ui'
+import { useEffect, useMemo, useState } from 'react'
+
+export default function ModulePage() {
+  const { moduleKey } = useParams()
+  const { session } = useAuth()
+  const module = session?.modules.find(item => item.key === moduleKey)
+  if (!module) return <Navigate to="/app" replace />
+  if (module.key !== 'almera') return <GenericModule module={module} />
+  return <AlmeraPage />
+}
+
+function AlmeraPage() {
+  const [records, setRecords] = useState<AlmeraRecord[]>([])
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('ALL')
+
+  useEffect(() => { void listAlmeraRecords().then(setRecords) }, [])
+
+  const filtered = useMemo(() => records.filter(record => {
+    const text = `${record.id} ${record.request} ${record.process} ${record.document} ${record.responsible}`.toLowerCase()
+    return text.includes(query.toLowerCase()) && (status === 'ALL' || record.status === status)
+  }), [records, query, status])
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        eyebrow="Modulo central"
+        title="Gestion ALMERA"
+        description="Bandeja inicial para solicitudes documentales, documentos gestionados, procesos institucionales, evidencias, responsables, estados y seguimiento."
+        actions={<><Button><Plus size={16} /> Nuevo registro</Button><Button variant="secondary"><Download size={16} /> Exportar</Button></>}
+      />
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Solicitudes" value={records.length} detail="Registros temporales listos para API" tone="info" />
+        <StatCard label="En revision" value={records.filter(item => item.status === 'IN_REVIEW').length} detail="Requieren validacion" tone="warning" />
+        <StatCard label="Cerradas" value={records.filter(item => item.status === 'CLOSED' || item.status === 'APPROVED').length} detail="Con trazabilidad" tone="success" />
+        <StatCard label="Devueltas" value={records.filter(item => item.status === 'RETURNED').length} detail="Con observaciones" tone="danger" />
+      </section>
+
+      <Card className="p-5">
+        <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+          <SearchBox value={query} onChange={setQuery} placeholder="Buscar por solicitud, proceso, documento o responsable" />
+          <select className="input" value={status} onChange={event => setStatus(event.target.value)}>
+            <option value="ALL">Todos los estados</option>
+            {Object.entries(ALMERA_STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <Button variant="secondary"><Filter size={16} /> Filtrar</Button>
+        </div>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="border-b border-white/10 p-5">
+          <p className="eyebrow">Bandeja de trabajo</p>
+          <h2 className="mt-1 text-xl font-black">Registros de gestion</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="data-table min-w-[980px]">
+            <thead>
+              <tr>
+                <th>Solicitud</th>
+                <th>Proceso / documento</th>
+                <th>Tipo</th>
+                <th>Responsable</th>
+                <th>Fechas</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(record => (
+                <tr key={record.id}>
+                  <td>
+                    <strong className="block">{record.id}</strong>
+                    <span className="mt-1 block text-sm text-slate-400">{record.request}</span>
+                  </td>
+                  <td>
+                    <strong className="block">{record.process}</strong>
+                    <span className="mt-1 block text-sm text-slate-400">{record.document}</span>
+                  </td>
+                  <td><Badge tone="accent">{ALMERA_TYPE_LABELS[record.managementType]}</Badge></td>
+                  <td>{record.responsible}</td>
+                  <td><span className="font-mono text-xs text-slate-400">{record.registeredAt}{record.closedAt ? ` / ${record.closedAt}` : ''}</span></td>
+                  <td><StatusBadge status={ALMERA_STATUS_LABELS[record.status]} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
+        <Card className="p-5">
+          <p className="eyebrow">Registro rapido</p>
+          <h2 className="mt-1 text-xl font-black">Formulario preparado</h2>
+          <div className="mt-5 grid gap-4">
+            <Field label="Solicitud documental"><input placeholder="Ej. Actualizacion de procedimiento institucional" /></Field>
+            <Field label="Tipo de gestion"><select>{Object.entries(ALMERA_TYPE_LABELS).map(([key, label]) => <option key={key}>{label}</option>)}</select></Field>
+            <Field label="Observaciones"><textarea placeholder="Resumen de soporte, evidencia o decision administrativa" /></Field>
+            <Button><FilePlus2 size={16} /> Registrar gestion</Button>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <p className="eyebrow">Modelo de datos</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {['Solicitudes documentales', 'Documentos cargados', 'Procesos institucionales', 'Actividades de acompanamiento', 'Evidencias o soportes', 'Informes de seguimiento', 'Estados de gestion', 'Responsables y fechas'].map(item => (
+              <div key={item} className="rounded-xl border border-white/10 bg-white/[.035] p-4 text-sm font-bold text-slate-300">{item}</div>
+            ))}
+          </div>
+        </Card>
+      </section>
+    </div>
+  )
+}
+
+function GenericModule({ module }: { module: { name: string; description: string } }) {
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader eyebrow="Modulo preparado" title={module.name} description={module.description} actions={<Badge tone="info">Fase inicial</Badge>} />
+      <Card className="p-8">
+        <h2 className="text-xl font-black">Estructura lista para crecimiento gradual</h2>
+        <p className="mt-3 max-w-3xl text-slate-400">Este espacio queda conectado a navegacion, permisos y catalogo modular. La siguiente fase puede agregar tablas, formularios y servicios propios sin reescribir la base administrativa.</p>
+      </Card>
+    </div>
+  )
+}

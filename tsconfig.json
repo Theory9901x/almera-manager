@@ -13,5 +13,5 @@
     "ignoreDeprecations": "5.0",
     "allowArbitraryExtensions": true
   },
-  "include": ["src", "electron", "db"]
+  "include": ["src/main.tsx", "src/App.tsx", "src/platform", "src/shared", "src/modules/almera", "vite.config.ts"]
 }

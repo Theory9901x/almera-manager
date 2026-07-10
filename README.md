@@ -1,113 +1,65 @@
-# Almera Manager
+# SGIMR
 
-App de escritorio para la gestión profesional de la plataforma Almera.
-Construida con **Electron + React + TypeScript + SQLite**.
+Sistema de Gestion Integral Modular para centralizar procesos de una entidad con
+acceso por organizacion, usuario, rol, permiso y modulo.
 
----
+## Arquitectura
 
-## Requisitos previos
+- React + TypeScript + Vite para la experiencia web.
+- Node.js + Express para la API.
+- PostgreSQL para datos transaccionales y control de acceso.
+- Sesiones seguras mediante cookie `HttpOnly`; en la base solo se almacena el hash del token.
+- PM2 para ejecutar la aplicacion en el VPS.
+- Proxy web existente del VPS para publicar `sgimr.cloud` con HTTPS.
 
-- Node.js 18 o superior
-- npm 9+
-- Windows 10+ / macOS 12+ / Ubuntu 20+
+## Fase actual
 
----
+La fase 1 implementa el nucleo de identidad y modularidad:
 
-## Instalación y arranque
+- login;
+- organizaciones;
+- usuarios y membresias;
+- roles y permisos;
+- catalogo de modulos;
+- modulos habilitados por entidad;
+- modulos asignados por rol;
+- administracion desde la interfaz web.
+
+Consulta [docs/FASE-1-NUCLEO.md](docs/FASE-1-NUCLEO.md) para el alcance y el
+despliegue.
+
+## Desarrollo
+
+Requiere Node.js 24 LTS y PostgreSQL 16+.
 
 ```bash
-# 1. Instalar dependencias
 npm install
-
-# 2. Arrancar en modo desarrollo
 npm run dev
 ```
 
-La app abre automáticamente en una ventana de escritorio.
+Variables minimas:
 
----
-
-## Comandos disponibles
-
-| Comando | Descripción |
-|---------|-------------|
-| `npm run dev` | Modo desarrollo con hot reload |
-| `npm run build` | Compilar para producción |
-| `npm run package` | Generar instalador (.exe / .dmg) |
-
----
-
-## Estructura del proyecto
-
-```
-almera-manager/
-├── electron/           # Proceso principal Electron
-│   ├── main.ts         # Ventana, ciclo de vida, registro IPC
-│   ├── preload.ts      # Bridge seguro React ↔ Electron
-│   └── ipc/            # Handlers por módulo
-│       ├── periodos.ts
-│       ├── gestion.ts
-│       ├── evidencias.ts
-│       ├── tareas.ts
-│       ├── actividades.ts
-│       ├── notificaciones.ts
-│       └── informes.ts
-│
-├── src/                # Interfaz React
-│   ├── App.tsx
-│   ├── main.tsx
-│   ├── index.css
-│   ├── modules/        # Una carpeta por pantalla
-│   │   ├── dashboard/
-│   │   ├── gestion/
-│   │   ├── evidencias/
-│   │   ├── tareas/
-│   │   ├── informes/
-│   │   └── notificaciones/
-│   ├── components/     # Sidebar, Header, Badge, MonthPicker
-│   ├── store/          # Estado global Zustand
-│   └── types/          # Tipos TypeScript + declaración window.api
-│
-├── db/
-│   ├── schema.sql      # Definición de tablas SQLite
-│   └── database.ts     # Conexión better-sqlite3
-│
-└── public/             # Iconos y assets estáticos
+```env
+DATABASE_URL=postgresql://sgimr:sgimr_dev@127.0.0.1:5432/sgimr
+PUBLIC_ORIGIN=http://localhost:3000
 ```
 
----
+La API aplica el esquema y crea la organizacion inicial al arrancar. En desarrollo,
+la cuenta inicial predeterminada es `admin@sgimr.cloud` con contrasena temporal
+`Admin1234!`; debe cambiarse antes de usar datos reales.
 
-## Dónde se guarda la base de datos
-
-El archivo `almera.db` se guarda en la carpeta de datos del sistema:
-
-- **Windows:** `%APPDATA%\almera-manager\almera.db`
-- **macOS:** `~/Library/Application Support/almera-manager/almera.db`
-- **Linux:** `~/.config/almera-manager/almera.db`
-
-Las evidencias (archivos copiados) se guardan en:
-`<userData>/evidencias/`
-
----
-
-## Módulos implementados
-
-| Módulo | Descripción |
-|--------|-------------|
-| **Dashboard** | Métricas del período activo |
-| **Gestión** | Indicadores + planes de mejora |
-| **Evidencias** | Carga de archivos con drag & drop |
-| **Tareas** | Tablero Kanban con alertas de vencimiento |
-| **Informes** | Exportación PDF y Excel |
-| **Notificaciones** | Historial de alertas del sistema |
-
----
-
-## Generar instalador
+## Verificacion
 
 ```bash
-# Windows (.exe instalador)
-npm run package:win
-
-# El instalador queda en /release
+npm run check
+npm run build
 ```
+
+## Produccion
+
+SGIMR se despliega en el VPS como aplicacion Node.js administrada por PM2, escuchando
+en `127.0.0.1:3100`. El proxy existente del VPS debe enrutar `sgimr.cloud` hacia ese
+puerto interno.
+
+El flujo automatizado de GitHub esta descrito en
+[docs/DESPLIEGUE-GITHUB.md](docs/DESPLIEGUE-GITHUB.md).

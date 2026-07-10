@@ -1,0 +1,82 @@
+name: Publicar SGIMR
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sgimr-production
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Revisar tipos
+        run: npm run check
+      - name: Compilar aplicacion
+        run: npm run build
+      - name: Empaquetar release
+        run: |
+          mkdir -p release
+          cp -R dist server package.json package-lock.json ecosystem.config.cjs release/
+          tar -czf sgimr-release.tgz -C release .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sgimr-release
+          path: sgimr-release.tgz
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sgimr-release
+      - name: Configurar acceso SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Copiar release
+        run: |
+          scp sgimr-release.tgz "$VPS_USER@$VPS_HOST:/tmp/sgimr-release.tgz"
+      - name: Actualizar aplicacion
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" '
+            set -eu
+            test -f /opt/sgimr/shared/.env
+            release="/opt/sgimr/releases/${{ github.sha }}"
+            mkdir -p "$release" /opt/sgimr/shared
+            tar -xzf /tmp/sgimr-release.tgz -C "$release"
+            ln -sfn /opt/sgimr/shared/.env "$release/.env"
+            cd "$release"
+            npm ci --omit=dev
+            ln -sfn "$release" /opt/sgimr/current
+            cd /opt/sgimr/current
+            pm2 startOrReload ecosystem.config.cjs --env production
+            pm2 save
+          '
+      - name: Verificar publicacion
+        run: curl --fail --retry 12 --retry-delay 5 https://sgimr.cloud/api/health

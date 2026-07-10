@@ -1,0 +1,29 @@
+name: Validar SGIMR
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v7
+      - name: Configurar Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Revisar tipos
+        run: npm run check
+      - name: Compilar aplicacion
+        run: npm run build
+      - name: Auditar dependencias de produccion
+        run: npm audit --omit=dev

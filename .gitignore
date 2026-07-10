@@ -6,3 +6,21 @@ release/
 *.db-shm
 *.db-wal
 .env
+
+# Código de escritorio anterior conservado solo en el equipo local
+/electron/
+/db/
+/out/
+/src/components/
+/src/lib/
+/src/modules/
+!/src/modules/
+!/src/modules/almera/
+!/src/modules/almera/**
+/src/store/
+/src/types/
+/electron-builder.json
+/electron.vite.config.ts
+/errores.txt
+/.sgimr-index
+/.tmp-deploy-redesign.sh
