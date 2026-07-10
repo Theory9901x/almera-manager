@@ -2,9 +2,9 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck,
   FileBarChart2, Headphones, HeartPulse, LayoutDashboard, LogOut, Menu, Settings,
-  ShieldCheck, Signal, Users, X,
+  Moon, ShieldCheck, Signal, Sun, Users, X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { Badge } from '@/shared/ui'
 
@@ -27,6 +27,10 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  const [contentTheme, setContentTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark'
+    return window.localStorage.getItem('sgimr-content-theme') === 'light' ? 'light' : 'dark'
+  })
   if (!session) return null
   const currentModule = session.modules
     .slice()
@@ -37,6 +41,10 @@ export default function AppLayout() {
     await logout()
     navigate('/login', { replace: true })
   }
+
+  useEffect(() => {
+    window.localStorage.setItem('sgimr-content-theme', contentTheme)
+  }, [contentTheme])
 
   return (
     <div className="app-shell lg:flex">
@@ -90,7 +98,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="shell-main">
+      <div className={`shell-main ${contentTheme === 'light' ? 'content-light' : ''}`}>
         <header className="shell-header sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 px-4 py-3 lg:px-8">
           <button className="mr-3 rounded-xl p-2 text-slate-300 hover:bg-white/10 lg:hidden" onClick={() => setOpen(true)}><Menu size={20} /></button>
           <div className="min-w-0">
@@ -98,6 +106,14 @@ export default function AppLayout() {
             <p className="truncate text-sm text-slate-400">{currentModule?.description || 'Gestion de usuarios, roles, permisos y entidad activa'}</p>
           </div>
           <div className="hidden items-center gap-3 md:flex">
+            <button
+              type="button"
+              onClick={() => setContentTheme(contentTheme === 'light' ? 'dark' : 'light')}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.035] px-3 py-1.5 font-mono text-[11px] font-black uppercase tracking-wider text-slate-300 transition hover:bg-white/[.08]"
+            >
+              {contentTheme === 'light' ? <Moon size={13} /> : <Sun size={13} />}
+              {contentTheme === 'light' ? 'Vista oscura' : 'Vista clara'}
+            </button>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.035] px-3 py-1.5 font-mono text-[11px] font-black uppercase tracking-wider text-slate-300"><Signal size={13} /> SGIMR</span>
             <Badge tone="success">Sistema operativo</Badge>
             <Badge tone="accent">{session.role.name}</Badge>

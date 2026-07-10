@@ -168,6 +168,86 @@ button:disabled { cursor: not-allowed; }
 .route-line article { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.03); padding: 14px; }
 .route-index { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(179,38,58,.18); color: #ff9cab; font-family: var(--font-mono); font-size: 11px; font-weight: 950; }
 
+.content-light {
+  --border: rgba(9,19,33,.12);
+  --border-strong: rgba(9,19,33,.2);
+  --text: #101722;
+  --muted: #546173;
+  --muted-2: #7a8492;
+  color: var(--text);
+  background:
+    linear-gradient(rgba(9,19,33,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(9,19,33,.025) 1px, transparent 1px),
+    radial-gradient(circle at 20% 0, rgba(179,38,58,.09), transparent 32%),
+    linear-gradient(135deg, #f7f8fb, #eef2f6 58%, #f8fafc);
+  background-size: 48px 48px, 48px 48px, auto, auto;
+}
+.content-light .shell-header {
+  background: rgba(255,255,255,.86);
+  border-bottom-color: rgba(9,19,33,.1);
+}
+.content-light main { color: #101722; }
+.content-light .page-header h1,
+.content-light .ui-card h2,
+.content-light .ui-card h3,
+.content-light .ui-card strong,
+.content-light .data-table td,
+.content-light .route-line article strong {
+  color: #101722;
+}
+.content-light .page-header p:not(.eyebrow),
+.content-light .text-slate-400,
+.content-light .text-slate-500,
+.content-light .route-line small {
+  color: #5d6878 !important;
+}
+.content-light .ui-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,249,252,.98));
+  border-color: rgba(9,19,33,.12);
+  box-shadow: 0 18px 45px rgba(17,24,39,.08);
+}
+.content-light .ui-card::after { background: linear-gradient(135deg, rgba(255,255,255,.7), transparent 30%, rgba(179,38,58,.04)); }
+.content-light .stat-card,
+.content-light .metric-strip > article,
+.content-light .route-line article,
+.content-light .login-route div,
+.content-light .rounded-xl.border,
+.content-light .rounded-2xl.border {
+  background-color: rgba(255,255,255,.78);
+  border-color: rgba(9,19,33,.11);
+}
+.content-light .metric-strip {
+  border-color: rgba(9,19,33,.12);
+  background: rgba(9,19,33,.12);
+}
+.content-light .stat-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(244,247,251,.96));
+}
+.content-light .input,
+.content-light .ui-field input,
+.content-light .ui-field select,
+.content-light .ui-field textarea,
+.content-light .search-box {
+  background: rgba(255,255,255,.92);
+  border-color: rgba(9,19,33,.13);
+  color: #101722;
+}
+.content-light .search-box input { color: #101722; }
+.content-light .data-table th,
+.content-light .data-table td {
+  border-bottom-color: rgba(9,19,33,.1);
+}
+.content-light .data-table tr:hover td { background: rgba(139,30,45,.045); }
+.content-light .ui-button-secondary {
+  background: rgba(255,255,255,.88);
+  color: #101722;
+  border-color: rgba(9,19,33,.14);
+}
+.content-light .ui-badge:not(.tone-success):not(.tone-warning):not(.tone-danger):not(.tone-accent):not(.tone-info) {
+  color: #5d6878;
+  border-color: rgba(9,19,33,.13);
+}
+
 @media (max-width: 760px) {
   .page-header { align-items: flex-start; flex-direction: column; }
   .page-actions { width: 100%; }
