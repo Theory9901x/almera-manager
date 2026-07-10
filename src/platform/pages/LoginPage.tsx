@@ -1,21 +1,15 @@
 import { useState } from 'react'
 import {
-  ArrowRight, CheckCircle2, Eye, EyeOff, FileText, Fingerprint,
-  HeartPulse, LockKeyhole, Mail, Radar, ShieldCheck, UserCog,
+  ArrowRight, Check, Eye, EyeOff, Fingerprint, Layers3,
+  LockKeyhole, Mail, ShieldCheck, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/platform/auth/AuthContext'
-import { Button } from '@/shared/ui'
+import { BrandMark, Button } from '@/shared/ui'
 
-const controlPoints = [
-  ['Usuarios', 'Roles, permisos y estados de acceso'],
-  ['ALMERA', 'Solicitudes, evidencias y seguimiento'],
-  ['Entidad', 'ESE Salud Yopal y modulos activos'],
-]
-
-const accessSignals = [
-  ['RBAC', '4 roles base'],
-  ['Permisos', '13 controles'],
-  ['Sesion', 'Cookie segura'],
+const capabilities = [
+  ['Gestión centralizada', 'Usuarios, roles y módulos en un solo espacio.'],
+  ['Trazabilidad ALMERA', 'Solicitudes, evidencias y estados siempre visibles.'],
+  ['Acceso institucional', 'Permisos y sesiones protegidas por rol.'],
 ]
 
 export default function LoginPage() {
@@ -31,60 +25,26 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try { await login(email, password) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible iniciar sesion') }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible iniciar sesión') }
     finally { setLoading(false) }
   }
 
   return (
     <main className="login-screen">
-      <section className="login-intel">
-        <div className="login-grid" />
-        <div className="login-brand">
-          <div className="brand-mark"><HeartPulse size={24} /></div>
-          <div>
-            <p>SGIMR</p>
-            <span>Gestion ALMERA institucional</span>
-          </div>
-        </div>
-
-        <div className="login-command">
-          <div className="command-kicker"><Radar size={16} /> consola administrativa</div>
-          <h1>Centro de control para operar usuarios, roles y gestion ALMERA.</h1>
-          <p>
-            Una base oscura, seria y modular para administrar la entidad activa,
-            controlar accesos y preparar el crecimiento hacia auditorias, matrices,
-            indicadores, PAMEC, MIPG y evidencias.
-          </p>
-        </div>
-
-        <div className="login-matrix">
-          {controlPoints.map(([title, text], index) => (
-            <article key={title}>
-              <span>0{index + 1}</span>
-              <strong>{title}</strong>
-              <p>{text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
       <section className="login-access">
+        <div className="login-mobile-brand">
+          <BrandMark compact />
+          <div><strong>SGIMR</strong><span>Gestión integral modular</span></div>
+        </div>
+
         <div className="access-card">
           <div className="access-card-head">
             <div>
-              <p className="eyebrow">Acceso seguro</p>
-              <h2>Entrar a SGIMR</h2>
+              <p className="eyebrow">Bienvenido de nuevo</p>
+              <h1>Accede a tu espacio</h1>
+              <p>Gestiona la operación institucional desde una plataforma segura y unificada.</p>
             </div>
             <div className="access-shield"><ShieldCheck /></div>
-          </div>
-
-          <div className="access-signals">
-            {accessSignals.map(([label, value]) => (
-              <div key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
           </div>
 
           <form onSubmit={submit} className="access-form">
@@ -92,39 +52,71 @@ export default function LoginPage() {
               <span>Correo institucional</span>
               <div className="login-input">
                 <Mail size={18} />
-                <input autoComplete="email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="usuario@sgimr.cloud" />
+                <input autoComplete="email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="nombre@entidad.gov.co" />
               </div>
             </label>
 
             <label>
-              <span>Clave de acceso</span>
+              <span>Contraseña</span>
               <div className="login-input">
                 <LockKeyhole size={18} />
-                <input autoComplete="current-password" type={show ? 'text' : 'password'} required value={password} onChange={event => setPassword(event.target.value)} placeholder="Contrasena" />
-                <button type="button" aria-label="Mostrar contrasena" onClick={() => setShow(!show)}>
+                <input autoComplete="current-password" type={show ? 'text' : 'password'} required value={password} onChange={event => setPassword(event.target.value)} placeholder="Ingresa tu contraseña" />
+                <button type="button" aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setShow(!show)}>
                   {show ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </label>
 
+            <div className="login-options">
+              <label className="remember-option"><input type="checkbox" /> <span>Recordar acceso</span></label>
+              <button type="button">¿Olvidaste tu contraseña?</button>
+            </div>
+
             {error && <div className="access-error">{error}</div>}
 
             <Button disabled={!ready || loading} className="access-submit">
-              {loading ? 'Verificando credenciales...' : <>Ingresar al panel <ArrowRight size={17} /></>}
+              {loading ? 'Verificando credenciales...' : <>Ingresar a SGIMR <ArrowRight size={17} /></>}
             </Button>
           </form>
 
           <div className="access-foot">
-            <span><Fingerprint size={15} /> Sesion protegida</span>
-            <span><CheckCircle2 size={15} /> Entidad verificada</span>
+            <span><Fingerprint size={15} /> Sesión protegida</span>
+            <span><Check size={15} /> Acceso por roles</span>
           </div>
         </div>
 
-        <div className="login-route">
-          <div><UserCog size={17} /><span>Usuarios</span></div>
-          <div><FileText size={17} /><span>ALMERA</span></div>
-          <div><ShieldCheck size={17} /><span>Permisos</span></div>
+        <p className="login-copyright">© 2026 SGIMR · Plataforma institucional</p>
+      </section>
+
+      <section className="login-intel">
+        <div className="login-glow login-glow-one" />
+        <div className="login-glow login-glow-two" />
+        <div className="login-circuit" />
+
+        <div className="login-brand">
+          <BrandMark />
+          <div>
+            <p>SGIMR</p>
+            <span>Sistema de Gestión Integral Modular</span>
+          </div>
         </div>
+
+        <div className="login-command">
+          <div className="command-kicker"><Sparkles size={15} /> Plataforma institucional</div>
+          <h2>Todo el control.<br /><span>Una sola plataforma.</span></h2>
+          <p>Una experiencia moderna para coordinar la gestión, asegurar la trazabilidad y tomar mejores decisiones.</p>
+
+          <div className="login-capabilities">
+            {capabilities.map(([title, description]) => (
+              <article key={title}>
+                <span><Layers3 size={16} /></span>
+                <div><strong>{title}</strong><p>{description}</p></div>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="login-trust"><ShieldCheck size={16} /> Entorno seguro · Gestión confiable</div>
       </section>
     </main>
   )

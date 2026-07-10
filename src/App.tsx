@@ -8,7 +8,7 @@ import ModulePage from '@/platform/pages/ModulePage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
-  if (!ready) return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Cargando SGI MR...</div>
+  if (!ready) return <div className="app-loading"><span className="loading-orbit" />Cargando SGIMR...</div>
   if (!session) return <Navigate to="/login" replace />
   return <AppLayout />
 }
