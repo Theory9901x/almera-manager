@@ -49,7 +49,7 @@ jobs:
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
       VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: sgimr-release
       - name: Configurar acceso SSH
