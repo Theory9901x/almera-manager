@@ -1,4 +1,4 @@
-import { Download, FilePlus2, Filter, Plus } from 'lucide-react'
+import { Download, FilePlus2, Filter, Layers3, Plus } from 'lucide-react'
 import { Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { ALMERA_STATUS_LABELS, ALMERA_TYPE_LABELS } from '@/modules/almera/constants'
@@ -37,7 +37,7 @@ function AlmeraPage() {
         actions={<><Button><Plus size={16} /> Nuevo registro</Button><Button variant="secondary"><Download size={16} /> Exportar</Button></>}
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="metric-strip">
         <StatCard label="Solicitudes" value={records.length} detail="Registros temporales listos para API" tone="info" />
         <StatCard label="En revision" value={records.filter(item => item.status === 'IN_REVIEW').length} detail="Requieren validacion" tone="warning" />
         <StatCard label="Cerradas" value={records.filter(item => item.status === 'CLOSED' || item.status === 'APPROVED').length} detail="Con trazabilidad" tone="success" />
@@ -45,6 +45,13 @@ function AlmeraPage() {
       </section>
 
       <Card className="p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="eyebrow">Mesa de control</p>
+            <h2 className="mt-1 text-xl font-black">Filtrar gestion documental</h2>
+          </div>
+          <Badge tone="accent">ALMERA operativo</Badge>
+        </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
           <SearchBox value={query} onChange={setQuery} placeholder="Buscar por solicitud, proceso, documento o responsable" />
           <select className="input" value={status} onChange={event => setStatus(event.target.value)}>
@@ -56,9 +63,14 @@ function AlmeraPage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="border-b border-white/10 p-5">
-          <p className="eyebrow">Bandeja de trabajo</p>
-          <h2 className="mt-1 text-xl font-black">Registros de gestion</h2>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 p-5">
+          <div>
+            <p className="eyebrow">Bandeja de trabajo</p>
+            <h2 className="mt-1 text-xl font-black">Registros de gestion</h2>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.035] px-3 py-2 font-mono text-[11px] font-black uppercase tracking-wider text-slate-400">
+            <Layers3 size={14} /> {filtered.length} visibles
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="data-table min-w-[980px]">
@@ -97,7 +109,7 @@ function AlmeraPage() {
       <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
         <Card className="p-5">
           <p className="eyebrow">Registro rapido</p>
-          <h2 className="mt-1 text-xl font-black">Formulario preparado</h2>
+          <h2 className="mt-1 text-xl font-black">Nueva gestion documental</h2>
           <div className="mt-5 grid gap-4">
             <Field label="Solicitud documental"><input placeholder="Ej. Actualizacion de procedimiento institucional" /></Field>
             <Field label="Tipo de gestion"><select>{Object.entries(ALMERA_TYPE_LABELS).map(([key, label]) => <option key={key}>{label}</option>)}</select></Field>
@@ -106,7 +118,8 @@ function AlmeraPage() {
           </div>
         </Card>
         <Card className="p-5">
-          <p className="eyebrow">Modelo de datos</p>
+          <p className="eyebrow">Estructura preparada</p>
+          <h2 className="mt-1 text-xl font-black">Componentes del ciclo ALMERA</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {['Solicitudes documentales', 'Documentos cargados', 'Procesos institucionales', 'Actividades de acompanamiento', 'Evidencias o soportes', 'Informes de seguimiento', 'Estados de gestion', 'Responsables y fechas'].map(item => (
               <div key={item} className="rounded-xl border border-white/10 bg-white/[.035] p-4 text-sm font-bold text-slate-300">{item}</div>

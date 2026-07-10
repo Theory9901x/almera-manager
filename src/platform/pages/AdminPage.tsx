@@ -38,8 +38,8 @@ export default function AdminPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         eyebrow="Control central"
-        title="Administracion"
-        description="Usuarios, roles, permisos, modulos y datos base de la entidad activa."
+        title="Gobierno administrativo"
+        description="Usuarios, roles, permisos, modulos y entidad activa bajo una misma consola de control."
         actions={<Badge tone="accent">{session?.organization.name}</Badge>}
       />
       <nav className="flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.035] p-1.5">
@@ -77,7 +77,7 @@ function UsersPanel({ data, reload, done }: PanelProps) {
   return <div className="grid gap-6 xl:grid-cols-[.78fr_1.22fr]">
     <Card className="h-fit p-6">
       <form onSubmit={create}>
-        <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#56D6C9]/10 text-[#56D6C9]"><UserPlus size={19} /></div><div><h2 className="font-black">Nuevo usuario</h2><p className="text-xs text-slate-400">Cuenta, rol inicial y acceso de entidad</p></div></div>
+        <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#56D6C9]/10 text-[#56D6C9]"><UserPlus size={19} /></div><div><h2 className="font-black">Alta de usuario</h2><p className="text-xs text-slate-400">Cuenta, rol inicial y acceso de entidad</p></div></div>
         <div className="mt-6 space-y-4">
           <Field label="Nombre completo"><input required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></Field>
           <Field label="Correo"><input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
@@ -88,10 +88,19 @@ function UsersPanel({ data, reload, done }: PanelProps) {
       </form>
     </Card>
     <Card className="overflow-hidden">
-      <div className="grid gap-3 border-b border-white/10 p-5 lg:grid-cols-[1fr_180px_160px]">
-        <SearchBox value={query} onChange={setQuery} placeholder="Buscar usuario, correo o rol" />
-        <select className="input" value={role} onChange={event => setRole(event.target.value)}><option value="ALL">Todos los roles</option>{data.roles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-        <select className="input" value={active} onChange={event => setActive(event.target.value)}><option value="ALL">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select>
+      <div className="border-b border-white/10 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="eyebrow">Directorio de acceso</p>
+            <h2 className="mt-1 text-xl font-black">Usuarios de la entidad</h2>
+          </div>
+          <Badge tone="info">{users.length} visibles</Badge>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-[1fr_180px_160px]">
+          <SearchBox value={query} onChange={setQuery} placeholder="Buscar usuario, correo o rol" />
+          <select className="input" value={role} onChange={event => setRole(event.target.value)}><option value="ALL">Todos los roles</option>{data.roles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          <select className="input" value={active} onChange={event => setActive(event.target.value)}><option value="ALL">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="data-table min-w-[860px]">
@@ -113,14 +122,72 @@ function RolesPanel({ data, reload, done }: PanelProps) {
   useEffect(() => { setModuleIds((selected?.module_ids || []).map(String)); setPermissionIds((selected?.permission_ids || []).map(String)) }, [selectedId, data, selected])
   async function create(event: React.FormEvent) { event.preventDefault(); const role = await api.createRole({ name, description }) as AdminRole; setName(''); setDescription(''); await reload(); setSelectedId(String(role.id)); done('Rol creado; ahora configura sus accesos') }
   function toggle(list: string[], value: string, setter: (items: string[]) => void) { setter(list.includes(value) ? list.filter(id => id !== value) : [...list, value]) }
-  return <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-    <div className="space-y-5"><Card className="p-5"><form onSubmit={create}><h2 className="font-black">Crear rol</h2><div className="mt-4 space-y-3"><input required className="input" placeholder="Ej. Coordinador de calidad" value={name} onChange={e => setName(e.target.value)} /><textarea className="input min-h-20" placeholder="Responsabilidad del rol" value={description} onChange={e => setDescription(e.target.value)} /><Button className="w-full"><Plus size={15} /> Crear rol</Button></div></form></Card><Card className="p-2">{data.roles.map(role => <button key={role.id} onClick={() => setSelectedId(String(role.id))} className={`w-full rounded-xl p-3 text-left ${String(selectedId) === String(role.id) ? 'bg-[#B3263A] text-white' : 'hover:bg-white/[.06]'}`}><div className="flex items-center justify-between"><span className="text-sm font-bold">{role.name}</span>{role.system && <KeyRound size={13} className="text-[#56D6C9]" />}</div><p className="mt-1 text-xs text-slate-400">{role.user_count} usuarios</p></button>)}</Card></div>
-    {selected && <Card className="p-6"><div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Rol → permisos → modulos</p><h2 className="mt-1 text-xl font-black">{selected.name}</h2><p className="mt-1 text-sm text-slate-400">{selected.description || 'Sin descripcion'}</p></div>{selected.system && <Badge tone="info">Rol protegido</Badge>}</div>{selected.system ? <div className="mt-8 rounded-xl border border-white/10 bg-white/[.035] p-5 text-sm text-slate-400">El superadministrador conserva todos los modulos y permisos para evitar que la entidad quede sin administracion.</div> : <><AccessGroup title="Modulos visibles" description="Espacios que apareceran en el menu de este rol">{data.modules.filter(module => module.enabled).map(module => <CheckRow key={module.id} checked={moduleIds.includes(String(module.id))} onChange={() => toggle(moduleIds, String(module.id), setModuleIds)} title={module.name} description={module.description} />)}</AccessGroup><AccessGroup title="Permisos base" description="Acciones autorizadas para este rol">{data.permissions.map(permission => <CheckRow key={permission.id} checked={permissionIds.includes(String(permission.id))} onChange={() => toggle(permissionIds, String(permission.id), setPermissionIds)} title={permission.key} description={permission.description || permission.name} />)}</AccessGroup><Button onClick={async () => { await api.updateRoleAccess(String(selected.id), moduleIds, permissionIds); await reload(); done('Accesos del rol guardados') }} className="mt-6"><Save size={16} /> Guardar accesos</Button></>}</Card>}
-  </div>
+  return (
+    <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
+      <div className="space-y-5">
+        <Card className="p-5">
+          <form onSubmit={create}>
+            <p className="eyebrow">Matriz de autoridad</p>
+            <h2 className="mt-1 font-black">Crear rol</h2>
+            <div className="mt-4 space-y-3">
+              <input required className="input" placeholder="Ej. Coordinador de calidad" value={name} onChange={e => setName(e.target.value)} />
+              <textarea className="input min-h-20" placeholder="Responsabilidad del rol" value={description} onChange={e => setDescription(e.target.value)} />
+              <Button className="w-full"><Plus size={15} /> Crear rol</Button>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="p-2">
+          {data.roles.map(role => (
+            <button key={role.id} onClick={() => setSelectedId(String(role.id))} className={`w-full rounded-xl p-3 text-left ${String(selectedId) === String(role.id) ? 'bg-[#B3263A] text-white' : 'hover:bg-white/[.06]'}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold">{role.name}</span>
+                {role.system && <KeyRound size={13} className="text-[#56D6C9]" />}
+              </div>
+              <p className="mt-1 text-xs text-slate-400">{role.user_count} usuarios</p>
+            </button>
+          ))}
+        </Card>
+      </div>
+
+      {selected && (
+        <Card className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="eyebrow">Rol / permisos / modulos</p>
+              <h2 className="mt-1 text-xl font-black">{selected.name}</h2>
+              <p className="mt-1 text-sm text-slate-400">{selected.description || 'Sin descripcion'}</p>
+            </div>
+            {selected.system && <Badge tone="info">Rol protegido</Badge>}
+          </div>
+
+          {selected.system ? (
+            <div className="mt-8 rounded-xl border border-white/10 bg-white/[.035] p-5 text-sm text-slate-400">
+              El superadministrador conserva todos los modulos y permisos para evitar que la entidad quede sin administracion.
+            </div>
+          ) : (
+            <>
+              <AccessGroup title="Modulos visibles" description="Espacios que apareceran en el menu de este rol">
+                {data.modules.filter(module => module.enabled).map(module => (
+                  <CheckRow key={module.id} checked={moduleIds.includes(String(module.id))} onChange={() => toggle(moduleIds, String(module.id), setModuleIds)} title={module.name} description={module.description} />
+                ))}
+              </AccessGroup>
+              <AccessGroup title="Permisos base" description="Acciones autorizadas para este rol">
+                {data.permissions.map(permission => (
+                  <CheckRow key={permission.id} checked={permissionIds.includes(String(permission.id))} onChange={() => toggle(permissionIds, String(permission.id), setPermissionIds)} title={permission.key} description={permission.description || permission.name} />
+                ))}
+              </AccessGroup>
+              <Button onClick={async () => { await api.updateRoleAccess(String(selected.id), moduleIds, permissionIds); await reload(); done('Accesos del rol guardados') }} className="mt-6"><Save size={16} /> Guardar accesos</Button>
+            </>
+          )}
+        </Card>
+      )}
+    </div>
+  )
 }
 
 function ModulesPanel({ data, reload, done }: PanelProps) {
-  return <Card className="overflow-hidden"><div className="border-b border-white/10 p-6"><h2 className="font-black">Catalogo modular de la entidad</h2><p className="mt-1 text-sm text-slate-400">Un modulo habilitado puede asignarse a roles. Deshabilitarlo lo retira de la entidad.</p></div><div className="grid gap-4 p-6 md:grid-cols-2">{data.modules.map(module => <article key={module.id} className={`rounded-xl border p-5 ${module.enabled ? 'border-[#56D6C9]/24 bg-[#56D6C9]/[.055]' : 'border-white/10 bg-white/[.03] opacity-75'}`}><div className="flex items-start gap-4"><div className={`grid h-11 w-11 place-items-center rounded-xl ${module.enabled ? 'bg-[#56D6C9]/10 text-[#56D6C9]' : 'bg-white/[.06] text-slate-500'}`}><Settings size={19} /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><h3 className="font-black">{module.name}</h3><button disabled={module.key === 'admin'} aria-label={`Cambiar estado de ${module.name}`} onClick={async () => { await api.updateModule(String(module.id), !module.enabled); await reload(); done(`Modulo ${module.enabled ? 'deshabilitado' : 'habilitado'}`) }} className="disabled:cursor-not-allowed disabled:opacity-40">{module.enabled ? <ToggleRight className="text-[#56D6C9]" size={30} /> : <ToggleLeft className="text-slate-500" size={30} />}</button></div><p className="mt-2 text-sm leading-relaxed text-slate-400">{module.description}</p><p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">{module.key === 'admin' ? 'Esencial' : module.enabled ? 'Habilitado' : 'Deshabilitado'}</p></div></div></article>)}</div></Card>
+  return <Card className="overflow-hidden"><div className="border-b border-white/10 p-6"><h2 className="font-black">Catalogo operativo de modulos</h2><p className="mt-1 text-sm text-slate-400">Un modulo habilitado puede asignarse a roles. Deshabilitarlo lo retira de la entidad.</p></div><div className="grid gap-4 p-6 md:grid-cols-2">{data.modules.map(module => <article key={module.id} className={`rounded-xl border p-5 ${module.enabled ? 'border-[#56D6C9]/24 bg-[#56D6C9]/[.055]' : 'border-white/10 bg-white/[.03] opacity-75'}`}><div className="flex items-start gap-4"><div className={`grid h-11 w-11 place-items-center rounded-xl ${module.enabled ? 'bg-[#56D6C9]/10 text-[#56D6C9]' : 'bg-white/[.06] text-slate-500'}`}><Settings size={19} /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><h3 className="font-black">{module.name}</h3><button disabled={module.key === 'admin'} aria-label={`Cambiar estado de ${module.name}`} onClick={async () => { await api.updateModule(String(module.id), !module.enabled); await reload(); done(`Modulo ${module.enabled ? 'deshabilitado' : 'habilitado'}`) }} className="disabled:cursor-not-allowed disabled:opacity-40">{module.enabled ? <ToggleRight className="text-[#56D6C9]" size={30} /> : <ToggleLeft className="text-slate-500" size={30} />}</button></div><p className="mt-2 text-sm leading-relaxed text-slate-400">{module.description}</p><p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">{module.key === 'admin' ? 'Esencial' : module.enabled ? 'Habilitado' : 'Deshabilitado'}</p></div></div></article>)}</div></Card>
 }
 
 function EntityPanel({ data }: { data: AdminOverview }) {
