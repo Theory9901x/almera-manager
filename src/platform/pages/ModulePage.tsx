@@ -30,7 +30,7 @@ function AlmeraPage() {
   }), [records, query, status])
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="module-workspace module-workspace-almera mx-auto max-w-7xl space-y-6">
       <PageHeader
         eyebrow="Modulo central"
         title="Gestion ALMERA"
@@ -134,7 +134,7 @@ function AlmeraPage() {
 
 function GenericModule({ module }: { module: { name: string; description: string } }) {
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="module-workspace mx-auto max-w-7xl space-y-6">
       <PageHeader eyebrow="Modulo preparado" title={module.name} description={module.description} actions={<Badge tone="info">Fase inicial</Badge>} />
       <Card className="p-8">
         <h2 className="text-xl font-black">Estructura lista para crecimiento gradual</h2>
@@ -151,7 +151,7 @@ function ReportsPage() {
     ['INF-2026-Q2', 'Resumen institucional de evidencias', 'Trimestre II', 'En armado', '61%'],
   ]
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="module-workspace module-workspace-reports mx-auto max-w-7xl space-y-6">
       <PageHeader
         eyebrow="Informes basicos"
         title="Seguimiento e informes"

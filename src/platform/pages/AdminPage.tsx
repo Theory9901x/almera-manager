@@ -44,15 +44,15 @@ export default function AdminPage() {
 
   if (!canAdmin) return <Navigate to="/app" replace />
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="admin-workspace mx-auto max-w-7xl space-y-6">
       <PageHeader
         eyebrow="Control central"
         title="Gobierno administrativo"
         description="Usuarios, roles, permisos, modulos y entidad activa bajo una misma consola de control."
         actions={<Badge tone="accent">{session?.organization.name}</Badge>}
       />
-      <nav className="flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.035] p-1.5">
-        {availableTabs.map(({ id, Icon, label }) => <button key={id} onClick={() => navigate(`/app/administracion/${id}`)} className={`flex min-w-fit items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition ${tab === id ? 'bg-[#B3263A] text-white' : 'text-slate-400 hover:bg-white/[.06] hover:text-white'}`}><Icon size={16} />{label}</button>)}
+      <nav className="admin-tabs flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.035] p-1.5">
+        {availableTabs.map(({ id, Icon, label }) => <button key={id} onClick={() => navigate(`/app/administracion/${id}`)} className={`flex min-w-fit items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition ${tab === id ? 'is-active' : ''}`}><Icon size={16} />{label}</button>)}
       </nav>
       {notice && <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"><Check size={16} />{notice}</div>}
       {error && <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{error}</div>}
