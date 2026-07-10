@@ -1,4 +1,4 @@
-import { Download, FilePlus2, Filter, Layers3, Plus } from 'lucide-react'
+import { BarChart3, Download, FileBarChart2, FilePlus2, Filter, Layers3, Plus } from 'lucide-react'
 import { Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { ALMERA_STATUS_LABELS, ALMERA_TYPE_LABELS } from '@/modules/almera/constants'
@@ -12,8 +12,9 @@ export default function ModulePage() {
   const { session } = useAuth()
   const module = session?.modules.find(item => item.key === moduleKey)
   if (!module) return <Navigate to="/app" replace />
-  if (module.key !== 'almera') return <GenericModule module={module} />
-  return <AlmeraPage />
+  if (module.key === 'almera') return <AlmeraPage />
+  if (module.key === 'reports') return <ReportsPage />
+  return <GenericModule module={module} />
 }
 
 function AlmeraPage() {
@@ -139,6 +140,68 @@ function GenericModule({ module }: { module: { name: string; description: string
         <h2 className="text-xl font-black">Estructura lista para crecimiento gradual</h2>
         <p className="mt-3 max-w-3xl text-slate-400">Este espacio queda conectado a navegacion, permisos y catalogo modular. La siguiente fase puede agregar tablas, formularios y servicios propios sin reescribir la base administrativa.</p>
       </Card>
+    </div>
+  )
+}
+
+function ReportsPage() {
+  const reports = [
+    ['INF-2026-07', 'Seguimiento mensual ALMERA', 'Julio 2026', 'Borrador', '86%'],
+    ['INF-2026-06', 'Solicitudes documentales cerradas', 'Junio 2026', 'Listo', '100%'],
+    ['INF-2026-Q2', 'Resumen institucional de evidencias', 'Trimestre II', 'En armado', '61%'],
+  ]
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        eyebrow="Informes basicos"
+        title="Seguimiento e informes"
+        description="Vista inicial para consolidar actividades ALMERA, estados de gestion, evidencias e indicadores basicos."
+        actions={<Button><Download size={16} /> Generar informe</Button>}
+      />
+
+      <section className="metric-strip">
+        <StatCard label="Borradores" value="2" detail="Pendientes de revision" tone="warning" />
+        <StatCard label="Listos" value="5" detail="Disponibles para consulta" tone="success" />
+        <StatCard label="Indicador ALMERA" value="86%" detail="Avance mensual" tone="info" />
+        <StatCard label="Evidencias" value="38" detail="Registradas este mes" tone="accent" />
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1fr_360px]">
+        <Card className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 p-5">
+            <div>
+              <p className="eyebrow">Consolidado</p>
+              <h2 className="mt-1 text-xl font-black">Bandeja de informes</h2>
+            </div>
+            <Badge tone="info">{reports.length} registros</Badge>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[760px]">
+              <thead><tr><th>Codigo</th><th>Informe</th><th>Periodo</th><th>Estado</th><th>Avance</th></tr></thead>
+              <tbody>{reports.map(row => <tr key={row[0]}>{row.map((cell, index) => <td key={cell}>{index === 3 ? <StatusBadge status={cell} /> : index === 4 ? <span className="font-mono text-sm text-[#56D6C9]">{cell}</span> : cell}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <p className="eyebrow">Lectura ejecutiva</p>
+          <div className="mt-5 space-y-3">
+            {[
+              ['Solicitudes en revision', '4', FileBarChart2],
+              ['Pendientes de evidencia', '9', Layers3],
+              ['Cierre documental', '75%', BarChart3],
+            ].map(([label, value, Icon]) => (
+              <article key={label as string} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.035] p-4">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#56D6C9]/10 text-[#56D6C9]"><Icon size={18} /></span>
+                <span className="min-w-0 flex-1">
+                  <strong className="block">{value as string}</strong>
+                  <small className="text-slate-400">{label as string}</small>
+                </span>
+              </article>
+            ))}
+          </div>
+        </Card>
+      </section>
     </div>
   )
 }
