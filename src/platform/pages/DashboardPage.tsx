@@ -96,7 +96,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid gap-3">
             <QuickLink to="/app/modulos/almera" icon={<FileText size={18} />} title="Gestion ALMERA" text="Solicitudes, documentos, estados y evidencias" />
-            {canAdmin && <QuickLink to="/app/administracion" icon={<Users size={18} />} title="Usuarios, roles y permisos" text="Control de acceso y entidad activa" />}
+            {canAdmin && <QuickLink to="/app/administracion/users" icon={<Users size={18} />} title="Usuarios, roles y permisos" text="Control de acceso y entidad activa" />}
             <QuickLink to="/app/modulos/reports" icon={<Route size={18} />} title="Informes basicos" text="Seguimiento inicial y trazabilidad" />
           </div>
         </Card>

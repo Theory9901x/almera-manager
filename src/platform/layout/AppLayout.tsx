@@ -19,6 +19,7 @@ const icons = {
   'bar-chart': BarChart3,
   settings: Settings,
   users: Users,
+  building: Building2,
 }
 
 export default function AppLayout() {
@@ -66,7 +67,7 @@ export default function AppLayout() {
           {session.modules.map(module => {
             const Icon = icons[module.icon as keyof typeof icons] || Blocks
             return (
-              <NavLink key={module.id} to={module.route} end={module.key === 'dashboard'} onClick={() => setOpen(false)} className={({ isActive }) =>
+              <NavLink key={module.id} to={module.route} end={['dashboard', 'admin'].includes(module.key)} onClick={() => setOpen(false)} className={({ isActive }) =>
                 `group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm transition ${isActive ? 'border-[#B3263A]/70 bg-[#B3263A] text-white font-black shadow-lg shadow-black/25' : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/[.06] hover:text-white'}`
               }>
                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[.06] text-[#56D6C9] transition group-hover:bg-[#56D6C9] group-hover:text-slate-950"><Icon size={17} /></span>

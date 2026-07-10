@@ -21,6 +21,7 @@ function AppRoutes() {
       <Route path="/app" element={<ProtectedApp />}>
         <Route index element={<DashboardPage />} />
         <Route path="administracion" element={<AdminPage />} />
+        <Route path="administracion/:section" element={<AdminPage />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/app' : '/login'} replace />} />

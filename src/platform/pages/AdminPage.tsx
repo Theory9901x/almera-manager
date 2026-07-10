@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, KeyRound, Loader2, Plus, Save, Settings, Shield, ToggleLeft, ToggleRight, UserPlus, Users } from 'lucide-react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/platform/api'
 import { useAuth } from '@/platform/auth/AuthContext'
 import type { AdminOverview, AdminRole } from '@/platform/types'
 import { Badge, Button, Card, Field, PageHeader, SearchBox, StatusBadge } from '@/shared/ui'
 
-type Tab = 'users' | 'roles' | 'modules' | 'entity'
+type Tab = 'users' | 'roles' | 'modules' | 'entity' | 'settings'
+const tabKeys: Tab[] = ['users', 'roles', 'modules', 'entity', 'settings']
 
 export default function AdminPage() {
   const { session, refresh: refreshSession } = useAuth()
+  const { section } = useParams()
+  const navigate = useNavigate()
   const [data, setData] = useState<AdminOverview | null>(null)
-  const [tab, setTab] = useState<Tab>('users')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const routeTab = tabKeys.includes(section as Tab) ? section as Tab : 'users'
   const canUsers = Boolean(session?.permissions.some(item => ['users.view', 'users.create', 'users.edit', 'users.disable', 'users.manage'].includes(item)))
   const canRoles = Boolean(session?.permissions.some(item => ['roles.assign', 'roles.manage'].includes(item)))
   const canModules = Boolean(session?.permissions.some(item => ['settings.edit', 'modules.manage', 'organization.manage'].includes(item)))
@@ -22,15 +25,21 @@ export default function AdminPage() {
     canRoles && { id: 'roles' as Tab, Icon: Shield, label: 'Roles y permisos' },
     canModules && { id: 'modules' as Tab, Icon: Settings, label: 'Modulos' },
     canModules && { id: 'entity' as Tab, Icon: KeyRound, label: 'Entidad activa' },
+    canModules && { id: 'settings' as Tab, Icon: Settings, label: 'Configuracion' },
   ].filter(Boolean) as Array<{ id: Tab; Icon: typeof Users; label: string }>, [canUsers, canRoles, canModules])
   const canAdmin = session?.modules.some(module => module.key === 'admin') && availableTabs.length > 0
+  const tab = availableTabs.some(item => item.id === routeTab) ? routeTab : availableTabs[0]?.id
 
   async function load() {
     try { setError(''); setData(await api.adminOverview()) }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible cargar la administracion') }
   }
   useEffect(() => { if (canAdmin) void load() }, [canAdmin])
-  useEffect(() => { if (!availableTabs.some(item => item.id === tab) && availableTabs[0]) setTab(availableTabs[0].id) }, [availableTabs, tab])
+  useEffect(() => {
+    if (availableTabs[0] && (!section || !availableTabs.some(item => item.id === routeTab))) {
+      navigate(`/app/administracion/${availableTabs[0].id}`, { replace: true })
+    }
+  }, [availableTabs, navigate, routeTab, section])
   function done(message: string) { setNotice(message); setTimeout(() => setNotice(''), 2800) }
 
   if (!canAdmin) return <Navigate to="/app" replace />
@@ -43,7 +52,7 @@ export default function AdminPage() {
         actions={<Badge tone="accent">{session?.organization.name}</Badge>}
       />
       <nav className="flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.035] p-1.5">
-        {availableTabs.map(({ id, Icon, label }) => <button key={id} onClick={() => setTab(id)} className={`flex min-w-fit items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition ${tab === id ? 'bg-[#B3263A] text-white' : 'text-slate-400 hover:bg-white/[.06] hover:text-white'}`}><Icon size={16} />{label}</button>)}
+        {availableTabs.map(({ id, Icon, label }) => <button key={id} onClick={() => navigate(`/app/administracion/${id}`)} className={`flex min-w-fit items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition ${tab === id ? 'bg-[#B3263A] text-white' : 'text-slate-400 hover:bg-white/[.06] hover:text-white'}`}><Icon size={16} />{label}</button>)}
       </nav>
       {notice && <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"><Check size={16} />{notice}</div>}
       {error && <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -52,6 +61,7 @@ export default function AdminPage() {
         {tab === 'roles' && canRoles && <RolesPanel data={data} reload={load} done={done} />}
         {tab === 'modules' && canModules && <ModulesPanel data={data} reload={async () => { await load(); await refreshSession() }} done={done} />}
         {tab === 'entity' && canModules && <EntityPanel data={data} />}
+        {tab === 'settings' && canModules && <SettingsPanel data={data} />}
       </>}
     </div>
   )
@@ -193,6 +203,45 @@ function ModulesPanel({ data, reload, done }: PanelProps) {
 function EntityPanel({ data }: { data: AdminOverview }) {
   const activeModules = data.modules.filter(module => module.enabled)
   return <Card className="p-6"><p className="eyebrow">Entidad activa</p><h2 className="mt-1 text-2xl font-black">ESE Salud Yopal</h2><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{[['Tipo de entidad', 'ESE'], ['Administrador', 'Superadministrador'], ['Estado', 'Activa'], ['Modulos activos', String(activeModules.length)]].map(([label, value]) => <div key={label} className="rounded-xl border border-white/10 bg-white/[.035] p-4"><p className="font-mono text-[11px] uppercase tracking-wider text-slate-500">{label}</p><strong className="mt-2 block">{value}</strong></div>)}</div><div className="mt-6 flex flex-wrap gap-2">{activeModules.map(module => <Badge key={module.id} tone="info">{module.name}</Badge>)}</div></Card>
+}
+
+function SettingsPanel({ data }: { data: AdminOverview }) {
+  const adminPermissions = data.permissions.filter(permission => permission.key.includes('admin') || permission.key.includes('settings') || permission.key.includes('roles'))
+  return (
+    <div className="grid gap-6 xl:grid-cols-[.95fr_1.05fr]">
+      <Card className="p-6">
+        <p className="eyebrow">Configuracion base</p>
+        <h2 className="mt-1 text-2xl font-black">Parametros institucionales</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-400">Esta seccion deja preparado el punto de control para informacion de entidad, modulos activos, permisos sensibles y futuras integraciones de ALMERA.</p>
+        <div className="mt-6 grid gap-3">
+          {[
+            ['Entidad', 'ESE Salud Yopal'],
+            ['Origen', 'sgimr.cloud'],
+            ['Sesion', 'Cookie HttpOnly'],
+            ['Modo', 'Produccion VPS'],
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.035] p-4">
+              <span className="font-mono text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <p className="eyebrow">Permisos sensibles</p>
+        <h2 className="mt-1 text-xl font-black">Controles administrativos</h2>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {adminPermissions.map(permission => (
+            <div key={permission.id} className="rounded-xl border border-white/10 bg-white/[.035] p-4">
+              <Badge tone="accent">{permission.key}</Badge>
+              <p className="mt-3 text-sm text-slate-400">{permission.description || permission.name}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  )
 }
 
 interface PanelProps { data: AdminOverview; reload(): Promise<void>; done(message: string): void }

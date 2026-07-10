@@ -113,11 +113,11 @@ ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.des
 INSERT INTO modules (key, name, description, route, icon, position) VALUES
   ('dashboard', 'Inicio', 'Resumen general y accesos rapidos', '/app', 'layout-dashboard', 0),
   ('almera', 'Gestion ALMERA', 'Solicitudes documentales, documentos, evidencias, estados e informes de seguimiento', '/app/modulos/almera', 'clipboard-check', 10),
-  ('users', 'Usuarios', 'Listado, creacion, edicion y activacion de usuarios', '/app/administracion', 'users', 20),
-  ('roles', 'Roles y permisos', 'Relacion rol, permisos y modulos asignados', '/app/administracion', 'shield-check', 30),
-  ('entity', 'Entidad activa', 'Informacion general y modulos habilitados de la entidad', '/app/administracion', 'building', 40),
+  ('users', 'Usuarios', 'Listado, creacion, edicion y activacion de usuarios', '/app/administracion/users', 'users', 20),
+  ('roles', 'Roles y permisos', 'Relacion rol, permisos y modulos asignados', '/app/administracion/roles', 'shield-check', 30),
+  ('entity', 'Entidad activa', 'Informacion general y modulos habilitados de la entidad', '/app/administracion/entity', 'building', 40),
   ('reports', 'Informes basicos', 'Informes iniciales de seguimiento y trazabilidad', '/app/modulos/reports', 'file-bar-chart', 50),
-  ('settings', 'Configuracion', 'Parametros visuales y administrativos preparados para fase siguiente', '/app/administracion', 'settings', 60),
+  ('settings', 'Configuracion', 'Parametros visuales y administrativos preparados para fase siguiente', '/app/administracion/settings', 'settings', 60),
   ('admin', 'Panel administrativo', 'Usuarios, roles, permisos, entidad y modulos', '/app/administracion', 'settings', 100)
 ON CONFLICT (key) DO UPDATE SET
   name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
