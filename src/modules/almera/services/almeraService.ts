@@ -1,51 +1,18 @@
-import type { AlmeraRecord } from '../types'
+import type { AlmeraCatalogs, Assistance, AssistanceMetrics, AlmeraRecord } from '../types'
 
-const records: AlmeraRecord[] = [
-  {
-    id: 'ALM-2026-014',
-    request: 'Solicitud documental de procesos misionales',
-    process: 'Gestion documental',
-    document: 'Manual de procesos institucionales',
-    activity: 'Revision y actualizacion de version vigente',
-    evidence: 'Acta tecnica y matriz de cambios',
-    report: 'Seguimiento mensual ALMERA',
-    status: 'IN_REVIEW',
-    managementType: 'ACTUALIZACION',
-    responsible: 'Gestor ALMERA',
-    registeredAt: '2026-07-08',
-    observations: 'Pendiente validacion final por administrador de entidad.',
-  },
-  {
-    id: 'ALM-2026-013',
-    request: 'Acompanamiento a cargue de soportes',
-    process: 'Calidad',
-    document: 'Evidencias PAMEC',
-    activity: 'Capacitacion operativa a lideres de proceso',
-    evidence: 'Listado de asistencia y capturas',
-    report: 'Informe de acompanamiento',
-    status: 'APPROVED',
-    managementType: 'CAPACITACION',
-    responsible: 'Coordinacion ALMERA',
-    registeredAt: '2026-07-04',
-    closedAt: '2026-07-05',
-    observations: 'Actividad cerrada con soportes completos.',
-  },
-  {
-    id: 'ALM-2026-012',
-    request: 'Correccion de documento devuelto',
-    process: 'Atencion al usuario',
-    document: 'Procedimiento SIAU',
-    activity: 'Ajuste de observaciones y control de version',
-    evidence: 'Documento ajustado',
-    report: 'Bitacora de revision',
-    status: 'RETURNED',
-    managementType: 'MODIFICACION',
-    responsible: 'Administrador entidad',
-    registeredAt: '2026-06-29',
-    observations: 'Requiere ampliar observaciones de aprobacion.',
-  },
-]
+async function call<T>(path:string,init?:RequestInit):Promise<T>{const response=await fetch(`/api/almera${path}`,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(init?.headers||{})},...init});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'No fue posible completar la operación');return data}
+export const almeraService={
+ catalogs:()=>call<AlmeraCatalogs>('/catalogs'),
+ assistances:(q='')=>call<Assistance[]>(`/assistances${q?`?q=${encodeURIComponent(q)}`:''}`),
+ metrics:()=>call<AssistanceMetrics>('/metrics'),
+ createAssistance:(data:Record<string,unknown>)=>call<Assistance>('/assistances',{method:'POST',body:JSON.stringify(data)}),
+ addAction:(id:string,data:Record<string,unknown>)=>call(`/assistances/${id}/actions`,{method:'POST',body:JSON.stringify(data)}),
+ close:(id:string,data:Record<string,unknown>)=>call(`/assistances/${id}/close`,{method:'POST',body:JSON.stringify(data)}),
+ audits:()=>call<unknown[]>('/audits'),
+ createAuditPlan:(data:Record<string,unknown>)=>call('/audit-plans',{method:'POST',body:JSON.stringify(data)}),
+}
 
-export async function listAlmeraRecords() {
-  return records
+export async function listAlmeraRecords():Promise<AlmeraRecord[]>{
+ const rows=await almeraService.assistances()
+ return rows.map(x=>({id:x.code,request:x.subject,process:x.process_name,document:x.module_name,activity:'Asistencia tecnica',evidence:'',report:'',status:x.status==='COMPLETADA'?'CLOSED':x.status==='CANCELADA'?'RETURNED':'IN_REVIEW',managementType:'SOPORTE',responsible:x.responsible_name||'Sin asignar',registeredAt:x.received_at,observations:x.overdue?'Asistencia vencida':''}))
 }

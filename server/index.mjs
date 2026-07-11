@@ -5,6 +5,7 @@ import { requireAuth } from './auth.mjs'
 import { bootstrap, migrate, pool } from './db.mjs'
 import { authRouter } from './routes/auth.mjs'
 import { adminRouter } from './routes/admin.mjs'
+import { almeraRouter } from './routes/almera.mjs'
 
 const isDev = process.argv.includes('--dev')
 if (isDev) process.env.NODE_ENV = 'development'
@@ -43,6 +44,7 @@ app.get('/api/health', async (_request, response, next) => {
 app.use('/api/auth', authRouter)
 app.get('/api/platform', requireAuth, (request, response) => response.json(request.auth))
 app.use('/api/admin', requireAuth, adminRouter)
+app.use('/api/almera', requireAuth, almeraRouter)
 app.use('/api', (_request, response) => response.status(404).json({ error: 'Ruta no encontrada' }))
 
 if (isDev) {

@@ -43,6 +43,13 @@ export async function bootstrap() {
       [orgName, orgSlug],
     )
     const organizationId = orgResult.rows[0].id
+    const processCatalog = [
+      ['EST-01','Gestión del Direccionamiento y Planeación Estratégica','ESTRATEGICO'],['EST-02','Gestión de Calidad y Mejoramiento Institucional','ESTRATEGICO'],
+      ['MIS-01','Atención por Hospitalización','MISIONAL'],['MIS-02','Apoyo Diagnóstico','MISIONAL'],['MIS-03','Apoyo Terapéutico','MISIONAL'],['MIS-04','Atención Humanizada','MISIONAL'],['MIS-05','Gestión de Salud Pública','MISIONAL'],['MIS-06','Docencia, Servicio e Investigación','MISIONAL'],['MIS-07','Gestión de Acceso','MISIONAL'],['MIS-08','Atención Ambulatoria','MISIONAL'],['MIS-09','Atención por Urgencias','MISIONAL'],
+      ['APO-01','Gestión Financiera','APOYO'],['APO-02','Gerencia del Talento Humano','APOYO'],['APO-03','Gestión Jurídica','APOYO'],['APO-04','Gerencia del Ambiente Físico','APOYO'],['APO-05','Gestión de la Tecnología','APOYO'],['APO-06','Gerencia de la Información','APOYO'],['APO-07','Gestión de las Comunicaciones','APOYO'],['EVC-01','Evaluación, Seguimiento y Control','EVALUACION_CONTROL']]
+    for (const [code,name,classification] of processCatalog) await client.query(`INSERT INTO institutional_processes(organization_id,code,name,classification) VALUES($1,$2,$3,$4) ON CONFLICT(organization_id,code) DO UPDATE SET name=EXCLUDED.name,classification=EXCLUDED.classification`,[organizationId,code,name,classification])
+    const almeraModules=['Documentos','Calidad','Seguridad del Paciente','Riesgos','Mecanismos de Integración, Actas de Comité y Reuniones','Evaluaciones','Encuestas','PQRSF','Indicadores','Cuadros de Mando','Gestión de Auditorías']
+    for (let i=0;i<almeraModules.length;i++) await client.query(`INSERT INTO almera_catalog_modules(organization_id,code,name) VALUES($1,$2,$3) ON CONFLICT(organization_id,code) DO UPDATE SET name=EXCLUDED.name`,[organizationId,`MOD-${String(i+1).padStart(2,'0')}`,almeraModules[i]])
 
     await client.query(
       `UPDATE roles SET key='SUPERADMIN', name='Superadministrador', description='Control total de usuarios, roles, modulos y entidad'
@@ -117,7 +124,7 @@ export async function bootstrap() {
 
     const baseRoles = [
       ['ADMIN_ENTIDAD', 'Administrador de entidad', 'Gestiona usuarios de su entidad, modulos asignados e informacion ALMERA', ['dashboard.view','users.view','users.create','users.edit','users.disable','roles.assign','almera.view','almera.create','almera.edit','almera.export','admin.view','settings.edit'], ['dashboard','almera','users','roles','entity','reports','settings','admin']],
-      ['GESTOR_ALMERA', 'Gestor ALMERA', 'Operacion diaria de solicitudes, actividades, evidencias y soportes ALMERA', ['dashboard.view','almera.view','almera.create','almera.edit','almera.export'], ['dashboard','almera','reports']],
+      ['GESTOR_ALMERA', 'Gestor ALMERA', 'Operacion diaria de solicitudes, actividades, evidencias y soportes ALMERA', ['dashboard.view','almera.view','almera.create','almera.edit','almera.export','almera.dashboard.view','almera.assistance.view','almera.assistance.create','almera.assistance.edit','almera.assistance.assign','almera.assistance.close','almera.assistance.reopen','almera.assistance.export','almera.audit.view','almera.audit.create','almera.audit.edit','almera.audit.execute','almera.audit.close','almera.audit.export','almera.report.generate'], ['dashboard','almera','reports']],
       ['CONSULTA', 'Consulta', 'Visualizacion de informacion permitida sin acciones de escritura', ['dashboard.view','almera.view'], ['dashboard','almera','reports']],
     ]
     let managerRoleId = null

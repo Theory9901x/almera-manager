@@ -6,18 +6,19 @@ import { listAlmeraRecords } from '@/modules/almera/services/almeraService'
 import type { AlmeraRecord } from '@/modules/almera/types'
 import { Badge, Button, Card, Field, PageHeader, SearchBox, StatCard, StatusBadge } from '@/shared/ui'
 import { useEffect, useMemo, useState } from 'react'
+import AlmeraWorkspace from '@/modules/almera/pages/AlmeraPage'
 
 export default function ModulePage() {
   const { moduleKey } = useParams()
   const { session } = useAuth()
   const module = session?.modules.find(item => item.key === moduleKey)
   if (!module) return <Navigate to="/app" replace />
-  if (module.key === 'almera') return <AlmeraPage />
+  if (module.key === 'almera') return <AlmeraWorkspace />
   if (module.key === 'reports') return <ReportsPage />
   return <GenericModule module={module} />
 }
 
-function AlmeraPage() {
+function LegacyAlmeraPage() {
   const [records, setRecords] = useState<AlmeraRecord[]>([])
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('ALL')
