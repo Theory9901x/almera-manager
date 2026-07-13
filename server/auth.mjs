@@ -77,6 +77,16 @@ export function requireAnyPermission(permissions) {
   }
 }
 
+export function requireAnyModuleAccess(moduleKeys) {
+  return (request, response, next) => {
+    const availableModules = request.auth?.modules || []
+    if (!moduleKeys.some(key => availableModules.some(module => module.key === key))) {
+      return response.status(403).json({ error: 'El modulo no esta habilitado para tu entidad y rol' })
+    }
+    next()
+  }
+}
+
 export async function issueSession(response, membershipId, request) {
   const token = createSessionToken()
   const days = Math.max(1, Number(process.env.SESSION_DAYS || 7))

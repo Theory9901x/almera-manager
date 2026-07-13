@@ -123,6 +123,13 @@ ON CONFLICT (key) DO UPDATE SET
   name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
   icon = EXCLUDED.icon, position = EXCLUDED.position;
 
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('technical-assistances', 'Asistencias Tecnicas', 'Registro, seguimiento, evidencias, alertas e indicadores de asistencias tecnicas', '/app/modulos/technical-assistances', 'headphones', 11, TRUE),
+  ('internal-audits', 'Auditorias Internas', 'Planeacion, ejecucion, hallazgos e informes de auditoria interna', '/app/modulos/internal-audits', 'shield-check', 12, FALSE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
 CREATE TABLE IF NOT EXISTS institutional_processes (
   id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   code TEXT NOT NULL, name TEXT NOT NULL, classification TEXT NOT NULL, responsible TEXT NOT NULL DEFAULT '',
@@ -149,6 +156,8 @@ CREATE TABLE IF NOT EXISTS technical_assistances (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), deleted_at TIMESTAMPTZ,
   UNIQUE (organization_id, code)
 );
+ALTER TABLE technical_assistances
+  ADD COLUMN IF NOT EXISTS completion_percent SMALLINT NOT NULL DEFAULT 0 CHECK (completion_percent BETWEEN 0 AND 100);
 CREATE INDEX IF NOT EXISTS assistance_scope_idx ON technical_assistances(organization_id,status,commitment_at);
 CREATE INDEX IF NOT EXISTS assistance_filters_idx ON technical_assistances(organization_id,process_id,almera_module_id,priority);
 CREATE TABLE IF NOT EXISTS assistance_actions (
@@ -157,6 +166,18 @@ CREATE TABLE IF NOT EXISTS assistance_actions (
   performed_by_id BIGINT NOT NULL REFERENCES users(id), description TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', observations TEXT NOT NULL DEFAULT '',
   new_status TEXT, new_commitment_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE assistance_actions
+  ADD COLUMN IF NOT EXISTS completion_percent SMALLINT CHECK (completion_percent BETWEEN 0 AND 100);
+CREATE TABLE IF NOT EXISTS evidences (
+  id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  assistance_id BIGINT REFERENCES technical_assistances(id) ON DELETE CASCADE,
+  action_id BIGINT REFERENCES assistance_actions(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (assistance_id IS NOT NULL OR action_id IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS evidence_assistance_idx ON evidences(organization_id,assistance_id,active);
 CREATE TABLE IF NOT EXISTS activity_logs (
   id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   entity_type TEXT NOT NULL, entity_id BIGINT NOT NULL, action TEXT NOT NULL, changes JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -208,4 +229,15 @@ INSERT INTO permissions(key,name,description) VALUES
  ('almera.audit.execute','Ejecutar auditorias','Diligenciar listas'),('almera.audit.close','Cerrar auditorias','Cerrar auditorias'),
  ('almera.audit.approve','Aprobar auditorias','Aprobar informes'),('almera.audit.export','Exportar auditorias','Generar informes'),
  ('almera.catalog.manage','Gestionar catalogos','Administrar catalogos'),('almera.report.generate','Generar informes','Crear informes ALMERA')
+ON CONFLICT(key) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description;
+
+INSERT INTO permissions(key,name,description) VALUES
+ ('technical_assistance.view','Ver asistencias tecnicas','Consultar bandeja, detalle, alertas y tablero'),
+ ('technical_assistance.create','Crear asistencias tecnicas','Registrar nuevas solicitudes de asistencia'),
+ ('technical_assistance.edit','Diligenciar asistencias tecnicas','Actualizar avance, actuaciones y evidencias'),
+ ('technical_assistance.close','Cerrar asistencias tecnicas','Completar o reabrir asistencias'),
+ ('technical_assistance.export','Exportar asistencias tecnicas','Descargar consolidados CSV'),
+ ('internal_audit.view','Ver auditorias internas','Consultar planes, ejecuciones e informes'),
+ ('internal_audit.manage','Gestionar auditorias internas','Crear y ejecutar auditorias'),
+ ('internal_audit.export','Generar informes de auditoria','Generar informes institucionales')
 ON CONFLICT(key) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description;

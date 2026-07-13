@@ -13,7 +13,7 @@ export default function ModulePage() {
   const { session } = useAuth()
   const module = session?.modules.find(item => item.key === moduleKey)
   if (!module) return <Navigate to="/app" replace />
-  if (module.key === 'almera') return <AlmeraWorkspace />
+  if (module.key === 'technical-assistances') return <AlmeraWorkspace />
   if (module.key === 'reports') return <ReportsPage />
   return <GenericModule module={module} />
 }
