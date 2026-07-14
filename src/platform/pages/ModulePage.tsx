@@ -6,16 +6,16 @@ import { listAlmeraRecords } from '@/modules/almera/services/almeraService'
 import type { AlmeraRecord } from '@/modules/almera/types'
 import { Badge, Button, Card, Field, PageHeader, SearchBox, StatCard, StatusBadge } from '@/shared/ui'
 import { useEffect, useMemo, useState } from 'react'
-import AlmeraWorkspace from '@/modules/almera/pages/AlmeraPage'
-import AdherenceMatrixWorkspace from '@/modules/adherence/pages/AdherenceMatrixPage'
+import GestionAlmeraWorkspace from '@/platform/pages/GestionAlmeraWorkspace'
+
+const gestionAlmeraKeys = ['almera', 'technical-assistances', 'adherence-matrix', 'internal-audits']
 
 export default function ModulePage() {
   const { moduleKey } = useParams()
   const { session } = useAuth()
   const module = session?.modules.find(item => item.key === moduleKey)
   if (!module) return <Navigate to="/app" replace />
-  if (module.key === 'technical-assistances') return <AlmeraWorkspace />
-  if (module.key === 'adherence-matrix') return <AdherenceMatrixWorkspace />
+  if (gestionAlmeraKeys.includes(module.key)) return <GestionAlmeraWorkspace />
   if (module.key === 'reports') return <ReportsPage />
   return <GenericModule module={module} />
 }

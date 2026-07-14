@@ -441,6 +441,7 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 
 /* Matrices de Adherencia */
 .adherence-nav{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.gestion-almera-nav{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .scope-editor{display:grid;gap:10px;padding:16px;border:1px solid var(--border-hairline);border-radius:var(--radius-card-sm);background:var(--color-surface-soft)}
 .criteria-row{display:grid;grid-template-columns:1fr 110px 36px;gap:8px;align-items:center}
 .criteria-row input[type=number]{text-align:right}

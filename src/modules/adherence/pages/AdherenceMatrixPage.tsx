@@ -8,12 +8,16 @@ import EvaluationsPanel from './EvaluationsPanel'
 import DashboardPanel from './DashboardPanel'
 import AuditorsPanel from './AuditorsPanel'
 
-type Tab = 'dashboard' | 'areas' | 'evaluations' | 'professionals' | 'positions' | 'auditors'
+type Tab = 'evaluations' | 'dashboard' | 'areas' | 'professionals' | 'positions' | 'auditors'
+
+// 'evaluations' y 'dashboard' son la vista operativa (todo usuario con acceso al módulo).
+// El resto es configuración y solo se muestra a quien tiene permiso de administrar el módulo.
+const adminOnlyTabs: Tab[] = ['areas', 'professionals', 'positions', 'auditors']
 
 const tabs = [
+  ['evaluations', 'Evaluación', ClipboardList],
   ['dashboard', 'Dashboard', LayoutDashboard],
   ['areas', 'Áreas y matrices', Layers3],
-  ['evaluations', 'Evaluaciones', ClipboardList],
   ['professionals', 'Profesionales', Users],
   ['positions', 'Cargos', Briefcase],
   ['auditors', 'Auditores', ShieldCheck],
@@ -34,8 +38,8 @@ function newProfessionalForm() { return { fullName: '', documentId: '', specialt
 export default function AdherenceMatrixPage() {
   const { session } = useAuth()
   const canManage = (session?.permissions || []).includes('adherence_matrix.manage')
-  const visibleTabs = tabs.filter(([key]) => key !== 'auditors' || canManage)
-  const [tab, setTab] = useState<Tab>('dashboard')
+  const visibleTabs = tabs.filter(([key]) => !adminOnlyTabs.includes(key) || canManage)
+  const [tab, setTab] = useState<Tab>('evaluations')
   const [areas, setAreas] = useState<Area[]>([])
   const [positions, setPositions] = useState<Position[]>([])
   const [professionals, setProfessionals] = useState<Professional[]>([])

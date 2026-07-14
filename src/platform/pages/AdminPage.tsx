@@ -67,12 +67,28 @@ export default function AdminPage() {
   )
 }
 
+function toggle(list: string[], value: string, setter: (items: string[]) => void) { setter(list.includes(value) ? list.filter(id => id !== value) : [...list, value]) }
+
 function UsersPanel({ data, reload, done }: PanelProps) {
   const [form, setForm] = useState({ fullName: '', email: '', password: '', roleId: data.roles.find(r => !r.system)?.id || data.roles[0]?.id || '' })
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [role, setRole] = useState('ALL')
   const [active, setActive] = useState('ALL')
+  const [moduleRoleId, setModuleRoleId] = useState(String(form.roleId))
+  const moduleRole = data.roles.find(item => String(item.id) === moduleRoleId)
+  const [moduleIds, setModuleIds] = useState<string[]>([])
+  const [savingModules, setSavingModules] = useState(false)
+  useEffect(() => { setModuleIds((moduleRole?.module_ids || []).map(String)) }, [moduleRoleId, data, moduleRole])
+  async function saveRoleModules() {
+    if (!moduleRole) return
+    setSavingModules(true)
+    try {
+      await api.updateRoleAccess(String(moduleRole.id), moduleIds, (moduleRole.permission_ids || []).map(String))
+      await reload()
+      done(`Módulos actualizados para "${moduleRole.name}"`)
+    } finally { setSavingModules(false) }
+  }
   const users = data.users.filter(user => {
     const matchesText = `${user.full_name} ${user.email} ${user.role_name}`.toLowerCase().includes(query.toLowerCase())
     const matchesRole = role === 'ALL' || String(user.role_id) === role
@@ -84,7 +100,42 @@ function UsersPanel({ data, reload, done }: PanelProps) {
     try { await api.createUser(form); setForm({ ...form, fullName: '', email: '', password: '' }); await reload(); done('Usuario creado y rol asignado') }
     finally { setSaving(false) }
   }
-  return <div className="grid gap-6 xl:grid-cols-[.78fr_1.22fr]">
+  return <div className="space-y-6">
+   <Card className="p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="eyebrow">Tipos de usuario</p>
+          <h2 className="mt-1 font-black">Módulos habilitados por rol</h2>
+          <p className="text-xs text-slate-400">Elige un tipo de usuario (rol) y marca los módulos que debe ver. Aplica a todos los usuarios con ese rol.</p>
+        </div>
+        <select className="input w-auto" value={moduleRoleId} onChange={e => setModuleRoleId(e.target.value)}>
+          {data.roles.map(item => <option key={item.id} value={item.id}>{item.name} ({item.user_count} usuarios)</option>)}
+        </select>
+      </div>
+      {moduleRole?.system ? (
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/[.035] p-5 text-sm text-slate-400">
+          El superadministrador conserva todos los módulos para evitar que la entidad quede sin administración.
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 grid gap-2 md:grid-cols-2">
+            {data.modules.filter(module => module.enabled).map(module => (
+              <CheckRow
+                key={module.id}
+                checked={moduleIds.includes(String(module.id))}
+                onChange={() => toggle(moduleIds, String(module.id), setModuleIds)}
+                title={module.name}
+                description={module.description}
+              />
+            ))}
+          </div>
+          <Button onClick={() => void saveRoleModules()} disabled={savingModules} className="mt-5">
+            <Save size={16} /> {savingModules ? 'Guardando...' : `Guardar módulos de "${moduleRole?.name}"`}
+          </Button>
+        </>
+      )}
+   </Card>
+   <div className="grid gap-6 xl:grid-cols-[.78fr_1.22fr]">
     <Card className="h-fit p-6">
       <form onSubmit={create}>
         <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#56D6C9]/10 text-[#56D6C9]"><UserPlus size={19} /></div><div><h2 className="font-black">Alta de usuario</h2><p className="text-xs text-slate-400">Cuenta, rol inicial y acceso de entidad</p></div></div>
@@ -92,11 +143,12 @@ function UsersPanel({ data, reload, done }: PanelProps) {
           <Field label="Nombre completo"><input required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></Field>
           <Field label="Correo"><input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
           <Field label="Contrasena inicial (min. 10 caracteres)"><input required minLength={10} type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></Field>
-          <Field label="Rol"><select required value={form.roleId} onChange={e => setForm({ ...form, roleId: e.target.value })}>{data.roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field>
+          <Field label="Rol"><select required value={form.roleId} onChange={e => { setForm({ ...form, roleId: e.target.value }); setModuleRoleId(e.target.value) }}>{data.roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field>
           <Button disabled={saving} className="w-full">{saving ? 'Creando...' : <><Plus size={16} /> Crear usuario</>}</Button>
         </div>
       </form>
     </Card>
+
     <Card className="overflow-hidden">
       <div className="border-b border-white/10 p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -119,6 +171,7 @@ function UsersPanel({ data, reload, done }: PanelProps) {
         </table>
       </div>
     </Card>
+   </div>
   </div>
 }
 
@@ -131,7 +184,6 @@ function RolesPanel({ data, reload, done }: PanelProps) {
   const [description, setDescription] = useState('')
   useEffect(() => { setModuleIds((selected?.module_ids || []).map(String)); setPermissionIds((selected?.permission_ids || []).map(String)) }, [selectedId, data, selected])
   async function create(event: React.FormEvent) { event.preventDefault(); const role = await api.createRole({ name, description }) as AdminRole; setName(''); setDescription(''); await reload(); setSelectedId(String(role.id)); done('Rol creado; ahora configura sus accesos') }
-  function toggle(list: string[], value: string, setter: (items: string[]) => void) { setter(list.includes(value) ? list.filter(id => id !== value) : [...list, value]) }
   return (
     <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
       <div className="space-y-5">

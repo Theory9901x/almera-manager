@@ -34,6 +34,11 @@ export default function AppLayout() {
     .sort((a, b) => b.route.length - a.route.length)
     .find(module => location.pathname === module.route || location.pathname.startsWith(`${module.route}/`))
 
+  const operationalKeys = ['technical-assistances', 'adherence-matrix', 'internal-audits', 'almera']
+  const operationalModules = session.modules.filter(module => operationalKeys.includes(module.key))
+  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key))
+  const operationalRoute = operationalKeys.map(key => operationalModules.find(module => module.key === key)?.route).find(Boolean)
+
   async function endSession() {
     await logout()
     navigate('/login', { replace: true })
@@ -63,7 +68,17 @@ export default function AppLayout() {
 
         <nav className="relative flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <p className="sidebar-label">Espacio de trabajo</p>
-          {session.modules.map(module => {
+          {operationalRoute && (
+            <NavLink
+              to={operationalRoute}
+              onClick={() => setOpen(false)}
+              className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
+            >
+              <span className="sidebar-link-icon"><ClipboardCheck size={17} /></span>
+              <span className="min-w-0 flex-1 truncate">Gestión ALMERA</span>
+            </NavLink>
+          )}
+          {otherModules.map(module => {
             const Icon = icons[module.icon as keyof typeof icons] || Blocks
             return (
               <NavLink
