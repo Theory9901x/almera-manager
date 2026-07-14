@@ -3,9 +3,11 @@ import { resolve } from 'node:path'
 import express from 'express'
 import { requireAuth } from './auth.mjs'
 import { bootstrap, migrate, pool } from './db.mjs'
+import { closePdfBrowser } from './pdf.mjs'
 import { authRouter } from './routes/auth.mjs'
 import { adminRouter } from './routes/admin.mjs'
 import { almeraRouter } from './routes/almera.mjs'
+import { adherenceRouter } from './routes/adherence.mjs'
 
 const isDev = process.argv.includes('--dev')
 if (isDev) process.env.NODE_ENV = 'development'
@@ -45,6 +47,7 @@ app.use('/api/auth', authRouter)
 app.get('/api/platform', requireAuth, (request, response) => response.json(request.auth))
 app.use('/api/admin', requireAuth, adminRouter)
 app.use('/api/almera', requireAuth, almeraRouter)
+app.use('/api/adherence', requireAuth, adherenceRouter)
 app.use('/api', (_request, response) => response.status(404).json({ error: 'Ruta no encontrada' }))
 
 if (isDev) {
@@ -72,6 +75,7 @@ const server = app.listen(port, host, () => {
 
 async function shutdown() {
   server.close(async () => {
+    await closePdfBrowser()
     await pool.end()
     process.exit(0)
   })

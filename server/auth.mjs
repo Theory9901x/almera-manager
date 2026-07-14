@@ -40,6 +40,7 @@ export async function getSessionContext(request) {
   ])
   return {
     sessionId: row.session_id,
+    membershipId: row.membership_id,
     user: { id: row.user_id, email: row.email, fullName: row.full_name },
     organization: { id: row.organization_id, name: row.organization_name, slug: row.organization_slug },
     role: { id: row.role_id, key: row.role_key, name: row.role_name },

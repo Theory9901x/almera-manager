@@ -439,6 +439,17 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 @media(max-width:1000px){.almera-nav{grid-template-columns:repeat(3,1fr)}.process-lane{grid-template-columns:1fr}.process-cards{grid-template-columns:repeat(2,1fr)}.almera-dashboard-grid,.catalog-grid{grid-template-columns:1fr}.filter-surface{grid-template-columns:1fr 1fr}.filter-search{grid-column:1/-1}}
 @media(max-width:640px){.almera-nav{grid-template-columns:repeat(2,1fr)}.process-cards{grid-template-columns:1fr}.filter-surface,.dialog-form{grid-template-columns:1fr}.dialog-form .full,.dialog-actions{grid-column:auto}.report-summary{grid-template-columns:1fr 1fr}.metric-strip{grid-template-columns:1fr 1fr}}
 
+/* Matrices de Adherencia */
+.adherence-nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+.scope-editor{display:grid;gap:10px;padding:16px;border:1px solid var(--border-hairline);border-radius:var(--radius-card-sm);background:var(--color-surface-soft)}
+.criteria-row{display:grid;grid-template-columns:1fr 110px 36px;gap:8px;align-items:center}
+.criteria-row input[type=number]{text-align:right}
+.score-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}
+.score-row em{font-style:normal;color:var(--muted)}
+.score-options{display:flex;gap:6px}
+.score-options button{min-width:34px;height:30px;border:1px solid var(--border-hairline);border-radius:8px;background:#fff;font-size:11px;font-weight:700;color:var(--muted);transition:background var(--ease),border-color var(--ease),color var(--ease)}
+.score-options button.active{background:var(--color-brand);border-color:var(--color-brand);color:#fff}
+
 /* Asistencias tecnicas */
 .assistance-nav{grid-template-columns:repeat(5,minmax(0,1fr))}.assistance-nav button{position:relative}.assistance-nav button b{display:grid;min-width:19px;height:19px;place-items:center;border-radius:99px;background:var(--brand);padding:0 5px;color:#fff;font-size:9px}
 .almera-alert>span{flex:1}.almera-alert button{display:grid;place-items:center;border:0;background:transparent;color:inherit}.almera-notice{display:flex;align-items:center;gap:9px;border:1px solid #9ed8c4;border-radius:14px;background:#effcf6;padding:12px 15px;color:#087a54;font-size:12px;font-weight:700}
