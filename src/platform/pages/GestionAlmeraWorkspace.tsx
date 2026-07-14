@@ -5,18 +5,20 @@ import { Card, PageHeader } from '@/shared/ui'
 import AlmeraWorkspace from '@/modules/almera/pages/AlmeraPage'
 import AdherenceMatrixWorkspace from '@/modules/adherence/pages/AdherenceMatrixPage'
 
-type SubTab = 'technical-assistances' | 'internal-audits' | 'adherence-matrix'
+type SubTab = 'technical-assistances' | 'audits' | 'adherence-matrix'
 
-const subTabDefs: [SubTab, string, typeof Headphones][] = [
-  ['technical-assistances', 'Asistencias Técnicas', Headphones],
-  ['internal-audits', 'Auditorías', ShieldCheck],
-  ['adherence-matrix', 'Matrices de Adherencia', ClipboardCheck],
+// Cada pestaña acepta una o más claves de modulo equivalentes, porque distintos
+// despliegues han seedeado el modulo de auditorías con nombres distintos ('audits' vs 'internal-audits').
+const subTabDefs: [SubTab, string, typeof Headphones, string[]][] = [
+  ['technical-assistances', 'Asistencias Técnicas', Headphones, ['technical-assistances']],
+  ['audits', 'Auditorías', ShieldCheck, ['audits', 'internal-audits']],
+  ['adherence-matrix', 'Matrices de Adherencia', ClipboardCheck, ['adherence-matrix']],
 ]
 
 export default function GestionAlmeraWorkspace() {
   const { session } = useAuth()
   const availableKeys = new Set((session?.modules || []).map(module => module.key))
-  const availableTabs = subTabDefs.filter(([key]) => availableKeys.has(key))
+  const availableTabs = subTabDefs.filter(([, , , keys]) => keys.some(key => availableKeys.has(key)))
   const [tab, setTab] = useState<SubTab | undefined>(availableTabs[0]?.[0])
   const activeTab = availableTabs.some(([key]) => key === tab) ? tab : availableTabs[0]?.[0]
 
@@ -41,7 +43,7 @@ export default function GestionAlmeraWorkspace() {
       )}
       {activeTab === 'technical-assistances' && <AlmeraWorkspace />}
       {activeTab === 'adherence-matrix' && <AdherenceMatrixWorkspace />}
-      {activeTab === 'internal-audits' && <AuditsPlaceholder />}
+      {activeTab === 'audits' && <AuditsPlaceholder />}
     </div>
   )
 }

@@ -34,7 +34,7 @@ export default function AppLayout() {
     .sort((a, b) => b.route.length - a.route.length)
     .find(module => location.pathname === module.route || location.pathname.startsWith(`${module.route}/`))
 
-  const operationalKeys = ['technical-assistances', 'adherence-matrix', 'internal-audits', 'almera']
+  const operationalKeys = ['technical-assistances', 'adherence-matrix', 'internal-audits', 'audits', 'almera']
   const operationalModules = session.modules.filter(module => operationalKeys.includes(module.key))
   const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key))
   const operationalRoute = operationalKeys.map(key => operationalModules.find(module => module.key === key)?.route).find(Boolean)

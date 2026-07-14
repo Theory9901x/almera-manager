@@ -8,7 +8,7 @@ import { Badge, Button, Card, Field, PageHeader, SearchBox, StatCard, StatusBadg
 import { useEffect, useMemo, useState } from 'react'
 import GestionAlmeraWorkspace from '@/platform/pages/GestionAlmeraWorkspace'
 
-const gestionAlmeraKeys = ['almera', 'technical-assistances', 'adherence-matrix', 'internal-audits']
+const gestionAlmeraKeys = ['almera', 'technical-assistances', 'adherence-matrix', 'internal-audits', 'audits']
 
 export default function ModulePage() {
   const { moduleKey } = useParams()
