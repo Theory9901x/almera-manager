@@ -157,6 +157,14 @@ export interface Threshold {
   order_index: number
 }
 
+export interface Auditor {
+  membership_id: string
+  full_name: string
+  email: string
+  role_name: string
+  area_ids: string[]
+}
+
 export interface DashboardScopeItem {
   areaName: string
   scopeName: string

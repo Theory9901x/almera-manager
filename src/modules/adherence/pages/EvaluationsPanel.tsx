@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, Download, Lock, Plus, Save, Send, Trash2, Unlock, X } from 'lucide-react'
 import { Badge, Button, Card, Field } from '@/shared/ui'
 import { adherenceService } from '../services/adherenceService'
@@ -13,7 +13,7 @@ const professionalStatusOptions = [
 ] as const
 
 const scoreOptions: { value: Score; label: string }[] = [
-  { value: 0, label: '0' }, { value: 1, label: '1' }, { value: 2, label: '2' }, { value: null, label: 'N/A' },
+  { value: 2, label: '2' }, { value: 1, label: '1' }, { value: 0, label: '0' }, { value: null, label: 'NA' },
 ]
 
 const conceptLabels: Record<string, string> = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
@@ -47,7 +47,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<EvaluationDetail | null>(null)
   const [scores, setScores] = useState<ScoreMap>({})
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [newRecordNumber, setNewRecordNumber] = useState('')
   const [criterionResults, setCriterionResults] = useState<CriterionResult[]>([])
   const [scopeResults, setScopeResults] = useState<ScopeResult[]>([])
@@ -80,7 +79,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       setScopeResults(result.scopeResults)
       setOverallCompliance(result.overallCompliance)
       setConcept(result.evaluation.concept)
-      setSelectedRecordId(result.records[0]?.id || null)
       setClosureForm({
         generalObservations: result.evaluation.general_observations || '',
         commitments: result.evaluation.commitments || '',
@@ -115,7 +113,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       setNewRecordNumber('')
       setDetail(current => current ? { ...current, records: [...current.records, record] } : current)
       setScores(current => ({ ...current, [record.id]: {} }))
-      setSelectedRecordId(record.id)
     } catch (caught) { fail(caught, 'No fue posible agregar la historia clínica') } finally { setBusy(false) }
   }
 
@@ -125,12 +122,19 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       await adherenceService.removeRecord(selectedId, recordId)
       setDetail(current => current ? { ...current, records: current.records.filter(record => record.id !== recordId) } : current)
       setScores(current => { const next = { ...current }; delete next[recordId]; return next })
-      if (selectedRecordId === recordId) setSelectedRecordId(null)
     } catch (caught) { fail(caught, 'No fue posible quitar la historia clínica') }
   }
 
   const setScore = (recordId: string, criterionId: string, value: Score) => {
     setScores(current => ({ ...current, [recordId]: { ...current[recordId], [criterionId]: value } }))
+  }
+
+  const clearScore = (recordId: string, criterionId: string) => {
+    setScores(current => {
+      const byCriterion = { ...current[recordId] }
+      delete byCriterion[criterionId]
+      return { ...current, [recordId]: byCriterion }
+    })
   }
 
   const saveScores = async () => {
@@ -149,6 +153,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   }
 
   const scopeCompliance = (scopeId: string) => scopeResults.find(result => result.scopeId === scopeId)?.compliancePercent ?? null
+  const criterionCompliance = (criterionId: string) => criterionResults.find(result => result.criterionId === criterionId)?.compliancePercent ?? null
 
   const updateRecordObservations = async (recordId: string, observations: string) => {
     if (!selectedId) return
@@ -212,7 +217,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   }
 
   if (selectedId && detail) {
-    const selectedRecord = detail.records.find(record => record.id === selectedRecordId) || null
     const isClosed = detail.evaluation.status === 'CLOSED'
     return (
       <div className="space-y-5">
@@ -236,72 +240,98 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         </Card>
 
         <Card className="p-5">
-          <p className="eyebrow">Historias clínicas</p>
-          <h2 className="mt-1 text-xl font-black">Historias clínicas evaluadas</h2>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {detail.records.map(record => (
-              <button
-                key={record.id}
-                className={`ui-badge tone-${record.id === selectedRecordId ? 'accent' : 'neutral'}`}
-                onClick={() => setSelectedRecordId(record.id)}
-              >
-                HC {record.record_number}
-                {!isClosed && <Trash2 size={12} onClick={event => { event.stopPropagation(); void removeRecord(record.id) }} />}
-              </button>
-            ))}
-          </div>
-          {!isClosed && (
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <div className="min-w-[220px] flex-1"><Field label="Nueva historia clínica (No.)"><input value={newRecordNumber} onChange={event => setNewRecordNumber(event.target.value)} placeholder="Ej. 100234" /></Field></div>
-              <Button onClick={() => void addRecord()} disabled={busy}><Plus size={16} />Agregar HC</Button>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="eyebrow">Calificación</p>
+              <h2 className="mt-1 text-xl font-black">Calificación por historia clínica</h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">Cada columna es una HC. Marca 2 (cumple), 1 (parcial), 0 (no cumple) o NA (no aplica) por criterio.</p>
             </div>
-          )}
+            {!isClosed && (
+              <div className="flex items-end gap-3">
+                <div className="min-w-[200px]"><Field label="Nueva HC (No.)"><input value={newRecordNumber} onChange={event => setNewRecordNumber(event.target.value)} placeholder="Ej. 100234" /></Field></div>
+                <Button onClick={() => void addRecord()} disabled={busy}><Plus size={16} />Agregar HC</Button>
+              </div>
+            )}
+          </div>
+
+          {detail.records.length ? (
+            <div className="hc-grid-wrap">
+              <table className="hc-grid">
+                <thead>
+                  <tr>
+                    <th className="hc-criterion">Criterio</th>
+                    <th className="hc-summary">% Cumpl.</th>
+                    {detail.records.map(record => (
+                      <th key={record.id}>
+                        HC {record.record_number}
+                        {!isClosed && <button onClick={() => void removeRecord(record.id)} aria-label={`Quitar HC ${record.record_number}`}><Trash2 size={11} /></button>}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.scopes.map(scope => (
+                    <Fragment key={scope.id}>
+                      <tr className="hc-scope-row">
+                        <td>{scope.name}</td>
+                        <td className="hc-summary">{scopeCompliance(scope.id) === null ? '—' : `${scopeCompliance(scope.id)!.toFixed(0)}%`}</td>
+                        {detail.records.map(record => <td key={record.id}></td>)}
+                      </tr>
+                      {detail.criteria.filter(criterion => criterion.scope_id === scope.id).map(criterion => (
+                        <tr key={criterion.id}>
+                          <td className="hc-criterion">{criterion.text} <em className="text-[var(--muted)]">({Number(criterion.weight).toFixed(0)}%)</em></td>
+                          <td className="hc-summary">{criterionCompliance(criterion.id) === null ? '—' : `${criterionCompliance(criterion.id)!.toFixed(0)}%`}</td>
+                          {detail.records.map(record => {
+                            const current = scores[record.id]?.[criterion.id]
+                            const selectValue = current === undefined ? '' : current === null ? 'NA' : String(current)
+                            return (
+                              <td key={record.id}>
+                                <select
+                                  className={`hc-score-select hc-score-${selectValue}`}
+                                  disabled={isClosed}
+                                  value={selectValue}
+                                  onChange={event => {
+                                    const raw = event.target.value
+                                    if (raw === '') clearScore(record.id, criterion.id)
+                                    else setScore(record.id, criterion.id, raw === 'NA' ? null : (Number(raw) as Score))
+                                  }}
+                                >
+                                  <option value="">–</option>
+                                  {scoreOptions.map(option => <option key={String(option.value)} value={option.value === null ? 'NA' : String(option.value)}>{option.label}</option>)}
+                                </select>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className="almera-empty"><p>Agrega al menos una historia clínica para empezar a calificar.</p></div>}
+
+          <div className="mt-4 flex justify-end">
+            <Button onClick={() => void saveScores()} disabled={busy || isClosed}><Save size={16} />Guardar calificaciones</Button>
+          </div>
         </Card>
 
-        {selectedRecord && (
+        {detail.records.length > 0 && (
           <Card className="p-5">
-            <p className="eyebrow">Calificación</p>
-            <h2 className="mt-1 text-xl font-black">HC {selectedRecord.record_number}</h2>
-            <div className="mt-4 grid gap-4">
-              {detail.scopes.map(scope => (
-                <div key={scope.id} className="scope-editor">
-                  <div className="flex items-center justify-between">
-                    <strong>{scope.name}</strong>
-                    <span className="text-xs text-[var(--muted)]">{scopeCompliance(scope.id) === null ? 'Sin datos' : `${scopeCompliance(scope.id)!.toFixed(1)}%`}</span>
-                  </div>
-                  <div className="grid gap-2">
-                    {detail.criteria.filter(criterion => criterion.scope_id === scope.id).map(criterion => (
-                      <div key={criterion.id} className="score-row">
-                        <span>{criterion.text} <em>({Number(criterion.weight).toFixed(0)}%)</em></span>
-                        <div className="score-options">
-                          {scoreOptions.map(option => (
-                            <button
-                              key={String(option.value)}
-                              disabled={isClosed}
-                              className={scores[selectedRecord.id]?.[criterion.id] === option.value ? 'active' : ''}
-                              onClick={() => setScore(selectedRecord.id, criterion.id, option.value)}
-                            >{option.label}</button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            <p className="eyebrow">Notas</p>
+            <h2 className="mt-1 text-xl font-black">Observaciones por historia clínica</h2>
+            <div className="mt-3 divide-y divide-[var(--border-hairline)]">
+              {detail.records.map(record => (
+                <div key={record.id} className="hc-observations-row">
+                  <strong>HC {record.record_number}</strong>
+                  <input
+                    disabled={isClosed}
+                    defaultValue={record.observations}
+                    onBlur={event => void updateRecordObservations(record.id, event.target.value)}
+                    placeholder="Observación del evaluador para esta HC (opcional)"
+                  />
                 </div>
               ))}
-            </div>
-            <div className="mt-4">
-              <Field label={`Observaciones para HC ${selectedRecord.record_number}`}>
-                <textarea
-                  rows={3}
-                  disabled={isClosed}
-                  defaultValue={selectedRecord.observations}
-                  onBlur={event => void updateRecordObservations(selectedRecord.id, event.target.value)}
-                  placeholder="Observaciones del evaluador para esta historia clínica"
-                />
-              </Field>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button onClick={() => void saveScores()} disabled={busy || isClosed}><Save size={16} />Guardar calificaciones</Button>
             </div>
           </Card>
         )}

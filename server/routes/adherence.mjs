@@ -7,6 +7,47 @@ import { renderAdherenceDashboardHtml } from '../templates/adherenceDashboardRep
 
 export const adherenceRouter = Router()
 
+// Ámbitos institucionales: siempre son estos 7, en este orden, para cualquier área.
+// Los criterios sí varían por área; esta lista es solo la plantilla por defecto para una matriz nueva.
+export const FIXED_SCOPES = ['ANAMNESIS', 'EXAMEN FÍSICO', 'ANÁLISIS', 'DIAGNÓSTICO', 'AYUDAS DIAGNÓSTICAS', 'PLAN DE MANEJO', 'LEGIBILIDAD']
+
+const DEFAULT_CRITERIA = [
+  { scopeIndex: 0, text: 'Se evidencia registro del motivo de consulta.', weight: 4 },
+  { scopeIndex: 0, text: 'Se evidencia descripción (Tiempo de evolución, frecuencia de aparición, síntomas asociados, factores que mejoran o empeoran el cuadro clínico, tratamientos recibidos para atender la causa de motivo de consulta. En caso de trauma las circunstancias).', weight: 8 },
+  { scopeIndex: 0, text: 'Evaluación de factores de riesgo según resolución 3280 de 2018', weight: 3 },
+  { scopeIndex: 0, text: 'Se evidencia registro y/o actualización de los antecedentes personales (Médico, Quirúrgicos, Gineco-obstétricos / Pediátrico, Traumáticos, Tóxico / Alérgicos, Farmacológicos), antecedentes familiares, hospitalarios', weight: 6 },
+  { scopeIndex: 0, text: 'Se evidencia registro de los hallazgos positivos en la revisión por sistemas, acordes al motivo de consulta, enfermedad actual, antecedentes e indaga sobre asistencia a urgencias.', weight: 4 },
+  { scopeIndex: 1, text: 'Se evidencia registro de la totalidad de los signos vitales (frecuencia cardiaca, frecuencia respiratoria, tensión arterial, temperatura, escala de dolor)', weight: 4 },
+  { scopeIndex: 1, text: 'Estado general del paciente (Peso, condiciones generales del paciente, explicando estas en lo posible)', weight: 4 },
+  { scopeIndex: 1, text: 'Se evidencia registro de examen físico topográfico, acorde con la anamnesis. Registro de examen físico de los datos positivos y los negativos pertinentes al desarrollo de la historia clínica', weight: 8 },
+  { scopeIndex: 2, text: 'Se evidencia análisis del contenido del paciente, diagnóstico y conducta a seguir. Teniendo en cuenta (orden, legibilidad, coherencia y racionalidad científica)', weight: 8 },
+  { scopeIndex: 2, text: 'Se documenta en la historia clínica la conciliación medicamentosa, según los criterios institucionales de inclusión', weight: 3 },
+  { scopeIndex: 3, text: 'El (los) diagnóstico(s) se correlacionan con los hallazgos positivos de la anamnesis y el examen físico.', weight: 8 },
+  { scopeIndex: 4, text: 'Se correlacionan las solicitudes ayudas diagnosticas acorde a la anamnesis y hallazgos en el examen físico. En caso de no cumplir especificar en el recuadro inferior.', weight: 10 },
+  { scopeIndex: 4, text: 'Se evidencia registro de resultados y análisis de las ayudas diagnósticas previamente solicitadas.', weight: 8 },
+  { scopeIndex: 5, text: 'Se correlaciona el plan terapéutico con los hallazgos y este se hizo siguiendo la dosificación, presentación (genéricos), etc.', weight: 10 },
+  { scopeIndex: 5, text: 'Se dieron las recomendaciones, educación y signos de alarma acordes a la condición del paciente.', weight: 8 },
+  { scopeIndex: 6, text: 'La historia clínica es legible, se realiza uso únicamente de las siglas y abreviaturas permitidos.', weight: 4 },
+]
+
+async function seedMatrixVersion(client, matrixVersionId, criteriaTemplate = DEFAULT_CRITERIA) {
+  const scopeIds = []
+  for (const [index, name] of FIXED_SCOPES.entries()) {
+    const result = await client.query(
+      'INSERT INTO adherence_scopes (matrix_version_id, name, order_index) VALUES ($1, $2, $3) RETURNING id',
+      [matrixVersionId, name, index],
+    )
+    scopeIds.push(result.rows[0].id)
+  }
+  for (const [index, criterion] of criteriaTemplate.entries()) {
+    await client.query(
+      'INSERT INTO adherence_criteria (matrix_version_id, scope_id, text, weight, order_index) VALUES ($1, $2, $3, $4, $5)',
+      [matrixVersionId, scopeIds[criterion.scopeIndex], criterion.text, criterion.weight, index],
+    )
+  }
+  return scopeIds
+}
+
 const oid = request => request.auth.organization.id
 const uid = request => request.auth.user.id
 const mid = request => request.auth.membershipId
@@ -23,6 +64,27 @@ function fail(status, message) {
   const error = new Error(message)
   error.status = status
   throw error
+}
+
+async function allowedAreaIds(request) {
+  if (request.auth.permissions.includes('adherence_matrix.manage')) return null
+  const result = await query('SELECT area_id FROM adherence_auditor_areas WHERE membership_id = $1', [mid(request)])
+  return result.rows.map(row => String(row.area_id))
+}
+
+async function assertAreaAccess(request, areaId) {
+  const allowed = await allowedAreaIds(request)
+  if (allowed !== null && !allowed.includes(String(areaId))) fail(403, 'No tienes acceso a esta área')
+}
+
+async function assertEvaluationAccess(request) {
+  const result = await query(
+    `SELECT p.area_id FROM adherence_evaluations e JOIN adherence_professionals p ON p.id = e.professional_id
+     WHERE e.id = $1 AND e.organization_id = $2`,
+    [request.params.id, oid(request)],
+  )
+  if (!result.rows[0]) fail(404, 'Evaluación no encontrada')
+  await assertAreaAccess(request, result.rows[0].area_id)
 }
 
 function computeCompliance(criteria, scores) {
@@ -64,6 +126,11 @@ async function resolveConcept(organizationId, percent) {
 
 adherenceRouter.get('/areas', view, async (request, response, next) => {
   try {
+    const allowed = await allowedAreaIds(request)
+    if (allowed !== null && !allowed.length) return response.json([])
+    const params = [oid(request)]
+    const where = ['a.organization_id = $1']
+    if (allowed !== null) { params.push(allowed); where.push(`a.id = ANY($${params.length}::bigint[])`) }
     const result = await query(
       `SELECT a.id, a.name, a.active, a.created_at, a.updated_at,
               mv.id AS matrix_version_id, mv.version_number,
@@ -72,9 +139,9 @@ adherenceRouter.get('/areas', view, async (request, response, next) => {
               (SELECT COALESCE(SUM(c.weight), 0) FROM adherence_criteria c WHERE c.matrix_version_id = mv.id AND c.active) AS weight_total
        FROM adherence_areas a
        LEFT JOIN adherence_matrix_versions mv ON mv.area_id = a.id AND mv.is_current
-       WHERE a.organization_id = $1
+       WHERE ${where.join(' AND ')}
        ORDER BY a.name`,
-      [oid(request)],
+      params,
     )
     response.json(result.rows)
   } catch (error) { next(error) }
@@ -90,11 +157,12 @@ adherenceRouter.post('/areas', manage, async (request, response, next) => {
       `INSERT INTO adherence_areas (organization_id, name) VALUES ($1, $2) RETURNING *`,
       [oid(request), name],
     )
-    await client.query(
+    const version = await client.query(
       `INSERT INTO adherence_matrix_versions (area_id, version_number, is_current, created_by_id)
-       VALUES ($1, 1, TRUE, $2)`,
+       VALUES ($1, 1, TRUE, $2) RETURNING id`,
       [area.rows[0].id, uid(request)],
     )
+    await seedMatrixVersion(client, version.rows[0].id)
     await client.query('COMMIT')
     response.status(201).json(area.rows[0])
   } catch (error) {
@@ -130,6 +198,7 @@ adherenceRouter.get('/areas/:id/matrix', view, async (request, response, next) =
   try {
     const area = await query('SELECT id, name FROM adherence_areas WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
     if (!area.rows[0]) return response.status(404).json({ error: 'Área no encontrada' })
+    await assertAreaAccess(request, area.rows[0].id)
     const version = await query(
       'SELECT id, version_number FROM adherence_matrix_versions WHERE area_id = $1 AND is_current',
       [request.params.id],
@@ -153,17 +222,12 @@ adherenceRouter.put('/areas/:id/matrix', manage, async (request, response, next)
   const client = await pool.connect()
   try {
     const body = request.body || {}
-    const scopesInput = Array.isArray(body.scopes) ? body.scopes : []
     const criteriaInput = Array.isArray(body.criteria) ? body.criteria : []
-    if (!scopesInput.length) return response.status(400).json({ error: 'La matriz necesita al menos un ámbito' })
-    for (const scope of scopesInput) {
-      if (!String(scope?.name || '').trim()) return response.status(400).json({ error: 'Todos los ámbitos necesitan un nombre' })
-    }
     for (const criterion of criteriaInput) {
       const weight = Number(criterion?.weight)
       if (!String(criterion?.text || '').trim()) return response.status(400).json({ error: 'Todos los criterios necesitan un texto' })
       if (!Number.isFinite(weight) || weight <= 0) return response.status(400).json({ error: 'Cada criterio necesita un peso mayor a 0' })
-      if (!Number.isInteger(criterion?.scopeIndex) || criterion.scopeIndex < 0 || criterion.scopeIndex >= scopesInput.length) {
+      if (!Number.isInteger(criterion?.scopeIndex) || criterion.scopeIndex < 0 || criterion.scopeIndex >= FIXED_SCOPES.length) {
         return response.status(400).json({ error: 'Cada criterio debe pertenecer a un ámbito válido' })
       }
     }
@@ -194,10 +258,10 @@ adherenceRouter.put('/areas/:id/matrix', manage, async (request, response, next)
     }
 
     const scopeIds = []
-    for (const [index, scope] of scopesInput.entries()) {
+    for (const [index, name] of FIXED_SCOPES.entries()) {
       const result = await client.query(
         `INSERT INTO adherence_scopes (matrix_version_id, name, order_index) VALUES ($1, $2, $3) RETURNING id`,
-        [targetVersionId, String(scope.name).trim(), Number.isInteger(scope.orderIndex) ? scope.orderIndex : index],
+        [targetVersionId, name, index],
       )
       scopeIds.push(result.rows[0].id)
     }
@@ -263,9 +327,15 @@ adherenceRouter.patch('/positions/:id', manage, async (request, response, next) 
 
 adherenceRouter.get('/professionals', view, async (request, response, next) => {
   try {
+    const allowed = await allowedAreaIds(request)
+    if (allowed !== null && !allowed.length) return response.json([])
     const params = [oid(request)]
     const where = ['p.organization_id = $1']
-    if (request.query.areaId) { params.push(request.query.areaId); where.push(`p.area_id = $${params.length}`) }
+    if (allowed !== null) { params.push(allowed); where.push(`p.area_id = ANY($${params.length}::bigint[])`) }
+    if (request.query.areaId) {
+      if (allowed !== null && !allowed.includes(String(request.query.areaId))) return response.status(403).json({ error: 'No tienes acceso a esta área' })
+      params.push(request.query.areaId); where.push(`p.area_id = $${params.length}`)
+    }
     if (request.query.positionId) { params.push(request.query.positionId); where.push(`p.position_id = $${params.length}`) }
     if (request.query.q) { params.push(`%${request.query.q}%`); where.push(`(p.full_name ILIKE $${params.length} OR p.document_id ILIKE $${params.length})`) }
     const result = await query(
@@ -328,10 +398,16 @@ adherenceRouter.patch('/professionals/:id', manage, async (request, response, ne
 
 adherenceRouter.get('/evaluations', view, async (request, response, next) => {
   try {
+    const allowed = await allowedAreaIds(request)
+    if (allowed !== null && !allowed.length) return response.json([])
     const params = [oid(request)]
     const where = ['e.organization_id = $1']
+    if (allowed !== null) { params.push(allowed); where.push(`p.area_id = ANY($${params.length}::bigint[])`) }
     if (request.query.professionalId) { params.push(request.query.professionalId); where.push(`e.professional_id = $${params.length}`) }
-    if (request.query.areaId) { params.push(request.query.areaId); where.push(`p.area_id = $${params.length}`) }
+    if (request.query.areaId) {
+      if (allowed !== null && !allowed.includes(String(request.query.areaId))) return response.status(403).json({ error: 'No tienes acceso a esta área' })
+      params.push(request.query.areaId); where.push(`p.area_id = $${params.length}`)
+    }
     if (request.query.monthReported) { params.push(request.query.monthReported); where.push(`e.month_reported = $${params.length}`) }
     const result = await query(
       `SELECT e.id, e.month_reported, e.evaluation_date, e.total_records, e.overall_compliance, e.concept, e.status,
@@ -355,6 +431,8 @@ adherenceRouter.post('/evaluations', evaluate, async (request, response, next) =
     }
     const professional = await query('SELECT id, area_id, status FROM adherence_professionals WHERE id = $1 AND organization_id = $2', [body.professionalId, oid(request)])
     if (!professional.rows[0]) return response.status(400).json({ error: 'El profesional no pertenece a esta entidad' })
+    const allowed = await allowedAreaIds(request)
+    if (allowed !== null && !allowed.includes(String(professional.rows[0].area_id))) return response.status(403).json({ error: 'No tienes acceso al área de este profesional' })
     const version = await query('SELECT id FROM adherence_matrix_versions WHERE area_id = $1 AND is_current', [professional.rows[0].area_id])
     if (!version.rows[0]) return response.status(400).json({ error: 'El área del profesional no tiene una matriz vigente' })
     const result = await query(
@@ -395,6 +473,7 @@ async function loadEvaluationDetail(organizationId, evaluationId) {
 
 adherenceRouter.get('/evaluations/:id', view, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     const detail = await loadEvaluationDetail(oid(request), request.params.id)
     if (!detail) return response.status(404).json({ error: 'Evaluación no encontrada' })
     response.json(detail)
@@ -403,6 +482,7 @@ adherenceRouter.get('/evaluations/:id', view, async (request, response, next) =>
 
 adherenceRouter.patch('/evaluations/:id', evaluate, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     const body = request.body || {}
     const fieldMap = { generalObservations: 'general_observations', commitments: 'commitments', improvementPlanPercent: 'improvement_plan_percent' }
     const changes = Object.entries(fieldMap).filter(([key]) => Object.hasOwn(body, key))
@@ -422,6 +502,7 @@ adherenceRouter.patch('/evaluations/:id', evaluate, async (request, response, ne
 
 adherenceRouter.post('/evaluations/:id/close', close, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     const evaluatorSignedName = String(request.body?.evaluatorSignedName || request.auth.user.fullName).trim()
     const result = await query(
       `UPDATE adherence_evaluations
@@ -436,6 +517,7 @@ adherenceRouter.post('/evaluations/:id/close', close, async (request, response, 
 
 adherenceRouter.post('/evaluations/:id/reopen', close, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     if (!String(request.body?.justification || '').trim()) return response.status(400).json({ error: 'La justificación es obligatoria para reabrir' })
     const result = await query(
       `UPDATE adherence_evaluations
@@ -456,6 +538,7 @@ adherenceRouter.post('/evaluations/:id/reopen', close, async (request, response,
 
 adherenceRouter.post('/evaluations/:id/sign', close, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     const professionalSignedName = String(request.body?.professionalSignedName || '').trim()
     if (!professionalSignedName) return response.status(400).json({ error: 'El nombre del profesional es obligatorio para registrar la firma' })
     const result = await query(
@@ -470,6 +553,7 @@ adherenceRouter.post('/evaluations/:id/sign', close, async (request, response, n
 
 adherenceRouter.get('/evaluations/:id/report.pdf', exportData, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     const detail = await loadEvaluationDetail(oid(request), request.params.id)
     if (!detail) return response.status(404).json({ error: 'Evaluación no encontrada' })
     const thresholds = await query('SELECT concept, min_percent FROM adherence_thresholds WHERE organization_id = $1 ORDER BY min_percent DESC', [oid(request)])
@@ -484,6 +568,7 @@ adherenceRouter.get('/evaluations/:id/report.pdf', exportData, async (request, r
 adherenceRouter.post('/evaluations/:id/records', evaluate, async (request, response, next) => {
   const client = await pool.connect()
   try {
+    await assertEvaluationAccess(request)
     const recordNumber = String(request.body?.recordNumber || '').trim()
     if (!recordNumber) return response.status(400).json({ error: 'El número de HC es obligatorio' })
     await client.query('BEGIN')
@@ -508,6 +593,7 @@ adherenceRouter.post('/evaluations/:id/records', evaluate, async (request, respo
 
 adherenceRouter.patch('/evaluations/:id/records/:recordId', evaluate, async (request, response, next) => {
   try {
+    await assertEvaluationAccess(request)
     const evaluation = await query('SELECT id FROM adherence_evaluations WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
     if (!evaluation.rows[0]) return response.status(404).json({ error: 'Evaluación no encontrada' })
     const body = request.body || {}
@@ -530,6 +616,7 @@ adherenceRouter.patch('/evaluations/:id/records/:recordId', evaluate, async (req
 adherenceRouter.delete('/evaluations/:id/records/:recordId', evaluate, async (request, response, next) => {
   const client = await pool.connect()
   try {
+    await assertEvaluationAccess(request)
     await client.query('BEGIN')
     const evaluation = await client.query('SELECT id, status FROM adherence_evaluations WHERE id = $1 AND organization_id = $2 FOR UPDATE', [request.params.id, oid(request)])
     if (!evaluation.rows[0]) fail(404, 'Evaluación no encontrada')
@@ -551,6 +638,7 @@ adherenceRouter.delete('/evaluations/:id/records/:recordId', evaluate, async (re
 adherenceRouter.put('/evaluations/:id/scores', evaluate, async (request, response, next) => {
   const client = await pool.connect()
   try {
+    await assertEvaluationAccess(request)
     const scoresInput = Array.isArray(request.body?.scores) ? request.body.scores : []
     for (const item of scoresInput) {
       if (item.score !== null && ![0, 1, 2].includes(Number(item.score))) return response.status(400).json({ error: 'Cada puntuación debe ser 0, 1, 2 o No Aplica' })
@@ -591,12 +679,20 @@ adherenceRouter.put('/evaluations/:id/scores', evaluate, async (request, respons
 })
 
 async function loadDashboard(request) {
+  const allowed = await allowedAreaIds(request)
+  if (allowed !== null && !allowed.length) {
+    return { totalEvaluations: 0, averageCompliance: null, byConcept: { OPTIMO: 0, ACEPTABLE: 0, DEFICIENTE: 0, MUY_DEFICIENTE: 0 }, byScope: [], byProfessional: [], byMonth: [] }
+  }
   const params = [oid(request)]
   const where = ['e.organization_id = $1', 'e.total_records > 0']
+  if (allowed !== null) { params.push(allowed); where.push(`p.area_id = ANY($${params.length}::bigint[])`) }
   if (request.query.monthReported) { params.push(request.query.monthReported); where.push(`e.month_reported = $${params.length}`) }
   if (request.query.professionalId) { params.push(request.query.professionalId); where.push(`e.professional_id = $${params.length}`) }
   if (request.query.positionId) { params.push(request.query.positionId); where.push(`p.position_id = $${params.length}`) }
-  if (request.query.areaId) { params.push(request.query.areaId); where.push(`p.area_id = $${params.length}`) }
+  if (request.query.areaId) {
+    if (allowed !== null && !allowed.includes(String(request.query.areaId))) fail(403, 'No tienes acceso a esta área')
+    params.push(request.query.areaId); where.push(`p.area_id = $${params.length}`)
+  }
 
   const evaluations = await query(
     `SELECT e.id, e.overall_compliance, e.concept, e.month_reported, e.matrix_version_id, e.status, e.evaluation_date,
@@ -719,4 +815,47 @@ adherenceRouter.get('/dashboard/report.pdf', exportData, async (request, respons
     response.setHeader('Content-Disposition', 'attachment; filename="dashboard-adherencia.pdf"')
     response.send(pdf)
   } catch (error) { next(error) }
+})
+
+adherenceRouter.get('/auditors', manage, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT m.id AS membership_id, u.full_name, u.email, r.name AS role_name,
+              COALESCE(json_agg(DISTINCT aaa.area_id) FILTER (WHERE aaa.area_id IS NOT NULL), '[]') AS area_ids
+       FROM memberships m
+       JOIN users u ON u.id = m.user_id
+       JOIN roles r ON r.id = m.role_id
+       JOIN role_modules rm ON rm.role_id = r.id
+       JOIN modules mo ON mo.id = rm.module_id AND mo.key = 'adherence-matrix'
+       LEFT JOIN adherence_auditor_areas aaa ON aaa.membership_id = m.id
+       WHERE m.organization_id = $1 AND m.active = TRUE
+       GROUP BY m.id, u.full_name, u.email, r.name
+       ORDER BY u.full_name`,
+      [oid(request)],
+    )
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.put('/auditors/:membershipId/areas', manage, async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    const areaIds = Array.isArray(request.body?.areaIds) ? request.body.areaIds : []
+    const membership = await client.query('SELECT id FROM memberships WHERE id = $1 AND organization_id = $2', [request.params.membershipId, oid(request)])
+    if (!membership.rows[0]) return response.status(404).json({ error: 'Usuario no encontrado' })
+    if (areaIds.length) {
+      const validAreas = await client.query('SELECT id FROM adherence_areas WHERE organization_id = $1 AND id = ANY($2::bigint[])', [oid(request), areaIds])
+      if (validAreas.rows.length !== new Set(areaIds.map(String)).size) return response.status(400).json({ error: 'Una o más áreas no son válidas' })
+    }
+    await client.query('BEGIN')
+    await client.query('DELETE FROM adherence_auditor_areas WHERE membership_id = $1', [request.params.membershipId])
+    for (const areaId of areaIds) {
+      await client.query('INSERT INTO adherence_auditor_areas (membership_id, area_id) VALUES ($1, $2)', [request.params.membershipId, areaId])
+    }
+    await client.query('COMMIT')
+    response.json({ ok: true, areaIds })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    next(error)
+  } finally { client.release() }
 })

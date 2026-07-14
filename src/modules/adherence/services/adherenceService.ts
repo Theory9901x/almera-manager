@@ -1,4 +1,4 @@
-import type { Area, AreaMatrix, Dashboard, Evaluation, EvaluationDetail, EvaluationRecord, EvaluationSummary, Position, Professional, ScoreComputation, Threshold } from '../types'
+import type { Area, AreaMatrix, Auditor, Dashboard, Evaluation, EvaluationDetail, EvaluationRecord, EvaluationSummary, Position, Professional, ScoreComputation, Threshold } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/adherence${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) }, ...init })
@@ -51,6 +51,8 @@ export const adherenceService = {
     anchor.click()
     URL.revokeObjectURL(url)
   },
+  auditors: () => call<Auditor[]>('/auditors'),
+  updateAuditorAreas: (membershipId: string, areaIds: string[]) => call<{ ok: true }>(`/auditors/${membershipId}/areas`, { method: 'PUT', body: JSON.stringify({ areaIds }) }),
   thresholds: () => call<Threshold[]>('/thresholds'),
   updateThreshold: (concept: string, minPercent: number) => call<Threshold>(`/thresholds/${concept}`, { method: 'PATCH', body: JSON.stringify({ minPercent }) }),
   dashboard: (filters: DashboardFilters = {}) => call<Dashboard>(`/dashboard${toQueryString(filters)}`),

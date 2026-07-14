@@ -342,3 +342,9 @@ CREATE TABLE IF NOT EXISTS adherence_evaluation_scores (
   score SMALLINT CHECK (score IN (0,1,2)),
   UNIQUE (evaluation_record_id, criterion_id)
 );
+
+CREATE TABLE IF NOT EXISTS adherence_auditor_areas (
+  membership_id BIGINT NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+  area_id BIGINT NOT NULL REFERENCES adherence_areas(id) ON DELETE CASCADE,
+  PRIMARY KEY (membership_id, area_id)
+);

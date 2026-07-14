@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Briefcase, CheckCircle2, ClipboardList, LayoutDashboard, Layers3, Pencil, Plus, Save, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Briefcase, CheckCircle2, ClipboardList, LayoutDashboard, Layers3, Pencil, Plus, Save, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import { useAuth } from '@/platform/auth/AuthContext'
 import { Badge, Button, Card, Field, PageHeader, SearchBox } from '@/shared/ui'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, Position, Professional, ProfessionalStatus } from '../types'
 import EvaluationsPanel from './EvaluationsPanel'
 import DashboardPanel from './DashboardPanel'
+import AuditorsPanel from './AuditorsPanel'
 
-type Tab = 'dashboard' | 'areas' | 'evaluations' | 'professionals' | 'positions'
+type Tab = 'dashboard' | 'areas' | 'evaluations' | 'professionals' | 'positions' | 'auditors'
 
 const tabs = [
   ['dashboard', 'Dashboard', LayoutDashboard],
@@ -14,6 +16,7 @@ const tabs = [
   ['evaluations', 'Evaluaciones', ClipboardList],
   ['professionals', 'Profesionales', Users],
   ['positions', 'Cargos', Briefcase],
+  ['auditors', 'Auditores', ShieldCheck],
 ] as const
 
 const statusLabels: Record<ProfessionalStatus, string> = {
@@ -29,6 +32,9 @@ function makeKey() { return Math.random().toString(36).slice(2) }
 function newProfessionalForm() { return { fullName: '', documentId: '', specialty: '', areaId: '', positionId: '', status: 'ACTIVE_INDEFINITE' as ProfessionalStatus } }
 
 export default function AdherenceMatrixPage() {
+  const { session } = useAuth()
+  const canManage = (session?.permissions || []).includes('adherence_matrix.manage')
+  const visibleTabs = tabs.filter(([key]) => key !== 'auditors' || canManage)
   const [tab, setTab] = useState<Tab>('dashboard')
   const [areas, setAreas] = useState<Area[]>([])
   const [positions, setPositions] = useState<Position[]>([])
@@ -80,9 +86,6 @@ export default function AdherenceMatrixPage() {
     } catch (caught) { fail(caught, 'No fue posible abrir la matriz del área') }
   }
 
-  const addScope = () => setEditorScopes(current => [...current, { _key: makeKey(), name: '', criteria: [] }])
-  const removeScope = (key: string) => setEditorScopes(current => current.filter(scope => scope._key !== key))
-  const renameScope = (key: string, name: string) => setEditorScopes(current => current.map(scope => scope._key === key ? { ...scope, name } : scope))
   const addCriterion = (scopeKey: string) => setEditorScopes(current => current.map(scope => scope._key === scopeKey ? { ...scope, criteria: [...scope.criteria, { _key: makeKey(), text: '', weight: '' }] } : scope))
   const removeCriterion = (scopeKey: string, key: string) => setEditorScopes(current => current.map(scope => scope._key === scopeKey ? { ...scope, criteria: scope.criteria.filter(criterion => criterion._key !== key) } : scope))
   const updateCriterion = (scopeKey: string, key: string, patch: Partial<EditorCriterion>) => setEditorScopes(current => current.map(scope => scope._key === scopeKey ? { ...scope, criteria: scope.criteria.map(criterion => criterion._key === key ? { ...criterion, ...patch } : criterion) } : scope))
@@ -91,11 +94,10 @@ export default function AdherenceMatrixPage() {
     if (!selectedAreaId) return
     setBusy(true); setError('')
     try {
-      const scopes = editorScopes.map((scope, index) => ({ id: scope.id, name: scope.name.trim(), orderIndex: index }))
       const criteria = editorScopes.flatMap((scope, scopeIndex) => scope.criteria.map((criterion, index) => ({
         id: criterion.id, scopeIndex, text: criterion.text.trim(), weight: Number(criterion.weight), orderIndex: index,
       })))
-      const result = await adherenceService.saveMatrix(selectedAreaId, { scopes, criteria })
+      const result = await adherenceService.saveMatrix(selectedAreaId, { criteria })
       setVersionNumber(result.versionNumber)
       notify('Matriz guardada correctamente')
       await loadAreas()
@@ -164,7 +166,7 @@ export default function AdherenceMatrixPage() {
       />
 
       <nav className="almera-nav adherence-nav" aria-label="Secciones de matrices de adherencia">
-        {tabs.map(([key, label, Icon]) => (
+        {visibleTabs.map(([key, label, Icon]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => { setTab(key); setSelectedAreaId(null) }}>
             <Icon size={17} /><span>{label}</span>
           </button>
@@ -176,14 +178,16 @@ export default function AdherenceMatrixPage() {
 
       {tab === 'areas' && !selectedAreaId && (
         <div className="space-y-5">
-          <Card className="p-5">
-            <p className="eyebrow">Registro</p>
-            <h2 className="mt-1 text-xl font-black">Nueva área</h2>
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <div className="min-w-[260px] flex-1"><Field label="Nombre del área"><input value={newAreaName} onChange={event => setNewAreaName(event.target.value)} placeholder="Ej. Urgencias" /></Field></div>
-              <Button onClick={() => void createArea()} disabled={busy}><Plus size={16} />Crear área</Button>
-            </div>
-          </Card>
+          {canManage && (
+            <Card className="p-5">
+              <p className="eyebrow">Registro</p>
+              <h2 className="mt-1 text-xl font-black">Nueva área</h2>
+              <div className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="min-w-[260px] flex-1"><Field label="Nombre del área"><input value={newAreaName} onChange={event => setNewAreaName(event.target.value)} placeholder="Ej. Urgencias" /></Field></div>
+                <Button onClick={() => void createArea()} disabled={busy}><Plus size={16} />Crear área</Button>
+              </div>
+            </Card>
+          )}
 
           <Card className="overflow-hidden">
             <div className="table-toolbar">
@@ -202,10 +206,12 @@ export default function AdherenceMatrixPage() {
                       <td><Badge tone={Number(area.weight_total) === 100 ? 'success' : 'warning'}>{Number(area.weight_total).toFixed(0)} / 100</Badge></td>
                       <td><Badge tone={area.active ? 'success' : 'neutral'}>{area.active ? 'Activa' : 'Inactiva'}</Badge></td>
                       <td>
-                        <div className="flex justify-end gap-3">
-                          <button className="row-action" onClick={() => void openArea(area.id)}><Pencil size={14} />Editar matriz</button>
-                          <button className="row-action" onClick={() => void toggleAreaActive(area)}>{area.active ? 'Desactivar' : 'Activar'}</button>
-                        </div>
+                        {canManage && (
+                          <div className="flex justify-end gap-3">
+                            <button className="row-action" onClick={() => void openArea(area.id)}><Pencil size={14} />Editar matriz</button>
+                            <button className="row-action" onClick={() => void toggleAreaActive(area)}>{area.active ? 'Desactivar' : 'Activar'}</button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -227,13 +233,11 @@ export default function AdherenceMatrixPage() {
             </div>
           </div>
 
+          <p className="mb-3 text-xs text-[var(--muted)]">Los ámbitos son fijos para todas las áreas. Solo se editan los criterios y sus pesos (deben sumar 100 en total).</p>
           <div className="grid gap-4">
             {editorScopes.map(scope => (
               <div key={scope._key} className="scope-editor">
-                <div className="flex items-center gap-2">
-                  <input value={scope.name} onChange={event => renameScope(scope._key, event.target.value)} placeholder="Nombre del ámbito" className="flex-1" />
-                  <button className="row-action" onClick={() => removeScope(scope._key)}><Trash2 size={14} />Quitar ámbito</button>
-                </div>
+                <strong>{scope.name}</strong>
                 <div className="grid gap-2">
                   {scope.criteria.map(criterion => (
                     <div key={criterion._key} className="criteria-row">
@@ -248,8 +252,7 @@ export default function AdherenceMatrixPage() {
             ))}
           </div>
 
-          <div className="mt-4 flex items-center justify-between">
-            <button className="row-action" onClick={addScope}><Plus size={14} />Agregar ámbito</button>
+          <div className="mt-4 flex items-center justify-end">
             <Button onClick={() => void saveMatrix()} disabled={busy}><Save size={16} />Guardar matriz</Button>
           </div>
         </Card>
@@ -257,23 +260,27 @@ export default function AdherenceMatrixPage() {
 
       {tab === 'dashboard' && <DashboardPanel areas={areas} positions={positions} professionals={professionals} />}
 
+      {tab === 'auditors' && canManage && <AuditorsPanel areas={areas} />}
+
       {tab === 'evaluations' && <EvaluationsPanel areas={areas} professionals={professionals} />}
 
       {tab === 'professionals' && (
         <div className="space-y-5">
-          <Card className="p-5">
-            <p className="eyebrow">Registro</p>
-            <h2 className="mt-1 text-xl font-black">Nuevo profesional</h2>
-            <div className="dialog-form mt-4">
-              <Field label="Nombre completo"><input value={professionalForm.fullName} onChange={event => setProfessionalForm({ ...professionalForm, fullName: event.target.value })} /></Field>
-              <Field label="No. documento"><input value={professionalForm.documentId} onChange={event => setProfessionalForm({ ...professionalForm, documentId: event.target.value })} /></Field>
-              <Field label="Área"><select value={professionalForm.areaId} onChange={event => setProfessionalForm({ ...professionalForm, areaId: event.target.value })}><option value="">Selecciona un área</option>{areas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}</select></Field>
-              <Field label="Cargo"><select value={professionalForm.positionId} onChange={event => setProfessionalForm({ ...professionalForm, positionId: event.target.value })}><option value="">Selecciona un cargo</option>{positions.map(position => <option key={position.id} value={position.id}>{position.name}</option>)}</select></Field>
-              <Field label="Especialidad"><input value={professionalForm.specialty} onChange={event => setProfessionalForm({ ...professionalForm, specialty: event.target.value })} /></Field>
-              <Field label="Estado"><select value={professionalForm.status} onChange={event => setProfessionalForm({ ...professionalForm, status: event.target.value as ProfessionalStatus })}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-              <div className="full"><Button onClick={() => void createProfessional()} disabled={busy}><Plus size={16} />Registrar profesional</Button></div>
-            </div>
-          </Card>
+          {canManage && (
+            <Card className="p-5">
+              <p className="eyebrow">Registro</p>
+              <h2 className="mt-1 text-xl font-black">Nuevo profesional</h2>
+              <div className="dialog-form mt-4">
+                <Field label="Nombre completo"><input value={professionalForm.fullName} onChange={event => setProfessionalForm({ ...professionalForm, fullName: event.target.value })} /></Field>
+                <Field label="No. documento"><input value={professionalForm.documentId} onChange={event => setProfessionalForm({ ...professionalForm, documentId: event.target.value })} /></Field>
+                <Field label="Área"><select value={professionalForm.areaId} onChange={event => setProfessionalForm({ ...professionalForm, areaId: event.target.value })}><option value="">Selecciona un área</option>{areas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}</select></Field>
+                <Field label="Cargo"><select value={professionalForm.positionId} onChange={event => setProfessionalForm({ ...professionalForm, positionId: event.target.value })}><option value="">Selecciona un cargo</option>{positions.map(position => <option key={position.id} value={position.id}>{position.name}</option>)}</select></Field>
+                <Field label="Especialidad"><input value={professionalForm.specialty} onChange={event => setProfessionalForm({ ...professionalForm, specialty: event.target.value })} /></Field>
+                <Field label="Estado"><select value={professionalForm.status} onChange={event => setProfessionalForm({ ...professionalForm, status: event.target.value as ProfessionalStatus })}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                <div className="full"><Button onClick={() => void createProfessional()} disabled={busy}><Plus size={16} />Registrar profesional</Button></div>
+              </div>
+            </Card>
+          )}
 
           <Card className="overflow-hidden">
             <div className="table-toolbar">
@@ -307,7 +314,7 @@ export default function AdherenceMatrixPage() {
                       <td>{professional.area_name}</td>
                       <td>{professional.position_name}</td>
                       <td><Badge tone={professional.active ? 'success' : 'neutral'}>{statusLabels[professional.status]}</Badge></td>
-                      <td><button className="row-action" onClick={() => startEditProfessional(professional)}><Pencil size={14} />Editar</button></td>
+                      <td>{canManage && <button className="row-action" onClick={() => startEditProfessional(professional)}><Pencil size={14} />Editar</button>}</td>
                     </tr>
                   ))}
                   {!professionals.length && <tr><td colSpan={5}><div className="almera-empty"><Users size={30} /><p>No hay profesionales registrados.</p></div></td></tr>}
@@ -320,14 +327,16 @@ export default function AdherenceMatrixPage() {
 
       {tab === 'positions' && (
         <div className="space-y-5">
-          <Card className="p-5">
-            <p className="eyebrow">Registro</p>
-            <h2 className="mt-1 text-xl font-black">Nuevo cargo</h2>
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <div className="min-w-[260px] flex-1"><Field label="Nombre del cargo"><input value={newPositionName} onChange={event => setNewPositionName(event.target.value)} placeholder="Ej. Médico General" /></Field></div>
-              <Button onClick={() => void createPosition()} disabled={busy}><Plus size={16} />Crear cargo</Button>
-            </div>
-          </Card>
+          {canManage && (
+            <Card className="p-5">
+              <p className="eyebrow">Registro</p>
+              <h2 className="mt-1 text-xl font-black">Nuevo cargo</h2>
+              <div className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="min-w-[260px] flex-1"><Field label="Nombre del cargo"><input value={newPositionName} onChange={event => setNewPositionName(event.target.value)} placeholder="Ej. Médico General" /></Field></div>
+                <Button onClick={() => void createPosition()} disabled={busy}><Plus size={16} />Crear cargo</Button>
+              </div>
+            </Card>
+          )}
 
           <Card className="overflow-hidden">
             <div className="table-toolbar">
@@ -341,7 +350,7 @@ export default function AdherenceMatrixPage() {
                     <tr key={position.id}>
                       <td><strong>{position.name}</strong></td>
                       <td><Badge tone={position.active ? 'success' : 'neutral'}>{position.active ? 'Activo' : 'Inactivo'}</Badge></td>
-                      <td><button className="row-action" onClick={() => void togglePositionActive(position)}>{position.active ? 'Desactivar' : 'Activar'}</button></td>
+                      <td>{canManage && <button className="row-action" onClick={() => void togglePositionActive(position)}>{position.active ? 'Desactivar' : 'Activar'}</button>}</td>
                     </tr>
                   ))}
                   {!positions.length && <tr><td colSpan={3}><div className="almera-empty"><Briefcase size={30} /><p>No hay cargos registrados.</p></div></td></tr>}
