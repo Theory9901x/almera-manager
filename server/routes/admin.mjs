@@ -1,11 +1,17 @@
 import { Router } from 'express'
-import { requireAnyPermission, requirePermission } from '../auth.mjs'
+import { requireAnyPermission } from '../auth.mjs'
 import { pool, query } from '../db.mjs'
-import { hashPassword, normalizeEmail, safeKey } from '../security.mjs'
+import { hashPassword, normalizeEmail } from '../security.mjs'
 
 export const adminRouter = Router()
 
 adminRouter.use(requireAnyPermission(['admin.view', 'users.view', 'users.manage', 'roles.assign', 'roles.manage', 'settings.edit', 'modules.manage', 'organization.manage']))
+
+function fail(status, message) {
+  const error = new Error(message)
+  error.status = status
+  throw error
+}
 
 adminRouter.get('/overview', async (request, response, next) => {
   try {
@@ -13,16 +19,14 @@ adminRouter.get('/overview', async (request, response, next) => {
     const [users, roles, modules, permissions] = await Promise.all([
       query(
         `SELECT u.id, u.email, u.full_name, u.active, u.last_login_at,
-                m.id AS membership_id, m.active AS membership_active, r.id AS role_id, r.name AS role_name
+                m.id AS membership_id, m.active AS membership_active, r.id AS role_id, r.key AS role_key, r.name AS role_name,
+                m.position_id, ap.name AS position_name
          FROM memberships m JOIN users u ON u.id=m.user_id JOIN roles r ON r.id=m.role_id
+         LEFT JOIN adherence_positions ap ON ap.id = m.position_id
          WHERE m.organization_id=$1 ORDER BY u.full_name`, [organizationId]),
       query(
-        `SELECT r.id, r.key, r.name, r.description, r.system,
-                COALESCE(json_agg(DISTINCT rm.module_id) FILTER (WHERE rm.module_id IS NOT NULL), '[]') AS module_ids,
-                COALESCE(json_agg(DISTINCT rp.permission_id) FILTER (WHERE rp.permission_id IS NOT NULL), '[]') AS permission_ids,
-                COUNT(DISTINCT m.id)::int AS user_count
-         FROM roles r LEFT JOIN role_modules rm ON rm.role_id=r.id
-         LEFT JOIN role_permissions rp ON rp.role_id=r.id LEFT JOIN memberships m ON m.role_id=r.id
+        `SELECT r.id, r.key, r.name, r.description, r.system, COUNT(DISTINCT m.id)::int AS user_count
+         FROM roles r LEFT JOIN memberships m ON m.role_id=r.id
          WHERE r.organization_id=$1 GROUP BY r.id ORDER BY r.system DESC, r.name`, [organizationId]),
       query(
         `SELECT mo.*, COALESCE(om.enabled, FALSE) AS enabled
@@ -70,6 +74,14 @@ adminRouter.patch('/users/:membershipId', requireAnyPermission(['users.edit', 'u
     const membershipId = Number(request.params.membershipId)
     const roleId = Number(request.body?.roleId)
     const active = Boolean(request.body?.active)
+    if (Object.hasOwn(request.body || {}, 'positionId')) {
+      const positionId = request.body.positionId === null || request.body.positionId === '' ? null : Number(request.body.positionId)
+      if (positionId !== null) {
+        const position = await query('SELECT id FROM adherence_positions WHERE id=$1 AND organization_id=$2', [positionId, organizationId])
+        if (!position.rows[0]) return response.status(400).json({ error: 'El cargo no pertenece a esta entidad' })
+      }
+      await query('UPDATE memberships SET position_id=$1 WHERE id=$2 AND organization_id=$3', [positionId, membershipId, organizationId])
+    }
     const result = await query(
       `UPDATE memberships m SET role_id=$1, active=$2
        FROM roles r WHERE m.id=$3 AND m.organization_id=$4 AND r.id=$1 AND r.organization_id=$4
@@ -79,42 +91,124 @@ adminRouter.patch('/users/:membershipId', requireAnyPermission(['users.edit', 'u
   } catch (error) { next(error) }
 })
 
-adminRouter.post('/roles', requireAnyPermission(['roles.assign', 'roles.manage']), async (request, response, next) => {
+adminRouter.get('/users/:membershipId/modules', async (request, response, next) => {
   try {
     const organizationId = request.auth.organization.id
-    const name = String(request.body?.name || '').trim()
-    const description = String(request.body?.description || '').trim()
-    const key = safeKey(name)
-    if (name.length < 3 || !key) return response.status(400).json({ error: 'El rol necesita un nombre válido' })
+    const membershipId = Number(request.params.membershipId)
+    const membership = await query('SELECT id FROM memberships WHERE id=$1 AND organization_id=$2', [membershipId, organizationId])
+    if (!membership.rows[0]) return response.status(404).json({ error: 'Usuario no encontrado' })
     const result = await query(
-      `INSERT INTO roles (organization_id,key,name,description) VALUES ($1,$2,$3,$4)
-       RETURNING *`, [organizationId, key, name, description])
-    response.status(201).json(result.rows[0])
-  } catch (error) {
-    if (error.code === '23505') return response.status(409).json({ error: 'Ya existe un rol con ese nombre' })
-    next(error)
-  }
+      `SELECT mo.id AS module_id, mo.key AS module_key, mo.name AS module_name, mm.function_key,
+              ap.id AS area_id, ap.name AS area_name,
+              COALESCE(
+                (SELECT json_agg(json_build_object('id', aa.id, 'name', aa.name))
+                 FROM adherence_auditor_areas aaa JOIN adherence_areas aa ON aa.id = aaa.area_id
+                 WHERE aaa.membership_id = $1 AND mo.key = 'adherence-matrix'),
+                '[]'
+              ) AS auditor_areas
+       FROM membership_modules mm
+       JOIN modules mo ON mo.id = mm.module_id
+       LEFT JOIN adherence_professionals pr ON pr.membership_id = $1 AND mo.key = 'adherence-matrix'
+       LEFT JOIN adherence_areas ap ON ap.id = pr.area_id
+       WHERE mm.membership_id = $1
+       ORDER BY mo.position, mo.name`,
+      [membershipId],
+    )
+    response.json(result.rows)
+  } catch (error) { next(error) }
 })
 
-adminRouter.put('/roles/:roleId/access', requireAnyPermission(['roles.assign', 'roles.manage']), async (request, response, next) => {
+adminRouter.put('/users/:membershipId/modules/:moduleKey', requireAnyPermission(['users.edit', 'users.manage']), async (request, response, next) => {
   const client = await pool.connect()
   try {
     const organizationId = request.auth.organization.id
-    const roleId = Number(request.params.roleId)
-    const moduleIds = [...new Set((request.body?.moduleIds || []).map(Number).filter(Boolean))]
-    const permissionIds = [...new Set((request.body?.permissionIds || []).map(Number).filter(Boolean))]
-    const role = await client.query('SELECT system FROM roles WHERE id=$1 AND organization_id=$2', [roleId, organizationId])
-    if (!role.rows[0]) return response.status(404).json({ error: 'Rol no encontrado' })
-    if (role.rows[0].system) return response.status(400).json({ error: 'El rol principal del sistema no puede limitarse' })
+    const membershipId = Number(request.params.membershipId)
+    const moduleKey = String(request.params.moduleKey)
+    const membership = await client.query(
+      `SELECT m.id, m.position_id, u.full_name, r.key AS role_key
+       FROM memberships m JOIN users u ON u.id=m.user_id JOIN roles r ON r.id=m.role_id
+       WHERE m.id=$1 AND m.organization_id=$2`,
+      [membershipId, organizationId],
+    )
+    if (!membership.rows[0]) return response.status(404).json({ error: 'Usuario no encontrado' })
+    if (membership.rows[0].role_key !== 'USUARIO') return response.status(400).json({ error: 'Solo los usuarios con rol "Usuario" reciben módulos individuales; Admin y Superadmin ya tienen acceso completo' })
+    const module = await client.query('SELECT id FROM modules WHERE key=$1', [moduleKey])
+    if (!module.rows[0]) return response.status(404).json({ error: 'Módulo no encontrado' })
+
     await client.query('BEGIN')
-    await client.query('DELETE FROM role_modules WHERE role_id=$1', [roleId])
-    await client.query('DELETE FROM role_permissions WHERE role_id=$1', [roleId])
-    if (moduleIds.length) await client.query(
-      `INSERT INTO role_modules (role_id,module_id)
-       SELECT $1, unnest($2::bigint[])`, [roleId, moduleIds])
-    if (permissionIds.length) await client.query(
-      `INSERT INTO role_permissions (role_id,permission_id)
-       SELECT $1, unnest($2::bigint[])`, [roleId, permissionIds])
+
+    if (moduleKey === 'adherence-matrix') {
+      const functionKey = String(request.body?.function || '').trim().toUpperCase()
+      if (!['AUDITOR', 'PROFESIONAL'].includes(functionKey)) fail(400, 'Elige la función: Auditor o Profesional')
+      await client.query(
+        `INSERT INTO membership_modules (membership_id, module_id, function_key) VALUES ($1,$2,$3)
+         ON CONFLICT (membership_id, module_id) DO UPDATE SET function_key=EXCLUDED.function_key`,
+        [membershipId, module.rows[0].id, functionKey],
+      )
+
+      const areaId = Number(request.body?.areaId)
+      if (!areaId) fail(400, 'El área es obligatoria para habilitar Matrices de Adherencia')
+      const area = await client.query('SELECT id FROM adherence_areas WHERE id=$1 AND organization_id=$2', [areaId, organizationId])
+      if (!area.rows[0]) fail(400, 'El área no pertenece a esta entidad')
+
+      if (functionKey === 'AUDITOR') {
+        await client.query(
+          'INSERT INTO adherence_auditor_areas (membership_id, area_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [membershipId, areaId],
+        )
+      } else {
+        const documentId = String(request.body?.documentId || '').trim()
+        const positionId = Number(request.body?.positionId) || membership.rows[0].position_id
+        if (!documentId) fail(400, 'El número de documento es obligatorio para habilitar Matrices de Adherencia')
+        if (!positionId) fail(400, 'El cargo es obligatorio (el usuario aún no tiene uno en su perfil)')
+        const position = await client.query('SELECT id FROM adherence_positions WHERE id=$1 AND organization_id=$2', [positionId, organizationId])
+        if (!position.rows[0]) fail(400, 'El cargo no pertenece a esta entidad')
+        const existing = await client.query('SELECT id FROM adherence_professionals WHERE membership_id=$1', [membershipId])
+        if (existing.rows[0]) {
+          await client.query(
+            'UPDATE adherence_professionals SET area_id=$1, document_id=$2, position_id=$3, active=TRUE, updated_at=NOW() WHERE id=$4',
+            [areaId, documentId, positionId, existing.rows[0].id],
+          )
+        } else {
+          await client.query(
+            `INSERT INTO adherence_professionals (organization_id, area_id, position_id, full_name, document_id, status, membership_id)
+             VALUES ($1,$2,$3,$4,$5,'ACTIVE_INDEFINITE',$6)`,
+            [organizationId, areaId, positionId, membership.rows[0].full_name, documentId, membershipId],
+          )
+        }
+      }
+    } else {
+      await client.query(
+        'INSERT INTO membership_modules (membership_id, module_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+        [membershipId, module.rows[0].id],
+      )
+    }
+
+    await client.query('COMMIT')
+    response.json({ ok: true })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    if (error.code === '23505') return response.status(409).json({ error: 'Ya existe un profesional con ese número de documento' })
+    next(error)
+  } finally { client.release() }
+})
+
+adminRouter.delete('/users/:membershipId/modules/:moduleKey', requireAnyPermission(['users.edit', 'users.manage']), async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    const organizationId = request.auth.organization.id
+    const membershipId = Number(request.params.membershipId)
+    const moduleKey = String(request.params.moduleKey)
+    const membership = await client.query('SELECT id FROM memberships WHERE id=$1 AND organization_id=$2', [membershipId, organizationId])
+    if (!membership.rows[0]) return response.status(404).json({ error: 'Usuario no encontrado' })
+    const module = await client.query('SELECT id FROM modules WHERE key=$1', [moduleKey])
+    if (!module.rows[0]) return response.status(404).json({ error: 'Módulo no encontrado' })
+    await client.query('BEGIN')
+    await client.query('DELETE FROM membership_modules WHERE membership_id=$1 AND module_id=$2', [membershipId, module.rows[0].id])
+    if (moduleKey === 'adherence-matrix') {
+      await client.query('UPDATE adherence_professionals SET membership_id=NULL WHERE membership_id=$1', [membershipId])
+      await client.query('DELETE FROM adherence_auditor_areas WHERE membership_id=$1', [membershipId])
+    }
     await client.query('COMMIT')
     response.json({ ok: true })
   } catch (error) {

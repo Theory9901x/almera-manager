@@ -1,4 +1,8 @@
+import { randomUUID } from 'node:crypto'
+import { mkdir, unlink } from 'node:fs/promises'
+import { extname, resolve } from 'node:path'
 import { Router } from 'express'
+import multer from 'multer'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requireAnyPermission } from '../auth.mjs'
 import { renderPdf } from '../pdf.mjs'
@@ -7,8 +11,32 @@ import { renderAdherenceDashboardHtml } from '../templates/adherenceDashboardRep
 
 export const adherenceRouter = Router()
 
-// Ámbitos institucionales: siempre son estos 7, en este orden, para cualquier área.
-// Los criterios sí varían por área; esta lista es solo la plantilla por defecto para una matriz nueva.
+const uploadRoot = resolve(process.env.UPLOAD_DIR || 'uploads/adherence')
+await mkdir(uploadRoot, { recursive: true })
+
+const allowedEvidenceMimeTypes = new Set([
+  'application/pdf', 'image/png', 'image/jpeg',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv', 'text/plain',
+])
+
+const uploadEvidence = multer({
+  storage: multer.diskStorage({
+    destination: uploadRoot,
+    filename: (_request, file, callback) => callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase().slice(0, 10)}`),
+  }),
+  limits: { fileSize: 15 * 1024 * 1024, files: 5 },
+  fileFilter: (_request, file, callback) => {
+    if (allowedEvidenceMimeTypes.has(file.mimetype)) return callback(null, true)
+    const error = new Error('Tipo de archivo no permitido')
+    error.status = 415
+    callback(error)
+  },
+})
+
+// Plantilla por defecto para una matriz nueva. Cada área puede tener ámbitos distintos:
+// esta lista solo se usa para pre-llenar áreas recién creadas; luego son editables.
 export const FIXED_SCOPES = ['ANAMNESIS', 'EXAMEN FÍSICO', 'ANÁLISIS', 'DIAGNÓSTICO', 'AYUDAS DIAGNÓSTICAS', 'PLAN DE MANEJO', 'LEGIBILIDAD']
 
 const DEFAULT_CRITERIA = [
@@ -85,6 +113,11 @@ async function assertEvaluationAccess(request) {
   )
   if (!result.rows[0]) fail(404, 'Evaluación no encontrada')
   await assertAreaAccess(request, result.rows[0].area_id)
+}
+
+async function ownProfessionalId(request) {
+  const result = await query('SELECT id FROM adherence_professionals WHERE membership_id = $1 AND organization_id = $2', [mid(request), oid(request)])
+  return result.rows[0]?.id ?? null
 }
 
 function computeCompliance(criteria, scores) {
@@ -222,12 +255,21 @@ adherenceRouter.put('/areas/:id/matrix', manage, async (request, response, next)
   const client = await pool.connect()
   try {
     const body = request.body || {}
+    const scopesInput = (Array.isArray(body.scopes) ? body.scopes : FIXED_SCOPES.map(name => ({ name })))
+      .map(scope => ({ name: String(scope?.name || '').trim() }))
+    if (!scopesInput.length) return response.status(400).json({ error: 'La matriz necesita al menos un ámbito' })
+    for (const scope of scopesInput) {
+      if (!scope.name) return response.status(400).json({ error: 'Todos los ámbitos necesitan un nombre' })
+    }
+    if (new Set(scopesInput.map(scope => scope.name.toUpperCase())).size !== scopesInput.length) {
+      return response.status(400).json({ error: 'No puede haber ámbitos con el mismo nombre' })
+    }
     const criteriaInput = Array.isArray(body.criteria) ? body.criteria : []
     for (const criterion of criteriaInput) {
       const weight = Number(criterion?.weight)
       if (!String(criterion?.text || '').trim()) return response.status(400).json({ error: 'Todos los criterios necesitan un texto' })
       if (!Number.isFinite(weight) || weight <= 0) return response.status(400).json({ error: 'Cada criterio necesita un peso mayor a 0' })
-      if (!Number.isInteger(criterion?.scopeIndex) || criterion.scopeIndex < 0 || criterion.scopeIndex >= FIXED_SCOPES.length) {
+      if (!Number.isInteger(criterion?.scopeIndex) || criterion.scopeIndex < 0 || criterion.scopeIndex >= scopesInput.length) {
         return response.status(400).json({ error: 'Cada criterio debe pertenecer a un ámbito válido' })
       }
     }
@@ -258,10 +300,10 @@ adherenceRouter.put('/areas/:id/matrix', manage, async (request, response, next)
     }
 
     const scopeIds = []
-    for (const [index, name] of FIXED_SCOPES.entries()) {
+    for (const [index, scope] of scopesInput.entries()) {
       const result = await client.query(
         `INSERT INTO adherence_scopes (matrix_version_id, name, order_index) VALUES ($1, $2, $3) RETURNING id`,
-        [targetVersionId, name, index],
+        [targetVersionId, scope.name, index],
       )
       scopeIds.push(result.rows[0].id)
     }
@@ -377,6 +419,11 @@ adherenceRouter.patch('/professionals/:id', manage, async (request, response, ne
     const fieldMap = {
       fullName: 'full_name', documentId: 'document_id', specialty: 'specialty',
       status: 'status', areaId: 'area_id', positionId: 'position_id', active: 'active',
+      membershipId: 'membership_id',
+    }
+    if (Object.hasOwn(body, 'membershipId') && body.membershipId) {
+      const membership = await query('SELECT id FROM memberships WHERE id = $1 AND organization_id = $2', [body.membershipId, oid(request)])
+      if (!membership.rows[0]) return response.status(400).json({ error: 'La cuenta de usuario no pertenece a esta entidad' })
     }
     const changes = Object.entries(fieldMap).filter(([key]) => Object.hasOwn(body, key))
     if (!changes.length) return response.status(400).json({ error: 'No hay cambios válidos' })
@@ -411,6 +458,7 @@ adherenceRouter.get('/evaluations', view, async (request, response, next) => {
     if (request.query.monthReported) { params.push(request.query.monthReported); where.push(`e.month_reported = $${params.length}`) }
     const result = await query(
       `SELECT e.id, e.month_reported, e.evaluation_date, e.total_records, e.overall_compliance, e.concept, e.status,
+              e.evaluator_membership_id,
               p.id AS professional_id, p.full_name AS professional_name, a.id AS area_id, a.name AS area_name
        FROM adherence_evaluations e
        JOIN adherence_professionals p ON p.id = e.professional_id
@@ -536,11 +584,25 @@ adherenceRouter.post('/evaluations/:id/reopen', close, async (request, response,
   } catch (error) { next(error) }
 })
 
-adherenceRouter.post('/evaluations/:id/sign', close, async (request, response, next) => {
+const signPermission = requireAnyPermission(['adherence_matrix.close', 'adherence_matrix.manage', 'adherence_matrix.own_plan'])
+
+adherenceRouter.post('/evaluations/:id/sign', signPermission, async (request, response, next) => {
   try {
-    await assertEvaluationAccess(request)
-    const professionalSignedName = String(request.body?.professionalSignedName || '').trim()
-    if (!professionalSignedName) return response.status(400).json({ error: 'El nombre del profesional es obligatorio para registrar la firma' })
+    const isAuditor = request.auth.permissions.includes('adherence_matrix.close') || request.auth.permissions.includes('adherence_matrix.manage')
+    let professionalSignedName
+    if (isAuditor) {
+      await assertEvaluationAccess(request)
+      professionalSignedName = String(request.body?.professionalSignedName || '').trim()
+      if (!professionalSignedName) return response.status(400).json({ error: 'El nombre del profesional es obligatorio para registrar la firma' })
+    } else {
+      const evaluation = await query('SELECT professional_id FROM adherence_evaluations WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+      if (!evaluation.rows[0]) return response.status(404).json({ error: 'Evaluación no encontrada' })
+      const professionalId = await ownProfessionalId(request)
+      if (!professionalId || String(professionalId) !== String(evaluation.rows[0].professional_id)) {
+        return response.status(403).json({ error: 'Solo puedes firmar tu propia evaluación' })
+      }
+      professionalSignedName = request.auth.user.fullName
+    }
     const result = await query(
       `UPDATE adherence_evaluations SET professional_signed_name = $1, professional_signed_at = NOW(), updated_at = NOW()
        WHERE id = $2 AND organization_id = $3 RETURNING *`,
@@ -548,6 +610,273 @@ adherenceRouter.post('/evaluations/:id/sign', close, async (request, response, n
     )
     if (!result.rows[0]) return response.status(404).json({ error: 'Evaluación no encontrada' })
     response.json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.get('/my-evaluations', requireAnyPermission(['adherence_matrix.own_plan']), async (request, response, next) => {
+  try {
+    const professionalId = await ownProfessionalId(request)
+    if (!professionalId) return response.status(404).json({ error: 'Tu cuenta no está vinculada a ningún profesional auditado todavía' })
+    const evaluations = await query(
+      `SELECT e.id, e.month_reported, e.evaluation_date, e.overall_compliance, e.concept, e.status,
+              e.commitments, e.improvement_plan_percent, e.general_observations,
+              e.professional_signed_name, e.professional_signed_at, e.evaluator_signed_name, e.evaluator_signed_at,
+              a.name AS area_name
+       FROM adherence_evaluations e
+       JOIN adherence_professionals p ON p.id = e.professional_id
+       JOIN adherence_areas a ON a.id = p.area_id
+       WHERE e.professional_id = $1 AND e.organization_id = $2
+       ORDER BY e.created_at DESC`,
+      [professionalId, oid(request)],
+    )
+    response.json(evaluations.rows)
+  } catch (error) { next(error) }
+})
+
+const planEvidencePermission = requireAnyPermission(['adherence_matrix.own_plan', 'adherence_matrix.evaluate', 'adherence_matrix.manage'])
+
+async function assertEvaluationAccessForEvidence(request) {
+  const isAuditor = request.auth.permissions.includes('adherence_matrix.evaluate') || request.auth.permissions.includes('adherence_matrix.manage')
+  if (isAuditor) return assertEvaluationAccess(request)
+  const evaluation = await query('SELECT professional_id FROM adherence_evaluations WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+  if (!evaluation.rows[0]) fail(404, 'Evaluación no encontrada')
+  const professionalId = await ownProfessionalId(request)
+  if (!professionalId || String(professionalId) !== String(evaluation.rows[0].professional_id)) fail(403, 'No tienes acceso a esta evaluación')
+}
+
+adherenceRouter.get('/evaluations/:id/plan-evidence', planEvidencePermission, async (request, response, next) => {
+  try {
+    await assertEvaluationAccessForEvidence(request)
+    const result = await query(
+      'SELECT id, original_name, mime_type, size_bytes, description, created_at FROM adherence_plan_evidence WHERE evaluation_id = $1 AND organization_id = $2 ORDER BY created_at',
+      [request.params.id, oid(request)],
+    )
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.post('/evaluations/:id/plan-evidence', planEvidencePermission, uploadEvidence.array('files', 5), async (request, response, next) => {
+  const files = request.files || []
+  const client = await pool.connect()
+  try {
+    if (!files.length) return response.status(400).json({ error: 'Selecciona al menos un archivo' })
+    await assertEvaluationAccessForEvidence(request)
+    await client.query('BEGIN')
+    const evaluation = await client.query('SELECT id FROM adherence_evaluations WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+    if (!evaluation.rows[0]) fail(404, 'Evaluación no encontrada')
+    const saved = []
+    for (const file of files) {
+      const evidence = await client.query(
+        `INSERT INTO adherence_plan_evidence (organization_id, evaluation_id, original_name, mime_type, size_bytes, storage_key, description, uploaded_by_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, original_name, mime_type, size_bytes, description, created_at`,
+        [oid(request), request.params.id, file.originalname, file.mimetype, file.size, file.filename, request.body?.description || '', uid(request)],
+      )
+      saved.push(evidence.rows[0])
+    }
+    await client.query('COMMIT')
+    response.status(201).json(saved)
+  } catch (error) {
+    await client.query('ROLLBACK')
+    await Promise.allSettled(files.map(file => unlink(file.path)))
+    next(error)
+  } finally { client.release() }
+})
+
+adherenceRouter.get('/evaluations/:id/plan-evidence/:evidenceId/download', planEvidencePermission, async (request, response, next) => {
+  try {
+    await assertEvaluationAccessForEvidence(request)
+    const result = await query(
+      'SELECT original_name, storage_key FROM adherence_plan_evidence WHERE id = $1 AND evaluation_id = $2 AND organization_id = $3',
+      [request.params.evidenceId, request.params.id, oid(request)],
+    )
+    if (!result.rows[0]) return response.status(404).json({ error: 'Evidencia no encontrada' })
+    response.download(resolve(uploadRoot, result.rows[0].storage_key), result.rows[0].original_name)
+  } catch (error) { next(error) }
+})
+
+// --- Plan de mejora con seguimientos (linea de tiempo) ---
+
+async function loadPlanWithAccess(request) {
+  const plan = await query(
+    `SELECT pl.*, p.membership_id AS professional_membership_id, p.area_id, p.full_name AS professional_name,
+            a.name AS area_name, e.month_reported
+     FROM adherence_improvement_plans pl
+     JOIN adherence_professionals p ON p.id = pl.professional_id
+     JOIN adherence_areas a ON a.id = p.area_id
+     JOIN adherence_evaluations e ON e.id = pl.evaluation_id
+     WHERE pl.id = $1 AND pl.organization_id = $2`,
+    [request.params.id, oid(request)],
+  )
+  if (!plan.rows[0]) fail(404, 'Plan de mejora no encontrado')
+  const row = plan.rows[0]
+  const isAuditorTier = request.auth.permissions.includes('adherence_matrix.evaluate') || request.auth.permissions.includes('adherence_matrix.manage')
+  if (isAuditorTier) {
+    await assertAreaAccess(request, row.area_id)
+  } else {
+    const professionalId = await ownProfessionalId(request)
+    if (!professionalId || String(professionalId) !== String(row.professional_id)) fail(403, 'No tienes acceso a este plan de mejora')
+  }
+  return row
+}
+
+adherenceRouter.get('/evaluations/:id/plan', evaluate, async (request, response, next) => {
+  try {
+    await assertEvaluationAccess(request)
+    const plan = await query('SELECT * FROM adherence_improvement_plans WHERE evaluation_id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+    response.json(plan.rows[0] || null)
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.put('/evaluations/:id/plan', evaluate, async (request, response, next) => {
+  try {
+    await assertEvaluationAccess(request)
+    const description = String(request.body?.description || '').trim()
+    const plannedStartDate = request.body?.plannedStartDate || null
+    const plannedEndDate = request.body?.plannedEndDate || null
+    if (!description) return response.status(400).json({ error: 'La descripción del plan de mejora es obligatoria' })
+    const evaluation = await query('SELECT professional_id FROM adherence_evaluations WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+    if (!evaluation.rows[0]) return response.status(404).json({ error: 'Evaluación no encontrada' })
+    const existing = await query('SELECT id FROM adherence_improvement_plans WHERE evaluation_id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+    let result
+    if (existing.rows[0]) {
+      result = await query(
+        `UPDATE adherence_improvement_plans SET description=$1, planned_start_date=$2, planned_end_date=$3, updated_at=NOW()
+         WHERE id=$4 RETURNING *`,
+        [description, plannedStartDate, plannedEndDate, existing.rows[0].id],
+      )
+    } else {
+      result = await query(
+        `INSERT INTO adherence_improvement_plans (organization_id, evaluation_id, professional_id, description, planned_start_date, planned_end_date, created_by_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        [oid(request), request.params.id, evaluation.rows[0].professional_id, description, plannedStartDate, plannedEndDate, uid(request)],
+      )
+    }
+    response.status(201).json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.get('/my-plans', requireAnyPermission(['adherence_matrix.own_plan']), async (request, response, next) => {
+  try {
+    const professionalId = await ownProfessionalId(request)
+    if (!professionalId) return response.status(404).json({ error: 'Tu cuenta no está vinculada a ningún profesional auditado todavía' })
+    const plans = await query(
+      `SELECT pl.*, a.name AS area_name, e.month_reported
+       FROM adherence_improvement_plans pl
+       JOIN adherence_areas a ON a.id = (SELECT area_id FROM adherence_professionals WHERE id = pl.professional_id)
+       JOIN adherence_evaluations e ON e.id = pl.evaluation_id
+       WHERE pl.professional_id = $1 AND pl.organization_id = $2
+       ORDER BY pl.created_at DESC`,
+      [professionalId, oid(request)],
+    )
+    response.json(plans.rows)
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.get('/plans/:id', requireAnyPermission(['adherence_matrix.own_plan', 'adherence_matrix.evaluate', 'adherence_matrix.manage']), async (request, response, next) => {
+  try {
+    const plan = await loadPlanWithAccess(request)
+    response.json(plan)
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.post('/plans/:id/start', requireAnyPermission(['adherence_matrix.own_plan']), async (request, response, next) => {
+  try {
+    const plan = await loadPlanWithAccess(request)
+    if (plan.status !== 'NO_INICIADO') return response.status(409).json({ error: 'El plan ya fue iniciado' })
+    const result = await query(
+      `UPDATE adherence_improvement_plans SET status='EN_EJECUCION', actual_start_date=CURRENT_DATE, updated_at=NOW()
+       WHERE id=$1 RETURNING *`,
+      [plan.id],
+    )
+    response.json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.post('/plans/:id/complete', requireAnyPermission(['adherence_matrix.own_plan']), async (request, response, next) => {
+  try {
+    const plan = await loadPlanWithAccess(request)
+    if (Number(plan.progress_percent) < 100) return response.status(400).json({ error: 'El plan debe llegar a 100% de avance antes de marcarlo como terminado' })
+    if (plan.status === 'TERMINADO') return response.status(409).json({ error: 'El plan ya está terminado' })
+    const result = await query(
+      `UPDATE adherence_improvement_plans SET status='TERMINADO', actual_end_date=CURRENT_DATE, updated_at=NOW()
+       WHERE id=$1 RETURNING *`,
+      [plan.id],
+    )
+    response.json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.get('/plans/:id/followups', requireAnyPermission(['adherence_matrix.own_plan', 'adherence_matrix.evaluate', 'adherence_matrix.manage']), async (request, response, next) => {
+  try {
+    await loadPlanWithAccess(request)
+    const followups = await query(
+      `SELECT f.id, f.description, f.progress_percent, f.created_at, u.full_name AS author_name,
+              COALESCE(
+                (SELECT json_agg(json_build_object('id', ev.id, 'original_name', ev.original_name, 'mime_type', ev.mime_type, 'size_bytes', ev.size_bytes) ORDER BY ev.created_at)
+                 FROM adherence_plan_followup_evidence ev WHERE ev.followup_id = f.id),
+                '[]'
+              ) AS evidence
+       FROM adherence_plan_followups f
+       JOIN users u ON u.id = f.author_id
+       WHERE f.plan_id = $1 AND f.organization_id = $2
+       ORDER BY f.created_at DESC`,
+      [request.params.id, oid(request)],
+    )
+    response.json(followups.rows)
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.post('/plans/:id/followups', requireAnyPermission(['adherence_matrix.own_plan']), uploadEvidence.array('files', 5), async (request, response, next) => {
+  const files = request.files || []
+  const client = await pool.connect()
+  try {
+    const plan = await loadPlanWithAccess(request)
+    const description = String(request.body?.description || '').trim()
+    const progressPercent = Number(request.body?.progressPercent)
+    if (!description) fail(400, 'Describe qué se hizo en este seguimiento')
+    if (!Number.isFinite(progressPercent) || progressPercent < 0 || progressPercent > 100) fail(400, 'El % de avance debe estar entre 0 y 100')
+    if (plan.status === 'TERMINADO') fail(409, 'El plan ya está terminado, no se pueden agregar más seguimientos')
+
+    await client.query('BEGIN')
+    const followup = await client.query(
+      `INSERT INTO adherence_plan_followups (organization_id, plan_id, author_id, description, progress_percent)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, description, progress_percent, created_at`,
+      [oid(request), plan.id, uid(request), description, progressPercent],
+    )
+    for (const file of files) {
+      await client.query(
+        `INSERT INTO adherence_plan_followup_evidence (organization_id, followup_id, original_name, mime_type, size_bytes, storage_key, uploaded_by_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [oid(request), followup.rows[0].id, file.originalname, file.mimetype, file.size, file.filename, uid(request)],
+      )
+    }
+    const nextStatus = plan.status === 'NO_INICIADO' ? 'EN_EJECUCION' : plan.status
+    await client.query(
+      `UPDATE adherence_improvement_plans SET progress_percent=$1, status=$2,
+              actual_start_date = COALESCE(actual_start_date, CURRENT_DATE), updated_at=NOW()
+       WHERE id=$3`,
+      [progressPercent, nextStatus, plan.id],
+    )
+    await client.query('COMMIT')
+    response.status(201).json(followup.rows[0])
+  } catch (error) {
+    await client.query('ROLLBACK')
+    await Promise.allSettled(files.map(file => unlink(file.path)))
+    next(error)
+  } finally { client.release() }
+})
+
+adherenceRouter.get('/plans/:id/followups/:followupId/evidence/:evidenceId/download', requireAnyPermission(['adherence_matrix.own_plan', 'adherence_matrix.evaluate', 'adherence_matrix.manage']), async (request, response, next) => {
+  try {
+    await loadPlanWithAccess(request)
+    const result = await query(
+      `SELECT ev.original_name, ev.storage_key FROM adherence_plan_followup_evidence ev
+       JOIN adherence_plan_followups f ON f.id = ev.followup_id
+       WHERE ev.id = $1 AND f.id = $2 AND f.plan_id = $3 AND ev.organization_id = $4`,
+      [request.params.evidenceId, request.params.followupId, request.params.id, oid(request)],
+    )
+    if (!result.rows[0]) return response.status(404).json({ error: 'Evidencia no encontrada' })
+    response.download(resolve(uploadRoot, result.rows[0].storage_key), result.rows[0].original_name)
   } catch (error) { next(error) }
 })
 

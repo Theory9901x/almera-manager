@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck,
   FileBarChart2, Headphones, LayoutDashboard, LogOut, Menu, Search, Settings,
@@ -6,7 +6,8 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/platform/auth/AuthContext'
-import { Badge, BrandMark } from '@/shared/ui'
+import { BrandMark } from '@/shared/ui'
+import { Badge, moduleIdentity } from '@/design-system'
 
 const icons = {
   'layout-dashboard': LayoutDashboard,
@@ -34,10 +35,21 @@ export default function AppLayout() {
     .sort((a, b) => b.route.length - a.route.length)
     .find(module => location.pathname === module.route || location.pathname.startsWith(`${module.route}/`))
 
-  const operationalKeys = ['technical-assistances', 'adherence-matrix', 'internal-audits', 'audits', 'almera']
+  const activeModuleKey = location.pathname.startsWith('/app/adherencia/') ? 'adherence-matrix'
+    : location.pathname.startsWith('/app/administracion') ? 'admin'
+    : currentModule?.key
+
+  const operationalKeys = ['technical-assistances', 'internal-audits', 'audits', 'almera']
   const operationalModules = session.modules.filter(module => operationalKeys.includes(module.key))
-  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key))
+  const adherenceModule = session.modules.find(module => module.key === 'adherence-matrix')
+  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key) && module.key !== 'adherence-matrix')
   const operationalRoute = operationalKeys.map(key => operationalModules.find(module => module.key === key)?.route).find(Boolean)
+
+  const adherenceLinks = adherenceModule ? [
+    session.permissions.includes('adherence_matrix.manage') && { to: '/app/adherencia/configuracion', label: 'Configuración' },
+    (session.permissions.includes('adherence_matrix.evaluate') || session.permissions.includes('adherence_matrix.manage')) && { to: '/app/adherencia/operacion', label: 'Operación' },
+    session.permissions.includes('adherence_matrix.own_plan') && { to: '/app/adherencia/mis-planes', label: 'Mis planes' },
+  ].filter(Boolean) as { to: string; label: string }[] : []
 
   async function endSession() {
     await logout()
@@ -68,18 +80,43 @@ export default function AppLayout() {
 
         <nav className="relative flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <p className="sidebar-label">Espacio de trabajo</p>
-          {operationalRoute && (
-            <NavLink
-              to={operationalRoute}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
-            >
-              <span className="sidebar-link-icon"><ClipboardCheck size={17} /></span>
-              <span className="min-w-0 flex-1 truncate">Gestión ALMERA</span>
-            </NavLink>
-          )}
+          {operationalRoute && (() => {
+            const identity = moduleIdentity('almera')
+            return (
+              <NavLink
+                to={operationalRoute}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
+                style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
+              >
+                <span className="sidebar-link-icon" style={{ background: `${identity.color}22`, color: identity.color }}><ClipboardCheck size={17} /></span>
+                <span className="min-w-0 flex-1 truncate">Gestión ALMERA</span>
+              </NavLink>
+            )
+          })()}
+          {adherenceLinks.length > 0 && (() => {
+            const identity = moduleIdentity('adherence-matrix')
+            return (
+              <div className="sidebar-group">
+                <p className="sidebar-group-label">Matrices de Adherencia</p>
+                {adherenceLinks.map(link => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
+                    style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
+                  >
+                    <span className="sidebar-link-icon" style={{ background: `${identity.color}22`, color: identity.color }}><ClipboardCheck size={17} /></span>
+                    <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })()}
           {otherModules.map(module => {
             const Icon = icons[module.icon as keyof typeof icons] || Blocks
+            const identity = moduleIdentity(module.key)
             return (
               <NavLink
                 key={module.id}
@@ -87,8 +124,9 @@ export default function AppLayout() {
                 end={['dashboard', 'admin'].includes(module.key)}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
+                style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
               >
-                <span className="sidebar-link-icon"><Icon size={17} /></span>
+                <span className="sidebar-link-icon" style={{ background: `${identity.color}22`, color: identity.color }}><Icon size={17} /></span>
                 <span className="min-w-0 flex-1 truncate">{module.name}</span>
               </NavLink>
             )
@@ -96,14 +134,14 @@ export default function AppLayout() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
+          <Link to="/app/mi-cuenta" className="sidebar-user" onClick={() => setOpen(false)}>
             <div className="sidebar-avatar">{initials}</div>
             <div className="min-w-0 flex-1">
               <p>{session.user.fullName}</p>
-              <span>{session.user.email}</span>
+              <span>{session.position?.name || session.user.email}</span>
             </div>
             <ChevronDown size={14} />
-          </div>
+          </Link>
           <button onClick={endSession} className="sidebar-logout"><LogOut size={15} /> Cerrar sesión</button>
         </div>
       </aside>
@@ -111,15 +149,24 @@ export default function AppLayout() {
       <div className="shell-main">
         <header className="shell-header sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 px-4 py-3 lg:px-8">
           <button aria-label="Abrir menú" className="mobile-menu lg:hidden" onClick={() => setOpen(true)}><Menu size={20} /></button>
-          <div className="min-w-0">
-            <p className="topbar-title">{currentModule?.name || 'Panel administrativo'}</p>
-            <p className="topbar-description">{currentModule?.description || 'Gestión de usuarios, roles, permisos y entidad activa'}</p>
+          <div className="min-w-0 flex items-center gap-2.5">
+            <span className="h-2 w-2 flex-none rounded-full" style={{ background: moduleIdentity(activeModuleKey).color }} aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="topbar-title">{currentModule?.name || 'Panel administrativo'}</p>
+              <p className="topbar-description">{currentModule?.description || 'Gestión de usuarios, roles, permisos y entidad activa'}</p>
+            </div>
           </div>
           <div className="topbar-actions hidden md:flex">
             <button className="topbar-search" type="button"><Search size={15} /> Buscar</button>
             <span className="topbar-system"><Sparkles size={14} /> SGIMR</span>
-            <Badge tone="success">Operativo</Badge>
-            <div className="topbar-avatar" title={session.user.fullName}>{initials}</div>
+            <Badge tone="info">Operativo</Badge>
+            <Link to="/app/mi-cuenta" className="topbar-profile" title="Gestión de usuario">
+              <div className="topbar-avatar">{initials}</div>
+              <span className="topbar-profile-info">
+                <strong>{session.user.fullName}</strong>
+                <small>{session.position?.name || session.role.name}</small>
+              </span>
+            </Link>
           </div>
         </header>
         <main className="p-4 sm:p-6 lg:p-8"><Outlet /></main>

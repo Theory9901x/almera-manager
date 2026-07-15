@@ -2,6 +2,8 @@ const FORMAT_CODE = 'FT-ADH-001'
 const FORMAT_VERSION = '1'
 
 const conceptLabels = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
+// Misma escala de semaforo fija que el dashboard en vivo — un mismo porcentaje siempre se ve del mismo color.
+const conceptColors = { OPTIMO: '#059669', ACEPTABLE: '#65A30D', DEFICIENTE: '#D97706', MUY_DEFICIENTE: '#DC2626' }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
@@ -76,7 +78,7 @@ export function renderAdherenceReportHtml({ evaluation, scopes, criteria, record
   .summary-card { flex: 1; border: 1px solid #d2d9e3; border-radius: 8px; padding: 10px 14px; }
   .summary-card span { display: block; font-size: 9px; color: #667085; text-transform: uppercase; }
   .summary-card strong { display: block; font-size: 20px; margin-top: 4px; }
-  .concept-badge { display: inline-block; margin-top: 4px; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 11px; background: #fff1f3; color: #c7192d; }
+  .concept-badge { display: inline-block; margin-top: 4px; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 11px; }
   .signatures { display: flex; gap: 24px; margin-top: 24px; }
   .signature-box { flex: 1; border-top: 1px solid #172033; padding-top: 6px; }
   .signature-box small { display: block; color: #667085; }
@@ -110,7 +112,7 @@ export function renderAdherenceReportHtml({ evaluation, scopes, criteria, record
   <div class="summary-box">
     <div class="summary-card"><span>Total HC evaluadas</span><strong>${evaluation.total_records}</strong></div>
     <div class="summary-card"><span>Cumplimiento general</span><strong>${formatPercent(evaluation.overall_compliance)}</strong></div>
-    <div class="summary-card"><span>Concepto</span><span class="concept-badge">${evaluation.concept ? (conceptLabels[evaluation.concept] || evaluation.concept) : 'Sin calificar'}</span></div>
+    <div class="summary-card"><span>Concepto</span><span class="concept-badge" style="background:${evaluation.concept ? `${conceptColors[evaluation.concept]}18` : '#f1f5f9'};color:${evaluation.concept ? conceptColors[evaluation.concept] : '#94a3b8'}">${evaluation.concept ? (conceptLabels[evaluation.concept] || evaluation.concept) : 'Sin calificar'}</span></div>
   </div>
 
   <h2>Historias clínicas evaluadas</h2>

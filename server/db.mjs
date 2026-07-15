@@ -67,33 +67,55 @@ export async function bootstrap() {
     )
     const roleId = roleResult.rows[0].id
     await client.query(
-      `INSERT INTO role_permissions (role_id, permission_id)
-       SELECT $1, id FROM permissions ON CONFLICT DO NOTHING`,
-      [roleId],
-    )
-    await client.query(
       `INSERT INTO organization_modules (organization_id, module_id, enabled)
        SELECT $1, id, TRUE FROM modules ON CONFLICT DO NOTHING`,
       [organizationId],
     )
+
     await client.query(
-      `INSERT INTO role_modules (role_id, module_id)
-       SELECT $1, id FROM modules ON CONFLICT DO NOTHING`,
-      [roleId],
+      `INSERT INTO roles (organization_id, key, name, description, system)
+       VALUES ($1, 'ADMIN', 'Administrador', 'Gestiona usuarios, modulos y areas de la entidad', TRUE)
+       ON CONFLICT (organization_id, key) DO UPDATE SET name = EXCLUDED.name`,
+      [organizationId],
     )
+    await client.query(
+      `INSERT INTO roles (organization_id, key, name, description, system)
+       VALUES ($1, 'USUARIO', 'Usuario', 'Cuenta operativa: solo ve los modulos y areas que se le habiliten individualmente', TRUE)
+       ON CONFLICT (organization_id, key) DO UPDATE SET name = EXCLUDED.name`,
+      [organizationId],
+    )
+
+    // SUPERADMIN y ADMIN reciben siempre todos los permisos y modulos; USUARIO no recibe nada por rol,
+    // su acceso sale exclusivamente de membership_modules (ver auth.mjs getSessionContext).
     await client.query(
       `INSERT INTO role_permissions (role_id, permission_id)
        SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-       WHERE r.organization_id=$1 AND r.system=TRUE
+       WHERE r.organization_id=$1 AND r.key IN ('SUPERADMIN','ADMIN')
        ON CONFLICT DO NOTHING`,
       [organizationId],
     )
     await client.query(
       `INSERT INTO role_modules (role_id, module_id)
        SELECT r.id, mo.id FROM roles r CROSS JOIN modules mo
-       WHERE r.organization_id=$1 AND r.system=TRUE
+       WHERE r.organization_id=$1 AND r.key IN ('SUPERADMIN','ADMIN')
        ON CONFLICT DO NOTHING`,
       [organizationId],
+    )
+
+    // Roles personalizados de iteraciones anteriores: se migran sus usuarios a USUARIO y se eliminan.
+    const legacyRoleKeys = ['ADMIN_ENTIDAD', 'CONSULTA', 'COORDINADOR_ASISTENCIA_TECNICA', 'GESTOR_ALMERA', 'gestor-mr']
+    const usuarioRole = await client.query(
+      `SELECT id FROM roles WHERE organization_id=$1 AND key='USUARIO'`,
+      [organizationId],
+    )
+    await client.query(
+      `UPDATE memberships SET role_id=$1
+       WHERE organization_id=$2 AND role_id IN (SELECT id FROM roles WHERE organization_id=$2 AND key = ANY($3))`,
+      [usuarioRole.rows[0].id, organizationId, legacyRoleKeys],
+    )
+    await client.query(
+      `DELETE FROM roles WHERE organization_id=$1 AND key = ANY($2)`,
+      [organizationId, legacyRoleKeys],
     )
 
     const membershipCount = await client.query(
@@ -122,57 +144,6 @@ export async function bootstrap() {
       console.info(`[bootstrap] Usuario administrador preparado: ${email}`)
     }
 
-    const baseRoles = [
-      ['ADMIN_ENTIDAD', 'Administrador de entidad', 'Gestiona usuarios de su entidad, modulos asignados e informacion ALMERA', ['dashboard.view','users.view','users.create','users.edit','users.disable','roles.assign','almera.view','almera.create','almera.edit','almera.export','admin.view','settings.edit','adherence_matrix.view','adherence_matrix.manage','adherence_matrix.evaluate','adherence_matrix.close','adherence_matrix.export','technical_assistance.view','technical_assistance.create','technical_assistance.edit','technical_assistance.close','technical_assistance.export'], ['dashboard','almera','users','roles','entity','reports','settings','admin','adherence-matrix','technical-assistances']],
-      ['GESTOR_ALMERA', 'Gestor ALMERA', 'Operacion diaria de solicitudes, actividades, evidencias y soportes ALMERA', ['dashboard.view','almera.view','almera.create','almera.edit','almera.export','almera.dashboard.view','almera.assistance.view','almera.assistance.create','almera.assistance.edit','almera.assistance.assign','almera.assistance.close','almera.assistance.reopen','almera.assistance.export','almera.audit.view','almera.audit.create','almera.audit.edit','almera.audit.execute','almera.audit.close','almera.audit.export','almera.report.generate','technical_assistance.view','technical_assistance.create','technical_assistance.edit','technical_assistance.close','technical_assistance.export'], ['dashboard','almera','technical-assistances','reports']],
-      ['CONSULTA', 'Consulta', 'Visualizacion de informacion permitida sin acciones de escritura', ['dashboard.view','almera.view'], ['dashboard','almera','reports']],
-      ['COORDINADOR_ASISTENCIA_TECNICA', 'Coordinador de Asistencia Tecnica', 'Registra, diligencia, cierra y exporta asistencias tecnicas', ['dashboard.view','technical_assistance.view','technical_assistance.create','technical_assistance.edit','technical_assistance.close','technical_assistance.export'], ['dashboard','technical-assistances']],
-    ]
-    let managerRoleId = null
-    for (const [key, name, description, permissions, modules] of baseRoles) {
-      const role = await client.query(
-        `INSERT INTO roles (organization_id, key, name, description, system)
-         VALUES ($1, $2, $3, $4, FALSE)
-         ON CONFLICT (organization_id, key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description
-         RETURNING id`,
-        [organizationId, key, name, description],
-      )
-      const roleId = role.rows[0].id
-      if (key === 'GESTOR_ALMERA') managerRoleId = roleId
-      await client.query(
-        `INSERT INTO role_permissions (role_id, permission_id)
-         SELECT $1, id FROM permissions WHERE key = ANY($2)
-         ON CONFLICT DO NOTHING`,
-        [roleId, permissions],
-      )
-      await client.query(
-        `INSERT INTO role_modules (role_id, module_id)
-         SELECT $1, id FROM modules WHERE key = ANY($2)
-         ON CONFLICT DO NOTHING`,
-        [roleId, modules],
-      )
-    }
-
-    if (process.env.BOOTSTRAP_TEST_USER_ENABLED !== 'false') {
-      const testEmail = normalizeEmail(process.env.BOOTSTRAP_TEST_USER_EMAIL || 'gestor.mr@sgimr.cloud')
-      const testPassword = process.env.BOOTSTRAP_TEST_USER_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'GestorMR2026!')
-      if (testPassword) {
-        const testUser = await client.query(
-          `INSERT INTO users (email, full_name, password_hash)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = NOW()
-           RETURNING id`,
-          [testEmail, process.env.BOOTSTRAP_TEST_USER_NAME || 'Usuario Prueba MR', hashPassword(testPassword)],
-        )
-        await client.query(
-          `INSERT INTO memberships (organization_id, user_id, role_id)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (organization_id, user_id) DO UPDATE SET role_id = EXCLUDED.role_id, active = TRUE`,
-          [organizationId, testUser.rows[0].id, managerRoleId],
-        )
-        console.info(`[bootstrap] Usuario de prueba preparado: ${testEmail}`)
-      }
-    }
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')

@@ -1,5 +1,7 @@
+// Misma escala de semaforo fija que el dashboard en vivo (src/modules/adherence/design/scopeColors.ts) —
+// un mismo porcentaje siempre se ve del mismo color, sin importar donde aparezca.
 const conceptLabels = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
-const conceptColors = { OPTIMO: '#087a54', ACEPTABLE: '#315fae', DEFICIENTE: '#a8640d', MUY_DEFICIENTE: '#c7192d' }
+const conceptColors = { OPTIMO: '#059669', ACEPTABLE: '#65A30D', DEFICIENTE: '#D97706', MUY_DEFICIENTE: '#DC2626' }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
@@ -22,7 +24,7 @@ function bar(label, value, thresholds, maxValue = 100) {
   return `
     <div class="bar-row">
       <span class="bar-label">${escapeHtml(label)}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:${width}%;background:${color}"></div></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${width}%;background:linear-gradient(90deg,${color}cc,${color})"></div></div>
       <span class="bar-value">${formatPercent(value)}</span>
     </div>`
 }
@@ -37,7 +39,7 @@ export function renderAdherenceDashboardHtml({ dashboard, thresholds, filters })
   const conceptRows = Object.entries(dashboard.byConcept).map(([concept, count]) => `
     <div class="bar-row">
       <span class="bar-label">${conceptLabels[concept] || concept}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:${dashboard.totalEvaluations ? (count / dashboard.totalEvaluations) * 100 : 0}%;background:${conceptColors[concept]}"></div></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${dashboard.totalEvaluations ? (count / dashboard.totalEvaluations) * 100 : 0}%;background:linear-gradient(90deg,${conceptColors[concept]}cc,${conceptColors[concept]})"></div></div>
       <span class="bar-value">${count}</span>
     </div>`).join('')
 

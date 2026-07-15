@@ -1,4 +1,4 @@
-import type { AdminOverview, SessionContext } from './types'
+import type { AdminOverview, Position, SessionContext, UserModuleGrant } from './types'
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
@@ -23,12 +23,15 @@ export const api = {
   adminOverview: () => request<AdminOverview>('/admin/overview'),
   createUser: (data: { fullName: string; email: string; password: string; roleId: string }) =>
     request('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
-  updateUser: (membershipId: string, data: { roleId: string; active: boolean }) =>
+  updateUser: (membershipId: string, data: { roleId: string; active: boolean; positionId?: string | null }) =>
     request(`/admin/users/${membershipId}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  createRole: (data: { name: string; description: string }) =>
-    request('/admin/roles', { method: 'POST', body: JSON.stringify(data) }),
-  updateRoleAccess: (roleId: string, moduleIds: string[], permissionIds: string[]) =>
-    request(`/admin/roles/${roleId}/access`, { method: 'PUT', body: JSON.stringify({ moduleIds, permissionIds }) }),
   updateModule: (moduleId: string, enabled: boolean) =>
     request(`/admin/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
+  userModules: (membershipId: string) => request<UserModuleGrant[]>(`/admin/users/${membershipId}/modules`),
+  grantUserModule: (membershipId: string, moduleKey: string, data?: { areaId?: string; documentId?: string; positionId?: string; function?: 'AUDITOR' | 'PROFESIONAL' }) =>
+    request(`/admin/users/${membershipId}/modules/${moduleKey}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+  revokeUserModule: (membershipId: string, moduleKey: string) =>
+    request(`/admin/users/${membershipId}/modules/${moduleKey}`, { method: 'DELETE' }),
+  positions: () => request<Position[]>('/auth/positions'),
+  createPosition: (name: string) => request<Position>('/auth/positions', { method: 'POST', body: JSON.stringify({ name }) }),
 }

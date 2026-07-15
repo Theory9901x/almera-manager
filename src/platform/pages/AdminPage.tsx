@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, KeyRound, Loader2, Plus, Save, Settings, Shield, ToggleLeft, ToggleRight, UserPlus, Users } from 'lucide-react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { AlertTriangle, Check, ChevronRight, KeyRound, Loader2, Plus, Settings, ToggleLeft, ToggleRight, UserPlus, Users, X } from 'lucide-react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/platform/api'
 import { useAuth } from '@/platform/auth/AuthContext'
-import type { AdminOverview, AdminRole } from '@/platform/types'
-import { Badge, Button, Card, Field, PageHeader, SearchBox, StatusBadge } from '@/shared/ui'
+import type { AdminOverview, AdminUser, Position, UserModuleGrant } from '@/platform/types'
+import { adherenceService } from '@/modules/adherence/services/adherenceService'
+import type { Area } from '@/modules/adherence/types'
+import { Badge, Button, Card, Field, PageHeader, SearchBox, Select, Table, moduleIdentity } from '@/design-system'
 
-type Tab = 'users' | 'roles' | 'modules' | 'entity' | 'settings'
-const tabKeys: Tab[] = ['users', 'roles', 'modules', 'entity', 'settings']
+type Tab = 'users' | 'modules' | 'entity' | 'settings'
+const tabKeys: Tab[] = ['users', 'modules', 'entity', 'settings']
+const identity = moduleIdentity('admin')
 
 export default function AdminPage() {
   const { session, refresh: refreshSession } = useAuth()
@@ -18,15 +21,13 @@ export default function AdminPage() {
   const [notice, setNotice] = useState('')
   const routeTab = tabKeys.includes(section as Tab) ? section as Tab : 'users'
   const canUsers = Boolean(session?.permissions.some(item => ['users.view', 'users.create', 'users.edit', 'users.disable', 'users.manage'].includes(item)))
-  const canRoles = Boolean(session?.permissions.some(item => ['roles.assign', 'roles.manage'].includes(item)))
   const canModules = Boolean(session?.permissions.some(item => ['settings.edit', 'modules.manage', 'organization.manage'].includes(item)))
   const availableTabs = useMemo(() => [
     canUsers && { id: 'users' as Tab, Icon: Users, label: 'Usuarios' },
-    canRoles && { id: 'roles' as Tab, Icon: Shield, label: 'Roles y permisos' },
     canModules && { id: 'modules' as Tab, Icon: Settings, label: 'Modulos' },
     canModules && { id: 'entity' as Tab, Icon: KeyRound, label: 'Entidad activa' },
     canModules && { id: 'settings' as Tab, Icon: Settings, label: 'Configuracion' },
-  ].filter(Boolean) as Array<{ id: Tab; Icon: typeof Users; label: string }>, [canUsers, canRoles, canModules])
+  ].filter(Boolean) as Array<{ id: Tab; Icon: typeof Users; label: string }>, [canUsers, canModules])
   const canAdmin = session?.modules.some(module => module.key === 'admin') && availableTabs.length > 0
   const tab = availableTabs.some(item => item.id === routeTab) ? routeTab : availableTabs[0]?.id
 
@@ -44,21 +45,30 @@ export default function AdminPage() {
 
   if (!canAdmin) return <Navigate to="/app" replace />
   return (
-    <div className="admin-workspace mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         eyebrow="Control central"
         title="Gobierno administrativo"
-        description="Usuarios, roles, permisos, modulos y entidad activa bajo una misma consola de control."
-        actions={<Badge tone="accent">{session?.organization.name}</Badge>}
+        description="Directorio de usuarios, modulos y entidad activa bajo una misma consola de control."
+        actions={<Badge tone="info">{session?.organization.name}</Badge>}
+        identity={identity}
       />
-      <nav className="admin-tabs flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.035] p-1.5">
-        {availableTabs.map(({ id, Icon, label }) => <button key={id} onClick={() => navigate(`/app/administracion/${id}`)} className={`flex min-w-fit items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition ${tab === id ? 'is-active' : ''}`}><Icon size={16} />{label}</button>)}
+      <nav className="ds-tabs" aria-label="Secciones de administracion">
+        {availableTabs.map(({ id, Icon, label }) => (
+          <button
+            key={id}
+            onClick={() => navigate(`/app/administracion/${id}`)}
+            className={`ds-tabs-item inline-flex items-center gap-2 ${tab === id ? 'is-active' : ''}`}
+            style={tab === id ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+          >
+            <Icon size={16} />{label}
+          </button>
+        ))}
       </nav>
-      {notice && <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"><Check size={16} />{notice}</div>}
-      {error && <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{error}</div>}
-      {!data ? <div className="grid min-h-64 place-items-center"><Loader2 className="animate-spin text-[#56D6C9]" /></div> : <>
+      {notice && <div className="flex items-center gap-2 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm text-[#087A54]"><Check size={16} />{notice}</div>}
+      {error && <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">{error}</div>}
+      {!data ? <div className="grid min-h-64 place-items-center"><Loader2 className="animate-spin" style={{ color: identity.color }} /></div> : <>
         {tab === 'users' && canUsers && <UsersPanel data={data} reload={load} done={done} />}
-        {tab === 'roles' && canRoles && <RolesPanel data={data} reload={load} done={done} />}
         {tab === 'modules' && canModules && <ModulesPanel data={data} reload={async () => { await load(); await refreshSession() }} done={done} />}
         {tab === 'entity' && canModules && <EntityPanel data={data} />}
         {tab === 'settings' && canModules && <SettingsPanel data={data} />}
@@ -67,204 +77,383 @@ export default function AdminPage() {
   )
 }
 
-function toggle(list: string[], value: string, setter: (items: string[]) => void) { setter(list.includes(value) ? list.filter(id => id !== value) : [...list, value]) }
-
 function UsersPanel({ data, reload, done }: PanelProps) {
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', roleId: data.roles.find(r => !r.system)?.id || data.roles[0]?.id || '' })
-  const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [role, setRole] = useState('ALL')
   const [active, setActive] = useState('ALL')
-  const [moduleRoleId, setModuleRoleId] = useState(String(form.roleId))
-  const moduleRole = data.roles.find(item => String(item.id) === moduleRoleId)
-  const [moduleIds, setModuleIds] = useState<string[]>([])
-  const [savingModules, setSavingModules] = useState(false)
-  useEffect(() => { setModuleIds((moduleRole?.module_ids || []).map(String)) }, [moduleRoleId, data, moduleRole])
-  async function saveRoleModules() {
-    if (!moduleRole) return
-    setSavingModules(true)
-    try {
-      await api.updateRoleAccess(String(moduleRole.id), moduleIds, (moduleRole.permission_ids || []).map(String))
-      await reload()
-      done(`Módulos actualizados para "${moduleRole.name}"`)
-    } finally { setSavingModules(false) }
-  }
+  const [showCreate, setShowCreate] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
   const users = data.users.filter(user => {
     const matchesText = `${user.full_name} ${user.email} ${user.role_name}`.toLowerCase().includes(query.toLowerCase())
     const matchesRole = role === 'ALL' || String(user.role_id) === role
     const matchesActive = active === 'ALL' || String(user.membership_active) === active
     return matchesText && matchesRole && matchesActive
   })
-  async function create(event: React.FormEvent) {
-    event.preventDefault(); setSaving(true)
-    try { await api.createUser(form); setForm({ ...form, fullName: '', email: '', password: '' }); await reload(); done('Usuario creado y rol asignado') }
-    finally { setSaving(false) }
-  }
-  return <div className="space-y-6">
-   <Card className="p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="eyebrow">Tipos de usuario</p>
-          <h2 className="mt-1 font-black">Módulos habilitados por rol</h2>
-          <p className="text-xs text-slate-400">Elige un tipo de usuario (rol) y marca los módulos que debe ver. Aplica a todos los usuarios con ese rol.</p>
-        </div>
-        <select className="input w-auto" value={moduleRoleId} onChange={e => setModuleRoleId(e.target.value)}>
-          {data.roles.map(item => <option key={item.id} value={item.id}>{item.name} ({item.user_count} usuarios)</option>)}
-        </select>
-      </div>
-      {moduleRole?.system ? (
-        <div className="mt-5 rounded-xl border border-white/10 bg-white/[.035] p-5 text-sm text-slate-400">
-          El superadministrador conserva todos los módulos para evitar que la entidad quede sin administración.
-        </div>
-      ) : (
-        <>
-          <div className="mt-5 grid gap-2 md:grid-cols-2">
-            {data.modules.filter(module => module.enabled).map(module => (
-              <CheckRow
-                key={module.id}
-                checked={moduleIds.includes(String(module.id))}
-                onChange={() => toggle(moduleIds, String(module.id), setModuleIds)}
-                title={module.name}
-                description={module.description}
-              />
-            ))}
-          </div>
-          <Button onClick={() => void saveRoleModules()} disabled={savingModules} className="mt-5">
-            <Save size={16} /> {savingModules ? 'Guardando...' : `Guardar módulos de "${moduleRole?.name}"`}
-          </Button>
-        </>
-      )}
-   </Card>
-   <div className="grid gap-6 xl:grid-cols-[.78fr_1.22fr]">
-    <Card className="h-fit p-6">
-      <form onSubmit={create}>
-        <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#56D6C9]/10 text-[#56D6C9]"><UserPlus size={19} /></div><div><h2 className="font-black">Alta de usuario</h2><p className="text-xs text-slate-400">Cuenta, rol inicial y acceso de entidad</p></div></div>
-        <div className="mt-6 space-y-4">
-          <Field label="Nombre completo"><input required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></Field>
-          <Field label="Correo"><input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
-          <Field label="Contrasena inicial (min. 10 caracteres)"><input required minLength={10} type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></Field>
-          <Field label="Rol"><select required value={form.roleId} onChange={e => { setForm({ ...form, roleId: e.target.value }); setModuleRoleId(e.target.value) }}>{data.roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field>
-          <Button disabled={saving} className="w-full">{saving ? 'Creando...' : <><Plus size={16} /> Crear usuario</>}</Button>
-        </div>
-      </form>
-    </Card>
+  const selectedUser = users.find(user => user.membership_id === selectedId) || data.users.find(user => user.membership_id === selectedId) || null
 
-    <Card className="overflow-hidden">
-      <div className="border-b border-white/10 p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="eyebrow">Directorio de acceso</p>
-            <h2 className="mt-1 text-xl font-black">Usuarios de la entidad</h2>
+  return (
+    <div className="space-y-5">
+      <Card accent={identity.color} className="overflow-hidden">
+        <div className="border-b border-[var(--border-hairline)] p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="ds-eyebrow">Base de datos</p>
+              <h2 className="mt-1 text-xl font-black">Usuarios de la entidad</h2>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge tone="info">{users.length} usuarios</Badge>
+              <Button identity={identity} onClick={() => setShowCreate(true)}><UserPlus size={16} /> Nuevo usuario</Button>
+            </div>
           </div>
-          <Badge tone="info">{users.length} visibles</Badge>
+          <div className="grid gap-3 lg:grid-cols-[1fr_180px_160px]">
+            <SearchBox value={query} onChange={setQuery} placeholder="Buscar usuario, correo o rol" />
+            <Select value={role} onChange={setRole} options={[{ value: 'ALL', label: 'Todos los roles' }, ...data.roles.map(item => ({ value: String(item.id), label: item.name }))]} />
+            <Select value={active} onChange={setActive} options={[{ value: 'ALL', label: 'Todos' }, { value: 'true', label: 'Activos' }, { value: 'false', label: 'Inactivos' }]} />
+          </div>
         </div>
-        <div className="grid gap-3 lg:grid-cols-[1fr_180px_160px]">
-          <SearchBox value={query} onChange={setQuery} placeholder="Buscar usuario, correo o rol" />
-          <select className="input" value={role} onChange={event => setRole(event.target.value)}><option value="ALL">Todos los roles</option>{data.roles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-          <select className="input" value={active} onChange={event => setActive(event.target.value)}><option value="ALL">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="data-table min-w-[860px]">
-          <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead>
-          <tbody>{users.map(user => <tr key={user.membership_id}><td><strong className="block">{user.full_name}</strong><span className="text-sm text-slate-400">{user.email}</span></td><td><select className="input" value={String(user.role_id)} onChange={async e => { await api.updateUser(user.membership_id, { roleId: e.target.value, active: user.membership_active }); await reload(); done('Rol actualizado') }}>{data.roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></td><td><StatusBadge status={user.membership_active ? 'Activo' : 'Inactivo'} /></td><td><span className="font-mono text-xs text-slate-400">{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Sin registro'}</span></td><td><Button variant="secondary" onClick={async () => { await api.updateUser(user.membership_id, { roleId: String(user.role_id), active: !user.membership_active }); await reload(); done(user.membership_active ? 'Usuario desactivado' : 'Usuario activado') }}>{user.membership_active ? 'Inactivar' : 'Activar'}</Button></td></tr>)}</tbody>
-        </table>
-      </div>
-    </Card>
-   </div>
-  </div>
+        <Table>
+          <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Cargo</th><th>Estado</th><th>Ultimo acceso</th><th></th></tr></thead>
+          <tbody>{users.map(user => {
+            const userInitials = user.full_name.split(' ').slice(0, 2).map(part => part[0]).join('')
+            return (
+              <tr key={user.membership_id} className="cursor-pointer" onClick={() => setSelectedId(user.membership_id)}>
+                <td>
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-8 w-8 flex-none place-items-center rounded-full text-[10px] font-black text-white" style={{ backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})` }}>{userInitials}</div>
+                    <strong>{user.full_name}</strong>
+                  </div>
+                </td>
+                <td className="text-sm text-[var(--muted)]">{user.email}</td>
+                <td><Badge tone={user.role_key === 'SUPERADMIN' || user.role_key === 'ADMIN' ? 'info' : 'neutral'}>{user.role_name}</Badge></td>
+                <td className="text-sm text-[var(--muted)]">{user.position_name || '—'}</td>
+                <td><Badge tone={user.membership_active ? 'info' : 'neutral'}>{user.membership_active ? 'Activo' : 'Inactivo'}</Badge></td>
+                <td><span className="font-mono text-xs text-[var(--muted)]">{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Sin registro'}</span></td>
+                <td><span className="row-action" style={{ color: identity.color }}>Ver <ChevronRight size={14} /></span></td>
+              </tr>
+            )
+          })}</tbody>
+        </Table>
+      </Card>
+
+      {showCreate && <CreateUserModal data={data} close={() => setShowCreate(false)} reload={reload} done={done} />}
+      {selectedUser && <UserDetailModal user={selectedUser} data={data} close={() => setSelectedId(null)} reload={reload} done={done} />}
+    </div>
+  )
 }
 
-function RolesPanel({ data, reload, done }: PanelProps) {
-  const [selectedId, setSelectedId] = useState(data.roles[0]?.id || '')
-  const selected = data.roles.find(role => String(role.id) === String(selectedId))
-  const [moduleIds, setModuleIds] = useState<string[]>([])
-  const [permissionIds, setPermissionIds] = useState<string[]>([])
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  useEffect(() => { setModuleIds((selected?.module_ids || []).map(String)); setPermissionIds((selected?.permission_ids || []).map(String)) }, [selectedId, data, selected])
-  async function create(event: React.FormEvent) { event.preventDefault(); const role = await api.createRole({ name, description }) as AdminRole; setName(''); setDescription(''); await reload(); setSelectedId(String(role.id)); done('Rol creado; ahora configura sus accesos') }
+function CreateUserModal({ data, close, reload, done }: { data: AdminOverview; close(): void; reload(): Promise<void>; done(message: string): void }) {
+  const usuarioRole = data.roles.find(r => r.key === 'USUARIO')
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', roleId: usuarioRole?.id || data.roles[0]?.id || '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function create(event: React.FormEvent) {
+    event.preventDefault(); setSaving(true); setError('')
+    try { await api.createUser(form); await reload(); done('Usuario creado y rol asignado'); close() }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible crear el usuario') }
+    finally { setSaving(false) }
+  }
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-      <div className="space-y-5">
-        <Card className="p-5">
-          <form onSubmit={create}>
-            <p className="eyebrow">Matriz de autoridad</p>
-            <h2 className="mt-1 font-black">Crear rol</h2>
-            <div className="mt-4 space-y-3">
-              <input required className="input" placeholder="Ej. Coordinador de calidad" value={name} onChange={e => setName(e.target.value)} />
-              <textarea className="input min-h-20" placeholder="Responsabilidad del rol" value={description} onChange={e => setDescription(e.target.value)} />
-              <Button className="w-full"><Plus size={15} /> Crear rol</Button>
-            </div>
-          </form>
-        </Card>
-
-        <Card className="p-2">
-          {data.roles.map(role => (
-            <button key={role.id} onClick={() => setSelectedId(String(role.id))} className={`w-full rounded-xl p-3 text-left ${String(selectedId) === String(role.id) ? 'bg-[#B3263A] text-white' : 'hover:bg-white/[.06]'}`}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold">{role.name}</span>
-                {role.system && <KeyRound size={13} className="text-[#56D6C9]" />}
-              </div>
-              <p className="mt-1 text-xs text-slate-400">{role.user_count} usuarios</p>
-            </button>
-          ))}
-        </Card>
-      </div>
-
-      {selected && (
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="eyebrow">Rol / permisos / modulos</p>
-              <h2 className="mt-1 text-xl font-black">{selected.name}</h2>
-              <p className="mt-1 text-sm text-slate-400">{selected.description || 'Sin descripcion'}</p>
-            </div>
-            {selected.system && <Badge tone="info">Rol protegido</Badge>}
+    <div className="almera-modal" onClick={close}>
+      <div className="ds-card almera-dialog" onClick={(event: React.MouseEvent) => event.stopPropagation()}>
+        <div className="dialog-head"><div><p className="ds-eyebrow">Alta de usuario</p><h2>Nuevo usuario</h2></div><button aria-label="Cerrar" onClick={close}><X /></button></div>
+        <form onSubmit={create} className="dialog-form">
+          <div className="full"><Field label="Nombre completo"><input className="ds-input" required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></Field></div>
+          <div className="full"><Field label="Correo"><input className="ds-input" required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field></div>
+          <Field label="Contrasena inicial (min. 10 caracteres)"><input className="ds-input" required minLength={10} type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></Field>
+          <Field label="Rol"><Select value={String(form.roleId)} onChange={value => setForm({ ...form, roleId: value })} options={data.roles.map(role => ({ value: String(role.id), label: role.name }))} /></Field>
+          {error && <div className="full"><p className="text-sm text-[#B91C1C]">{error}</p></div>}
+          <div className="dialog-actions">
+            <Button variant="secondary" type="button" onClick={close}>Cancelar</Button>
+            <Button identity={identity} disabled={saving}>{saving ? 'Creando...' : <><Plus size={16} /> Crear usuario</>}</Button>
           </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
-          {selected.system ? (
-            <div className="mt-8 rounded-xl border border-white/10 bg-white/[.035] p-5 text-sm text-slate-400">
-              El superadministrador conserva todos los modulos y permisos para evitar que la entidad quede sin administracion.
+function UserDetailModal({ user, data, close, reload, done }: { user: AdminUser; data: AdminOverview; close(): void; reload(): Promise<void>; done(message: string): void }) {
+  const initials = user.full_name.split(' ').slice(0, 2).map(part => part[0]).join('')
+  const [positions, setPositions] = useState<Position[]>([])
+  const [positionId, setPositionId] = useState(user.position_id || '')
+  const [newPositionName, setNewPositionName] = useState('')
+  const [savingPosition, setSavingPosition] = useState(false)
+
+  useEffect(() => { void api.positions().then(setPositions) }, [])
+  useEffect(() => { setPositionId(user.position_id || '') }, [user.position_id])
+
+  async function changeRole(roleId: string) {
+    await api.updateUser(user.membership_id, { roleId, active: user.membership_active })
+    await reload(); done('Rol actualizado')
+  }
+  async function toggleActive() {
+    await api.updateUser(user.membership_id, { roleId: String(user.role_id), active: !user.membership_active })
+    await reload(); done(user.membership_active ? 'Usuario desactivado' : 'Usuario activado')
+  }
+  async function saveCargo() {
+    setSavingPosition(true)
+    try {
+      let finalId = positionId
+      if (!finalId && newPositionName.trim()) {
+        const created = await api.createPosition(newPositionName.trim())
+        finalId = created.id
+      }
+      await api.updateUser(user.membership_id, { roleId: String(user.role_id), active: user.membership_active, positionId: finalId || null })
+      setNewPositionName('')
+      await reload(); done('Cargo actualizado')
+    } finally { setSavingPosition(false) }
+  }
+  return (
+    <div className="almera-modal detail-modal" onClick={close}>
+      <div className="ds-card almera-dialog user-detail" onClick={(event: React.MouseEvent) => event.stopPropagation()}>
+        <div className="dialog-head"><div><p className="ds-eyebrow">Ficha de usuario</p><h2>{user.full_name}</h2></div><button aria-label="Cerrar" onClick={close}><X /></button></div>
+
+        <div className="detail-summary">
+          <div className="grid h-11 w-11 flex-none place-items-center rounded-full text-sm font-black text-white" style={{ backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})` }}>{initials}</div>
+          <span>{user.email}</span>
+          <Badge tone={user.membership_active ? 'info' : 'neutral'}>{user.membership_active ? 'Activo' : 'Inactivo'}</Badge>
+        </div>
+
+        <div className="detail-block">
+          <h3>Datos de la cuenta</h3>
+          <dl>
+            <div><dt>Rol</dt><dd>
+              <Select value={String(user.role_id)} onChange={value => void changeRole(value)} options={data.roles.map(role => ({ value: String(role.id), label: role.name }))} />
+            </dd></div>
+            <div><dt>Ultimo acceso</dt><dd>{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Sin registro'}</dd></div>
+            <div><dt>Estado</dt><dd><Button variant="secondary" onClick={() => void toggleActive()}>{user.membership_active ? 'Inactivar' : 'Activar'}</Button></dd></div>
+          </dl>
+        </div>
+
+        <div className="detail-block">
+          <h3>Cargo</h3>
+          <p className="text-xs text-[var(--muted)]">El cargo lo asigna el administrador; se muestra junto al nombre del usuario en todo el sistema.</p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <Select
+              value={positionId || 'NONE'}
+              onChange={value => { setPositionId(value === 'NONE' ? '' : value); setNewPositionName('') }}
+              placeholder="Sin asignar"
+              options={[{ value: 'NONE', label: 'Sin asignar' }, ...positions.map(position => ({ value: position.id, label: position.name }))]}
+            />
+            <input className="ds-input" placeholder="O escribe un cargo nuevo" value={newPositionName} onChange={e => { setNewPositionName(e.target.value); setPositionId('') }} />
+          </div>
+          <Button className="mt-3" variant="secondary" disabled={savingPosition} onClick={() => void saveCargo()}>Guardar cargo</Button>
+        </div>
+
+        {user.role_key === 'USUARIO' && (
+          <div className="detail-block">
+            <h3>Modulos y area</h3>
+            <UserModulesPanel user={user} data={data} done={done} reload={reload} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data: AdminOverview; done(message: string): void; reload(): Promise<void> }) {
+  const [grants, setGrants] = useState<UserModuleGrant[] | null>(null)
+  const [error, setError] = useState('')
+  const [areas, setAreas] = useState<Area[]>([])
+  const [positions, setPositions] = useState<Position[]>([])
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [matrixForm, setMatrixForm] = useState<{ function: 'AUDITOR' | 'PROFESIONAL' | ''; areaId: string; documentId: string; positionId: string }>({ function: '', areaId: '', documentId: '', positionId: '' })
+
+  const load = () => api.userModules(user.membership_id).then(setGrants).catch(cause => setError(cause instanceof Error ? cause.message : 'No fue posible cargar los modulos'))
+  useEffect(() => { void load() }, [user.membership_id])
+  useEffect(() => { void adherenceService.areas().then(setAreas); void api.positions().then(setPositions) }, [])
+
+  if (!grants) return <div className="p-5 text-sm text-[var(--muted)]">Cargando modulos...</div>
+  const grantedKeys = new Set(grants.map(item => item.module_key))
+  const enabledModules = data.modules.filter(module => module.enabled)
+
+  async function toggle(moduleKey: string) {
+    setBusyKey(moduleKey); setError('')
+    try {
+      if (grantedKeys.has(moduleKey)) {
+        await api.revokeUserModule(user.membership_id, moduleKey)
+        await load(); await reload()
+        done('Modulo retirado')
+      } else if (moduleKey !== 'adherence-matrix') {
+        await api.grantUserModule(user.membership_id, moduleKey)
+        await load(); await reload()
+        done('Modulo habilitado')
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible actualizar el modulo') }
+    finally { setBusyKey(null) }
+  }
+
+  async function grantMatrix() {
+    if (!matrixForm.function) return
+    setBusyKey('adherence-matrix'); setError('')
+    try {
+      await api.grantUserModule(user.membership_id, 'adherence-matrix', {
+        function: matrixForm.function,
+        areaId: matrixForm.areaId,
+        documentId: matrixForm.documentId,
+        positionId: matrixForm.positionId || undefined,
+      })
+      setMatrixForm({ function: '', areaId: '', documentId: '', positionId: '' })
+      await load(); await reload()
+      done('Matrices de Adherencia habilitado')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible habilitar el modulo') }
+    finally { setBusyKey(null) }
+  }
+
+  const matrixGrant = grants.find(item => item.module_key === 'adherence-matrix')
+
+  return (
+    <div className="space-y-4 p-5">
+      {error && <div className="flex items-center gap-2 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-xs text-[#B91C1C]"><AlertTriangle size={14} />{error}<button onClick={() => setError('')}><X size={12} /></button></div>}
+      <div className="grid gap-2 md:grid-cols-2">
+        {enabledModules.map(module => {
+          const granted = grantedKeys.has(module.key)
+          const isMatrix = module.key === 'adherence-matrix'
+          return (
+            <div key={module.id} className="rounded-xl border border-[var(--border-hairline)] p-3">
+              <button
+                type="button"
+                disabled={busyKey === module.key || (isMatrix && !granted)}
+                onClick={() => void toggle(module.key)}
+                className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-60"
+              >
+                <span>
+                  <span className="block text-sm font-bold">{module.name}</span>
+                  {isMatrix && granted && matrixGrant?.function_key && (
+                    <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                      {matrixGrant.function_key === 'AUDITOR' ? 'Auditor' : 'Profesional'}
+                      {matrixGrant.function_key === 'PROFESIONAL' && matrixGrant.area_name ? ` · ${matrixGrant.area_name}` : ''}
+                      {matrixGrant.function_key === 'AUDITOR' && matrixGrant.auditor_areas.length > 0 ? ` · ${matrixGrant.auditor_areas.map(a => a.name).join(', ')}` : ''}
+                    </span>
+                  )}
+                </span>
+                {granted ? <ToggleRight style={{ color: identity.color }} size={26} /> : <ToggleLeft className="text-[var(--muted)]" size={26} />}
+              </button>
+              {isMatrix && !granted && (
+                <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
+                  <Select
+                    value={matrixForm.function}
+                    onChange={value => setMatrixForm({ ...matrixForm, function: value as 'AUDITOR' | 'PROFESIONAL' | '' })}
+                    placeholder="Función..."
+                    options={[
+                      { value: 'AUDITOR', label: 'Auditor (evalúa y ve el dashboard)' },
+                      { value: 'PROFESIONAL', label: 'Profesional (ve su propio plan)' },
+                    ]}
+                  />
+                  {matrixForm.function && (
+                    <>
+                      <Select
+                        value={matrixForm.areaId}
+                        onChange={value => setMatrixForm({ ...matrixForm, areaId: value })}
+                        placeholder="Area..."
+                        options={areas.map(area => ({ value: area.id, label: area.name }))}
+                      />
+                      {matrixForm.function === 'PROFESIONAL' && (
+                        <>
+                          <input className="ds-input" placeholder="No. de documento" value={matrixForm.documentId} onChange={e => setMatrixForm({ ...matrixForm, documentId: e.target.value })} />
+                          {!user.position_name && (
+                            <Select
+                              value={matrixForm.positionId}
+                              onChange={value => setMatrixForm({ ...matrixForm, positionId: value })}
+                              placeholder="Cargo..."
+                              options={positions.map(position => ({ value: position.id, label: position.name }))}
+                            />
+                          )}
+                        </>
+                      )}
+                      <Button
+                        identity={identity}
+                        className="w-full"
+                        disabled={
+                          busyKey === 'adherence-matrix' || !matrixForm.areaId ||
+                          (matrixForm.function === 'PROFESIONAL' && (!matrixForm.documentId || (!user.position_name && !matrixForm.positionId)))
+                        }
+                        onClick={() => void grantMatrix()}
+                      >
+                        Habilitar
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <>
-              <AccessGroup title="Modulos visibles" description="Espacios que apareceran en el menu de este rol">
-                {data.modules.filter(module => module.enabled).map(module => (
-                  <CheckRow key={module.id} checked={moduleIds.includes(String(module.id))} onChange={() => toggle(moduleIds, String(module.id), setModuleIds)} title={module.name} description={module.description} />
-                ))}
-              </AccessGroup>
-              <AccessGroup title="Permisos base" description="Acciones autorizadas para este rol">
-                {data.permissions.map(permission => (
-                  <CheckRow key={permission.id} checked={permissionIds.includes(String(permission.id))} onChange={() => toggle(permissionIds, String(permission.id), setPermissionIds)} title={permission.key} description={permission.description || permission.name} />
-                ))}
-              </AccessGroup>
-              <Button onClick={async () => { await api.updateRoleAccess(String(selected.id), moduleIds, permissionIds); await reload(); done('Accesos del rol guardados') }} className="mt-6"><Save size={16} /> Guardar accesos</Button>
-            </>
-          )}
-        </Card>
-      )}
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 function ModulesPanel({ data, reload, done }: PanelProps) {
-  return <Card className="overflow-hidden"><div className="border-b border-white/10 p-6"><h2 className="font-black">Catalogo operativo de modulos</h2><p className="mt-1 text-sm text-slate-400">Un modulo habilitado puede asignarse a roles. Deshabilitarlo lo retira de la entidad.</p></div><div className="grid gap-4 p-6 md:grid-cols-2">{data.modules.map(module => <article key={module.id} className={`rounded-xl border p-5 ${module.enabled ? 'border-[#56D6C9]/24 bg-[#56D6C9]/[.055]' : 'border-white/10 bg-white/[.03] opacity-75'}`}><div className="flex items-start gap-4"><div className={`grid h-11 w-11 place-items-center rounded-xl ${module.enabled ? 'bg-[#56D6C9]/10 text-[#56D6C9]' : 'bg-white/[.06] text-slate-500'}`}><Settings size={19} /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><h3 className="font-black">{module.name}</h3><button disabled={module.key === 'admin'} aria-label={`Cambiar estado de ${module.name}`} onClick={async () => { await api.updateModule(String(module.id), !module.enabled); await reload(); done(`Modulo ${module.enabled ? 'deshabilitado' : 'habilitado'}`) }} className="disabled:cursor-not-allowed disabled:opacity-40">{module.enabled ? <ToggleRight className="text-[#56D6C9]" size={30} /> : <ToggleLeft className="text-slate-500" size={30} />}</button></div><p className="mt-2 text-sm leading-relaxed text-slate-400">{module.description}</p><p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">{module.key === 'admin' ? 'Esencial' : module.enabled ? 'Habilitado' : 'Deshabilitado'}</p></div></div></article>)}</div></Card>
+  return (
+    <Card accent={identity.color} className="overflow-hidden">
+      <div className="border-b border-[var(--border-hairline)] p-6">
+        <h2 className="font-black">Catalogo operativo de modulos</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">Un modulo habilitado para la entidad puede asignarse a usuarios. Deshabilitarlo lo retira para todos.</p>
+      </div>
+      <div className="grid gap-4 p-6 md:grid-cols-2">
+        {data.modules.map(module => {
+          const moduleColor = moduleIdentity(module.key).color
+          return (
+            <article key={module.id} className="rounded-xl border p-5" style={{ borderColor: module.enabled ? `${moduleColor}40` : 'var(--border-hairline)', background: module.enabled ? `${moduleColor}0d` : 'var(--color-surface-soft)', opacity: module.enabled ? 1 : 0.75 }}>
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 flex-none place-items-center rounded-xl text-white" style={{ backgroundImage: module.enabled ? `linear-gradient(135deg, ${moduleIdentity(module.key).gradientFrom}, ${moduleIdentity(module.key).gradientTo})` : undefined, background: module.enabled ? undefined : 'var(--color-surface-card)', color: module.enabled ? undefined : 'var(--muted)' }}>
+                  <Settings size={19} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-black">{module.name}</h3>
+                    <button
+                      disabled={module.key === 'admin'}
+                      aria-label={`Cambiar estado de ${module.name}`}
+                      onClick={async () => { await api.updateModule(String(module.id), !module.enabled); await reload(); done(`Modulo ${module.enabled ? 'deshabilitado' : 'habilitado'}`) }}
+                      className="disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {module.enabled ? <ToggleRight style={{ color: moduleColor }} size={30} /> : <ToggleLeft className="text-[var(--muted)]" size={30} />}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{module.description}</p>
+                  <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">{module.key === 'admin' ? 'Esencial' : module.enabled ? 'Habilitado' : 'Deshabilitado'}</p>
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+    </Card>
+  )
 }
 
 function EntityPanel({ data }: { data: AdminOverview }) {
   const activeModules = data.modules.filter(module => module.enabled)
-  return <Card className="p-6"><p className="eyebrow">Entidad activa</p><h2 className="mt-1 text-2xl font-black">ESE Salud Yopal</h2><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{[['Tipo de entidad', 'ESE'], ['Administrador', 'Superadministrador'], ['Estado', 'Activa'], ['Modulos activos', String(activeModules.length)]].map(([label, value]) => <div key={label} className="rounded-xl border border-white/10 bg-white/[.035] p-4"><p className="font-mono text-[11px] uppercase tracking-wider text-slate-500">{label}</p><strong className="mt-2 block">{value}</strong></div>)}</div><div className="mt-6 flex flex-wrap gap-2">{activeModules.map(module => <Badge key={module.id} tone="info">{module.name}</Badge>)}</div></Card>
+  return (
+    <Card accent={identity.color} className="p-6">
+      <p className="ds-eyebrow">Entidad activa</p>
+      <h2 className="mt-1 text-2xl font-black">ESE Salud Yopal</h2>
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[['Tipo de entidad', 'ESE'], ['Administrador', 'Superadministrador'], ['Estado', 'Activa'], ['Modulos activos', String(activeModules.length)]].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-[var(--border-hairline)] p-4">
+            <p className="font-mono text-[11px] uppercase tracking-wider text-[var(--muted)]">{label}</p>
+            <strong className="mt-2 block">{value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 flex flex-wrap gap-2">{activeModules.map(module => <Badge key={module.id} tone="info">{module.name}</Badge>)}</div>
+    </Card>
+  )
 }
 
 function SettingsPanel({ data }: { data: AdminOverview }) {
   const adminPermissions = data.permissions.filter(permission => permission.key.includes('admin') || permission.key.includes('settings') || permission.key.includes('roles'))
   return (
     <div className="grid gap-6 xl:grid-cols-[.95fr_1.05fr]">
-      <Card className="p-6">
-        <p className="eyebrow">Configuracion base</p>
+      <Card accent={identity.color} className="p-6">
+        <p className="ds-eyebrow">Configuracion base</p>
         <h2 className="mt-1 text-2xl font-black">Parametros institucionales</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-400">Esta seccion deja preparado el punto de control para informacion de entidad, modulos activos, permisos sensibles y futuras integraciones de ALMERA.</p>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Esta seccion deja preparado el punto de control para informacion de entidad, modulos activos, permisos sensibles y futuras integraciones de ALMERA.</p>
         <div className="mt-6 grid gap-3">
           {[
             ['Entidad', 'ESE Salud Yopal'],
@@ -272,22 +461,23 @@ function SettingsPanel({ data }: { data: AdminOverview }) {
             ['Sesion', 'Cookie HttpOnly'],
             ['Modo', 'Produccion VPS'],
           ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.035] p-4">
-              <span className="font-mono text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</span>
+            <div key={label} className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] p-4">
+              <span className="font-mono text-[11px] font-black uppercase tracking-wider text-[var(--muted)]">{label}</span>
               <strong>{value}</strong>
             </div>
           ))}
         </div>
+        <Link to="/app/design-system" className="mt-4 inline-flex items-center gap-2 text-sm font-bold" style={{ color: identity.color }}>Galería del design system (revisión) →</Link>
       </Card>
 
-      <Card className="p-6">
-        <p className="eyebrow">Permisos sensibles</p>
+      <Card accent={identity.color} className="p-6">
+        <p className="ds-eyebrow">Permisos sensibles</p>
         <h2 className="mt-1 text-xl font-black">Controles administrativos</h2>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {adminPermissions.map(permission => (
-            <div key={permission.id} className="rounded-xl border border-white/10 bg-white/[.035] p-4">
-              <Badge tone="accent">{permission.key}</Badge>
-              <p className="mt-3 text-sm text-slate-400">{permission.description || permission.name}</p>
+            <div key={permission.id} className="rounded-xl border border-[var(--border-hairline)] p-4">
+              <Badge tone="info">{permission.key}</Badge>
+              <p className="mt-3 text-sm text-[var(--muted)]">{permission.description || permission.name}</p>
             </div>
           ))}
         </div>
@@ -297,5 +487,3 @@ function SettingsPanel({ data }: { data: AdminOverview }) {
 }
 
 interface PanelProps { data: AdminOverview; reload(): Promise<void>; done(message: string): void }
-function AccessGroup({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <div className="mt-8"><h3 className="font-black">{title}</h3><p className="mb-3 text-xs text-slate-400">{description}</p><div className="grid gap-2 md:grid-cols-2">{children}</div></div> }
-function CheckRow({ checked, onChange, title, description }: { checked: boolean; onChange(): void; title: string; description: string }) { return <button type="button" onClick={onChange} className={`flex gap-3 rounded-xl border p-4 text-left transition ${checked ? 'border-[#56D6C9]/50 bg-[#56D6C9]/10' : 'border-white/10 hover:border-white/20'}`}><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded ${checked ? 'bg-[#56D6C9] text-slate-950' : 'border border-white/20 bg-transparent'}`}>{checked && <Check size={13} />}</span><span><span className="block text-sm font-bold">{title}</span><span className="mt-1 block text-xs leading-relaxed text-slate-400">{description}</span></span></button> }

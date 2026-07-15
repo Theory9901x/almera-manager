@@ -1,4 +1,4 @@
-import type { Area, AreaMatrix, Auditor, Dashboard, Evaluation, EvaluationDetail, EvaluationRecord, EvaluationSummary, Position, Professional, ScoreComputation, Threshold } from '../types'
+import type { Area, AreaMatrix, Auditor, Dashboard, Evaluation, EvaluationDetail, EvaluationRecord, EvaluationSummary, ImprovementPlan, PlanFollowup, Position, Professional, ScoreComputation, Threshold } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/adherence${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) }, ...init })
@@ -64,6 +64,41 @@ export const adherenceService = {
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = 'dashboard-adherencia.pdf'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
+  linkProfessionalAccount: (id: string, membershipId: string | null) => call<Professional>(`/professionals/${id}`, { method: 'PATCH', body: JSON.stringify({ membershipId }) }),
+  myEvaluations: () => call<EvaluationSummary[]>('/my-evaluations'),
+
+  // Plan de mejora (auditor)
+  evaluationPlan: (evaluationId: string) => call<ImprovementPlan | null>(`/evaluations/${evaluationId}/plan`),
+  saveEvaluationPlan: (evaluationId: string, data: { description: string; plannedStartDate?: string; plannedEndDate?: string }) =>
+    call<ImprovementPlan>(`/evaluations/${evaluationId}/plan`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Mi plan de trabajo (profesional)
+  myPlans: () => call<ImprovementPlan[]>('/my-plans'),
+  plan: (planId: string) => call<ImprovementPlan>(`/plans/${planId}`),
+  startPlan: (planId: string) => call<ImprovementPlan>(`/plans/${planId}/start`, { method: 'POST' }),
+  completePlan: (planId: string) => call<ImprovementPlan>(`/plans/${planId}/complete`, { method: 'POST' }),
+  followups: (planId: string) => call<PlanFollowup[]>(`/plans/${planId}/followups`),
+  addFollowup: async (planId: string, description: string, progressPercent: number, files: FileList | null) => {
+    const body = new FormData()
+    body.append('description', description)
+    body.append('progressPercent', String(progressPercent))
+    if (files) Array.from(files).forEach(file => body.append('files', file))
+    const response = await fetch(`/api/adherence/plans/${planId}/followups`, { method: 'POST', credentials: 'same-origin', body })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'No fue posible registrar el seguimiento')
+    return data as PlanFollowup
+  },
+  downloadFollowupEvidence: async (planId: string, followupId: string, evidenceId: string, originalName: string) => {
+    const response = await fetch(`/api/adherence/plans/${planId}/followups/${followupId}/evidence/${evidenceId}/download`, { credentials: 'same-origin' })
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible descargar la evidencia') }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = originalName
     anchor.click()
     URL.revokeObjectURL(url)
   },

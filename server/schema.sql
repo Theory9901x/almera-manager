@@ -254,7 +254,8 @@ INSERT INTO permissions (key, name, description) VALUES
   ('adherence_matrix.manage', 'Administrar matrices de adherencia', 'Crear/editar areas, ambitos, criterios, profesionales y cargos'),
   ('adherence_matrix.evaluate', 'Evaluar adherencia', 'Crear y diligenciar evaluaciones'),
   ('adherence_matrix.close', 'Cerrar evaluaciones de adherencia', 'Registrar cierre, compromisos y firmas'),
-  ('adherence_matrix.export', 'Exportar matrices de adherencia', 'Generar informes PDF y exportar dashboard')
+  ('adherence_matrix.export', 'Exportar matrices de adherencia', 'Generar informes PDF y exportar dashboard'),
+  ('adherence_matrix.own_plan', 'Ver mi plan de mejora', 'El profesional ve sus propias evaluaciones y sube evidencias de su plan de mejora')
 ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
 
 CREATE TABLE IF NOT EXISTS adherence_areas (
@@ -277,9 +278,11 @@ CREATE TABLE IF NOT EXISTS adherence_professionals (
   full_name TEXT NOT NULL, document_id TEXT NOT NULL, specialty TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'ACTIVE_INDEFINITE' CHECK (status IN ('ACTIVE_INDEFINITE','ACTIVE_ADAPTATION','WITHDRAWN')),
   active BOOLEAN NOT NULL DEFAULT TRUE,
+  membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (organization_id, document_id)
 );
+ALTER TABLE adherence_professionals ADD COLUMN IF NOT EXISTS membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS adherence_matrix_versions (
   id BIGSERIAL PRIMARY KEY, area_id BIGINT NOT NULL REFERENCES adherence_areas(id) ON DELETE CASCADE,
@@ -348,3 +351,61 @@ CREATE TABLE IF NOT EXISTS adherence_auditor_areas (
   area_id BIGINT NOT NULL REFERENCES adherence_areas(id) ON DELETE CASCADE,
   PRIMARY KEY (membership_id, area_id)
 );
+
+CREATE TABLE IF NOT EXISTS adherence_plan_evidence (
+  id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  evaluation_id BIGINT NOT NULL REFERENCES adherence_evaluations(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS adherence_plan_evidence_eval_idx ON adherence_plan_evidence(evaluation_id);
+
+-- Modulos otorgados a un usuario en concreto (rol USUARIO). Admin/Superadmin no la necesitan.
+CREATE TABLE IF NOT EXISTS membership_modules (
+  membership_id BIGINT NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+  module_id BIGINT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (membership_id, module_id)
+);
+
+-- Cargo de perfil de cada usuario; mismo catalogo que "Cargo" en Matrices de Adherencia.
+ALTER TABLE memberships ADD COLUMN IF NOT EXISTS position_id BIGINT REFERENCES adherence_positions(id) ON DELETE SET NULL;
+
+-- Funcion dentro del modulo para un USUARIO (solo aplica a modulos que la necesitan, ej.
+-- adherence-matrix: 'AUDITOR' opera evaluaciones, 'PROFESIONAL' solo ve su propio plan).
+ALTER TABLE membership_modules ADD COLUMN IF NOT EXISTS function_key TEXT;
+
+-- Plan de mejora: entidad propia con seguimiento (ya no es solo el texto "commitments" de la evaluacion).
+CREATE TABLE IF NOT EXISTS adherence_improvement_plans (
+  id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  evaluation_id BIGINT NOT NULL REFERENCES adherence_evaluations(id) ON DELETE CASCADE,
+  professional_id BIGINT NOT NULL REFERENCES adherence_professionals(id),
+  description TEXT NOT NULL,
+  planned_start_date DATE, planned_end_date DATE,
+  actual_start_date DATE, actual_end_date DATE,
+  status TEXT NOT NULL DEFAULT 'NO_INICIADO' CHECK (status IN ('NO_INICIADO','EN_EJECUCION','TERMINADO')),
+  progress_percent INTEGER NOT NULL DEFAULT 0 CHECK (progress_percent BETWEEN 0 AND 100),
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS adherence_improvement_plans_professional_idx ON adherence_improvement_plans(professional_id);
+
+CREATE TABLE IF NOT EXISTS adherence_plan_followups (
+  id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  plan_id BIGINT NOT NULL REFERENCES adherence_improvement_plans(id) ON DELETE CASCADE,
+  author_id BIGINT NOT NULL REFERENCES users(id),
+  description TEXT NOT NULL,
+  progress_percent INTEGER NOT NULL CHECK (progress_percent BETWEEN 0 AND 100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS adherence_plan_followups_plan_idx ON adherence_plan_followups(plan_id);
+
+CREATE TABLE IF NOT EXISTS adherence_plan_followup_evidence (
+  id BIGSERIAL PRIMARY KEY, organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  followup_id BIGINT NOT NULL REFERENCES adherence_plan_followups(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL, uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS adherence_plan_followup_evidence_followup_idx ON adherence_plan_followup_evidence(followup_id);

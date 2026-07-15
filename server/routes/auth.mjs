@@ -44,6 +44,30 @@ authRouter.post('/login', async (request, response, next) => {
 
 authRouter.get('/me', requireAuth, (request, response) => response.json(request.auth))
 
+authRouter.get('/positions', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query(
+      'SELECT id, name FROM adherence_positions WHERE organization_id = $1 AND active ORDER BY name',
+      [request.auth.organization.id],
+    )
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+authRouter.post('/positions', requireAuth, async (request, response, next) => {
+  try {
+    const name = String(request.body?.name || '').trim()
+    if (!name) return response.status(400).json({ error: 'El nombre del cargo es obligatorio' })
+    const result = await query(
+      `INSERT INTO adherence_positions (organization_id, name) VALUES ($1, $2)
+       ON CONFLICT (organization_id, name) DO UPDATE SET active = TRUE
+       RETURNING id, name`,
+      [request.auth.organization.id, name],
+    )
+    response.status(201).json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
 authRouter.post('/logout', async (request, response, next) => {
   try {
     const token = readCookie(request, SESSION_COOKIE)

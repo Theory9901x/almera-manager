@@ -56,6 +56,7 @@ export interface Professional {
   specialty: string
   status: ProfessionalStatus
   active: boolean
+  membership_id: string | null
   created_at: string
   updated_at: string
 }
@@ -69,6 +70,7 @@ export interface EvaluationSummary {
   professional_name: string
   area_id: string
   area_name: string
+  evaluator_membership_id: string
   month_reported: string
   evaluation_date: string
   total_records: number
@@ -192,4 +194,42 @@ export interface Dashboard {
   byScope: DashboardScopeItem[]
   byProfessional: DashboardProfessionalItem[]
   byMonth: DashboardMonthItem[]
+}
+
+
+export type PlanStatus = 'NO_INICIADO' | 'EN_EJECUCION' | 'TERMINADO'
+
+export interface ImprovementPlan {
+  id: string
+  organization_id: string
+  evaluation_id: string
+  professional_id: string
+  description: string
+  planned_start_date: string | null
+  planned_end_date: string | null
+  actual_start_date: string | null
+  actual_end_date: string | null
+  status: PlanStatus
+  progress_percent: number
+  created_at: string
+  updated_at: string
+  area_name?: string
+  month_reported?: string
+  professional_name?: string
+}
+
+export interface FollowupEvidence {
+  id: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
+}
+
+export interface PlanFollowup {
+  id: string
+  description: string
+  progress_percent: number
+  created_at: string
+  author_name: string
+  evidence: FollowupEvidence[]
 }
