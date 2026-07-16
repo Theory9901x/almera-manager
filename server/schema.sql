@@ -455,6 +455,12 @@ CREATE INDEX IF NOT EXISTS surveys_org_idx ON surveys(organization_id, status);
 ALTER TABLE surveys ADD COLUMN IF NOT EXISTS is_template BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS surveys_template_idx ON surveys(organization_id, is_template);
 
+-- Evaluaciones de conocimiento (ej. guias clinicas): a diferencia de una encuesta de opinion, aqui
+-- si tiene valor formativo mostrarle el puntaje al encuestado al terminar. Default TRUE porque la
+-- mayoria de encuestas de opinion no usan preguntas con clave de calificacion (nunca calculan
+-- puntaje), asi que el flag no tiene efecto visible para ellas.
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS show_score_to_respondent BOOLEAN NOT NULL DEFAULT TRUE;
+
 CREATE TABLE IF NOT EXISTS survey_pages (
   id BIGSERIAL PRIMARY KEY,
   survey_id BIGINT NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,

@@ -429,6 +429,13 @@ function SettingsModal({ survey, onChange, onClose }: { survey: SurveyDetail; on
           <Field label="Exigir sesión interna">
             <Select value={survey.require_login ? 'yes' : 'no'} onChange={value => onChange({ requireLogin: value === 'yes' })} options={[{ value: 'no', label: 'No, acceso anónimo' }, { value: 'yes', label: 'Sí, exigir inicio de sesión' }]} />
           </Field>
+          <Field label="Mostrar puntaje al finalizar" hint="Solo aplica si hay preguntas con clave de calificación (evaluaciones de conocimiento)">
+            <Select
+              value={survey.show_score_to_respondent ? 'yes' : 'no'}
+              onChange={value => onChange({ showScoreToRespondent: value === 'yes' })}
+              options={[{ value: 'yes', label: 'Sí, mostrar puntaje' }, { value: 'no', label: 'No, mantener oculto' }]}
+            />
+          </Field>
           <Field label="Apertura programada" hint="Vacío = disponible de inmediato">
             <Input type="datetime-local" value={toLocalInputValue(survey.opens_at)} onChange={event => onChange({ opensAt: fromLocalInputValue(event.target.value) })} />
           </Field>

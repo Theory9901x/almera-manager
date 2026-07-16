@@ -1,4 +1,4 @@
-import { Plus, Trash2, GripVertical } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, Trash2, GripVertical } from 'lucide-react'
 import { Field, Input } from '@/design-system'
 import { ImageUploadButton } from './ImageUploadButton'
 import type { EmojiStep, LikertRow, MatchingTarget, QuestionConfig, QuestionType, SurveyOption } from '../types'
@@ -18,6 +18,10 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
 }) {
   if (['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'DROPDOWN', 'IMAGE_CHOICE'].includes(type)) {
     const options = (config.options as SurveyOption[]) || []
+    // Motor de calificacion generico: solo tiene sentido "una opcion correcta" en preguntas de
+    // opcion UNICA (evaluaciones de conocimiento, ej. guias clinicas) — nunca en multiple/imagenes.
+    const supportsScoring = type === 'SINGLE_CHOICE' || type === 'DROPDOWN'
+    const correctOptionId = (config.correctOptionId as string | null | undefined) || null
     return (
       <div className="survey-config-block">
         <p className="survey-config-label">Opciones</p>
@@ -25,6 +29,15 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
           {options.map((option, index) => (
             <div key={option.id} className="survey-config-option-row">
               <GripVertical size={14} className="survey-config-drag" />
+              {supportsScoring && (
+                <button
+                  type="button" className="survey-config-correct-toggle" aria-pressed={correctOptionId === option.id}
+                  title="Marcar como respuesta correcta"
+                  onClick={() => onChange({ ...config, correctOptionId: correctOptionId === option.id ? null : option.id })}
+                >
+                  {correctOptionId === option.id ? <CheckCircle2 size={18} color="#059669" /> : <Circle size={18} />}
+                </button>
+              )}
               {type === 'IMAGE_CHOICE' && (
                 <ImageUploadButton surveyId={surveyId} value={option.imageUrl} onChange={url => {
                   const next = options.slice()
@@ -41,7 +54,14 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
                   onChange({ ...config, options: next })
                 }}
               />
-              <button type="button" className="survey-config-remove" onClick={() => onChange({ ...config, options: options.filter(item => item.id !== option.id) })} aria-label="Quitar opción">
+              <button
+                type="button" className="survey-config-remove" aria-label="Quitar opción"
+                onClick={() => onChange({
+                  ...config,
+                  options: options.filter(item => item.id !== option.id),
+                  correctOptionId: correctOptionId === option.id ? null : correctOptionId,
+                })}
+              >
                 <Trash2 size={15} />
               </button>
             </div>
@@ -50,6 +70,11 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
         <button type="button" className="survey-config-add" onClick={() => onChange({ ...config, options: [...options, { id: newId('opt'), label: '' }] })}>
           <Plus size={14} /> Agregar opción
         </button>
+        {supportsScoring && (
+          <Field label="Puntos por respuesta correcta" hint="Vacío o 0 = esta pregunta no se califica (queda fuera del puntaje)">
+            <Input type="number" min={0} value={(config.points as number | undefined) ?? ''} onChange={event => onChange({ ...config, points: event.target.value === '' ? undefined : Number(event.target.value) })} />
+          </Field>
+        )}
         {type === 'MULTIPLE_CHOICE' && (
           <div className="survey-config-grid">
             <Field label="Mínimo de selecciones">

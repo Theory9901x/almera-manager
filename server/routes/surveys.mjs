@@ -8,6 +8,7 @@ import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { renderPdf } from '../pdf.mjs'
 import { renderSurveyReportHtml } from '../templates/surveyReport.mjs'
+import { aggregateScores, computeResponseScore, hasScoredQuestions } from '../surveyScoring.mjs'
 
 export const surveysRouter = Router()
 
@@ -108,9 +109,11 @@ function normalizeConfig(type, config = {}) {
   const base = config && typeof config === 'object' ? config : {}
   if (CHOICE_TYPES.has(type) && type !== 'YES_NO') {
     const options = Array.isArray(base.options) ? base.options : []
+    const normalizedOptions = options.map(normalizeOption)
+    const validOptionIds = new Set(normalizedOptions.map(option => option.id))
     return {
       ...base,
-      options: options.map(normalizeOption),
+      options: normalizedOptions,
       randomize: Boolean(base.randomize),
       minSelected: base.minSelected != null ? Number(base.minSelected) : null,
       maxSelected: base.maxSelected != null ? Number(base.maxSelected) : null,
@@ -118,6 +121,11 @@ function normalizeConfig(type, config = {}) {
       presentation: type === 'IMAGE_CHOICE' && base.presentation === 'faces' ? 'faces' : undefined,
       cardAccent: normalizeCardAccent(base.cardAccent),
       dependsOn: normalizeDependsOn(base.dependsOn),
+      // Motor de puntaje generico (ver server/surveyScoring.mjs): sin clave de calificacion por
+      // defecto — una pregunta solo entra al calculo si el administrador marca explicitamente
+      // cual opcion es correcta desde el constructor.
+      correctOptionId: base.correctOptionId && validOptionIds.has(String(base.correctOptionId)) ? String(base.correctOptionId) : null,
+      points: base.points != null ? Number(base.points) : undefined,
     }
   }
   if (type === 'SCALE') {
@@ -318,6 +326,7 @@ surveysRouter.patch('/:id', surveysModule, edit, async (request, response, next)
     if (body.opensAt !== undefined) set('opens_at', body.opensAt || null)
     if (body.closesAt !== undefined) set('closes_at', body.closesAt || null)
     if (body.isTemplate !== undefined) set('is_template', Boolean(body.isTemplate))
+    if (body.showScoreToRespondent !== undefined) set('show_score_to_respondent', Boolean(body.showScoreToRespondent))
     if (!fields.length) return response.json(survey)
     params.push(survey.id, oid(request))
     await query(`UPDATE surveys SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${params.length - 1} AND organization_id = $${params.length}`, params)
@@ -663,6 +672,23 @@ surveysRouter.get('/:id/responses', surveysModule, view, async (request, respons
       ),
       query(`SELECT COUNT(*)::int AS total FROM survey_responses r WHERE ${where.join(' AND ')}`, params),
     ])
+    const pages = await loadStructure(survey.id)
+    if (hasScoredQuestions(pages) && rowsResult.rows.length) {
+      const itemsResult = await query(
+        `SELECT response_id, question_id, value FROM survey_response_items WHERE response_id = ANY($1::bigint[])`,
+        [rowsResult.rows.map(row => row.id)],
+      )
+      const valuesByResponse = new Map()
+      for (const item of itemsResult.rows) {
+        const values = valuesByResponse.get(item.response_id) || new Map()
+        values.set(item.question_id, item.value)
+        valuesByResponse.set(item.response_id, values)
+      }
+      for (const row of rowsResult.rows) {
+        const { total } = computeResponseScore(pages, valuesByResponse.get(row.id) || new Map())
+        row.score = total.possible ? total : null
+      }
+    }
     response.json({ rows: rowsResult.rows, total: countResult.rows[0].total, limit, offset })
   } catch (error) { next(error) }
 })
@@ -740,7 +766,14 @@ surveysRouter.get('/:id/responses/:responseId', surveysModule, view, async (requ
        WHERE i.response_id = $1 ORDER BY q.order_index`,
       [responseResult.rows[0].id],
     )
-    response.json({ ...responseResult.rows[0], items: items.rows })
+    const pages = await loadStructure(survey.id)
+    let score = null
+    if (hasScoredQuestions(pages)) {
+      const values = new Map(items.rows.map(item => [item.question_id, item.value]))
+      const { total } = computeResponseScore(pages, values)
+      score = total.possible ? total : null
+    }
+    response.json({ ...responseResult.rows[0], items: items.rows, score })
   } catch (error) { next(error) }
 })
 
@@ -929,7 +962,20 @@ async function buildStatsPayload(survey, request) {
     months: monthsResult.rows.map(row => row.month_reported),
     comparison,
     questions: questionStats,
+    scoring: hasScoredQuestions(pages) ? buildScoringAggregate(pages, itemsByResponse) : null,
   }
+}
+
+// itemsByResponse trae la FILA completa de survey_response_items (value, text_value, ...) por
+// pregunta; el motor de puntaje solo necesita el valor tipado de cada respuesta.
+function buildScoringAggregate(pages, itemsByResponse) {
+  const valuesByResponse = new Map()
+  for (const [responseId, answers] of itemsByResponse) {
+    const values = new Map()
+    for (const [questionId, row] of answers) values.set(questionId, row.value)
+    valuesByResponse.set(responseId, values)
+  }
+  return aggregateScores(pages, valuesByResponse)
 }
 
 surveysRouter.get('/:id/stats', surveysModule, view, async (request, response, next) => {
@@ -984,7 +1030,12 @@ function computeQuestionStats(question, items) {
       const count = counts.get(option.id) || 0
       return { optionId: option.id, label: option.label, count, percent: totalAnswered ? Math.round((count / totalAnswered) * 100) : 0 }
     })
-    return { totalAnswered, breakdown }
+    // % de acierto de ESTA pregunta especifica (evaluaciones de conocimiento): solo si tiene clave
+    // de calificacion configurada — reutiliza el mismo breakdown en vez de un conteo aparte.
+    const accuracyPercent = config.correctOptionId != null
+      ? (breakdown.find(item => item.optionId === config.correctOptionId)?.percent ?? null)
+      : undefined
+    return { totalAnswered, breakdown, accuracyPercent }
   }
 
   if (question.type === 'SCALE' || question.type === 'NPS' || question.type === 'RATING' || question.type === 'EMOJI_SCALE') {

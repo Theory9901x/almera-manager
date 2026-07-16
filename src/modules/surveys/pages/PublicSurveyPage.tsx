@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Lock, Send } from 'lucide-react'
-import { ToastProvider, fadeSlideUp, useToast } from '@/design-system'
+import { ToastProvider, fadeSlideUp, semaphoreColor, useToast } from '@/design-system'
 import { publicSurveyService, PublicSurveyError } from '../services/publicSurveyService'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { useTilt } from '../components/useTilt'
 import { resolveLineIcon } from '../components/lineIcons'
-import type { CardAccent, DependsOn, PublicSurvey, PublicSurveyQuestion, SurveyOption } from '../types'
+import type { CardAccent, DependsOn, PublicSurvey, PublicSurveyQuestion, SurveyOption, SurveyScoring } from '../types'
 
 function deviceId() {
   const key = 'sgimr_survey_device_id'
@@ -88,6 +88,7 @@ function PublicSurveyContent() {
   const [responseId, setResponseId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [thankYou, setThankYou] = useState('')
+  const [score, setScore] = useState<SurveyScoring | null>(null)
 
   useEffect(() => {
     if (!slug) return
@@ -187,6 +188,7 @@ function PublicSurveyContent() {
     try {
       const result = await publicSurveyService.submit(slug, { completed: true, items: buildItems(), deviceId: deviceId(), responseId: responseId || undefined })
       setThankYou(result.thankYouMessage || survey.thank_you_message)
+      setScore(result.score || null)
       setPhase('done')
     } catch (cause) {
       if (cause instanceof PublicSurveyError && cause.alreadyResponded) { setPhase('already-responded'); return }
@@ -307,6 +309,26 @@ function PublicSurveyContent() {
               </motion.div>
               <h2>¡Gracias por participar!</h2>
               <p>{thankYou}</p>
+              {score && (
+                <div className="survey-score-summary">
+                  <div className="survey-score-total">
+                    <span className="survey-score-total-label">Tu puntaje</span>
+                    <span className="survey-score-total-value" style={{ color: semaphoreColor(score.total.percent) }}>
+                      {score.total.earned} / {score.total.possible} ({score.total.percent}%)
+                    </span>
+                  </div>
+                  {score.byBlock.length > 1 && (
+                    <div className="survey-score-blocks">
+                      {score.byBlock.map(block => (
+                        <div key={block.pageId} className="survey-score-block-row">
+                          <span>{block.title}</span>
+                          <strong style={{ color: semaphoreColor(block.percent) }}>{block.earned}/{block.possible} ({block.percent}%)</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

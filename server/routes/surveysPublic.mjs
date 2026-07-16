@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool, query } from '../db.mjs'
 import { getSessionContext } from '../auth.mjs'
+import { computeResponseScore } from '../surveyScoring.mjs'
 
 // Router público: sin requireAuth. Cualquiera con el enlace responde una encuesta CLIENTE_EXTERNO
 // sin iniciar sesión. La respuesta siempre queda almacenada en la plataforma.
@@ -26,7 +27,7 @@ function sanitizeConfigForPublic(config = {}) {
 async function loadPublicSurvey(slug) {
   const surveyResult = await query(
     `SELECT id, code, title, description, cover_image, audience, status, theme_color, thank_you_message,
-            allow_multiple_responses, require_login, opens_at, closes_at
+            allow_multiple_responses, require_login, show_score_to_respondent, opens_at, closes_at
      FROM surveys WHERE slug = $1`,
     [slug],
   )
@@ -317,7 +318,30 @@ surveysPublicRouter.post('/:slug/responses', async (request, response, next) => 
       )
     }
     await client.query('COMMIT')
-    response.status(201).json({ ok: true, responseId: String(responseId), thankYouMessage: survey.thank_you_message })
+
+    // Puntaje (evaluaciones de conocimiento): survey.pages ya tiene el config SANITIZADO (sin
+    // correctOptionId, para nunca filtrar la clave de calificacion antes de enviar) — para calcular
+    // el puntaje real hace falta el config CRUDO, consultado aparte solo para esto.
+    let score
+    if (completed && survey.show_score_to_respondent) {
+      const rawResult = await query(
+        `SELECT q.id, q.page_id, p.title AS page_title, q.config
+         FROM survey_questions q JOIN survey_pages p ON p.id = q.page_id
+         WHERE p.survey_id = $1`,
+        [survey.id],
+      )
+      const rawPagesMap = new Map()
+      for (const row of rawResult.rows) {
+        const page = rawPagesMap.get(row.page_id) || { id: row.page_id, title: row.page_title, questions: [] }
+        page.questions.push({ id: row.id, config: row.config })
+        rawPagesMap.set(row.page_id, page)
+      }
+      const answerValues = new Map(prepared.filter(entry => entry.value != null).map(entry => [String(entry.question.id), entry.value]))
+      const scoring = computeResponseScore([...rawPagesMap.values()], answerValues)
+      if (scoring.total.possible) score = scoring
+    }
+
+    response.status(201).json({ ok: true, responseId: String(responseId), thankYouMessage: survey.thank_you_message, score })
   } catch (error) {
     if (inTransaction) await client.query('ROLLBACK')
     next(error)

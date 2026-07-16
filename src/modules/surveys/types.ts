@@ -37,6 +37,13 @@ export interface ChoiceConfig {
   // satisfaccion con expresiones (ej. Tabita Excelente/Regular/Malo), no para seleccion de imagenes.
   presentation?: 'grid' | 'faces'
   dependsOn?: DependsOn
+  // Motor de calificacion generico (evaluaciones de conocimiento, ej. guias clinicas): si
+  // correctOptionId esta definido, la pregunta entra al calculo de puntaje (por pregunta, por
+  // bloque/pagina y total) usando `points` como valor de esa pregunta. Sin correctOptionId, la
+  // pregunta queda fuera del calculo de puntaje por completo (ej. cuando el documento fuente no
+  // marca ninguna opcion como correcta) — nunca se asume una respuesta correcta por defecto.
+  correctOptionId?: string | null
+  points?: number
 }
 export interface ScaleConfig { min: number; max: number; minLabel?: string; maxLabel?: string }
 export interface LikertConfig { rows: LikertRow[]; scaleMin: number; scaleMax: number; scaleLabels?: string[] }
@@ -100,11 +107,19 @@ export interface SurveyDetail extends Survey {
   cover_image: string | null
   allow_multiple_responses: boolean
   require_login: boolean
+  show_score_to_respondent: boolean
   thank_you_message: string
   pages: SurveyPage[]
 }
 
 export interface SurveyLink { url: string; qrDataUrl: string }
+
+// Motor de puntaje generico (evaluaciones de conocimiento): earned/possible se derivan siempre en
+// vivo de las respuestas guardadas + la clave de calificacion actual de cada pregunta (config.
+// correctOptionId/points) — nunca un puntaje cacheado que pueda desincronizarse si la clave cambia.
+export interface ScoreSummary { earned: number; possible: number; percent: number | null }
+export interface BlockScore extends ScoreSummary { pageId: string; title: string }
+export interface SurveyScoring { total: ScoreSummary; byBlock: BlockScore[] }
 
 export interface SurveyResponseSummary {
   id: string
@@ -115,6 +130,7 @@ export interface SurveyResponseSummary {
   submitted_at: string | null
   membership_id: string | null
   respondent_name: string | null
+  score?: ScoreSummary | null
 }
 
 export interface SurveyResponseDetail extends SurveyResponseSummary {
@@ -163,6 +179,9 @@ export interface SurveyStats {
   months: string[]
   comparison: StatsComparison | null
   questions: QuestionStat[]
+  // null cuando la encuesta no tiene ninguna pregunta con clave de calificacion configurada (ej.
+  // una encuesta de opinion comun) — nunca se fuerza un puntaje donde no hay respuesta correcta.
+  scoring: SurveyScoring | null
 }
 
 export interface SurveyResponseListResult { rows: SurveyResponseSummary[]; total: number; limit: number; offset: number }

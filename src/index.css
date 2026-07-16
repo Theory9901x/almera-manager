@@ -1663,6 +1663,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-config-add:hover { background: rgba(15,122,84,.1); }
 .survey-config-remove { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: none; background: none; color: var(--muted); cursor: pointer; flex: none; }
 .survey-config-remove:hover { color: #DC2626; background: rgba(220,38,38,.08); }
+.survey-config-correct-toggle { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: none; background: none; color: var(--muted); cursor: pointer; flex: none; }
+.survey-config-correct-toggle:hover { background: rgba(5,150,105,.1); color: #059669; }
 .survey-config-block { display: flex; flex-direction: column; gap: 10px; }
 .survey-config-label { margin: 0; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .survey-config-options { display: flex; flex-direction: column; gap: 6px; }
@@ -1767,14 +1769,17 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   background: radial-gradient(circle, var(--survey-accent, #0F7A54), transparent 70%);
   animation: survey-bg-float-1 22s ease-in-out infinite;
 }
+/* blob--2/3 derivan del MISMO --survey-accent (variaciones de luminosidad, no otro matiz) para que
+   nunca se mezclen dos colores de marca distintos en una misma encuesta — cualquier encuesta futura
+   con su propio color de tema hereda blobs monocromaticos automaticamente, sin tocar este CSS. */
 .survey-bg-blob--2 {
   width: 560px; height: 560px; bottom: -180px; right: -140px; opacity: .22;
-  background: radial-gradient(circle, #7048e8, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--survey-accent, #0F7A54) 70%, white), transparent 70%);
   animation: survey-bg-float-2 26s ease-in-out infinite;
 }
 .survey-bg-blob--3 {
   width: 340px; height: 340px; top: 40%; right: 8%; opacity: .18;
-  background: radial-gradient(circle, #e8590c, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--survey-accent, #0F7A54) 60%, black), transparent 70%);
   animation: survey-bg-float-3 18s ease-in-out infinite;
 }
 @keyframes survey-bg-float-1 {
@@ -1871,6 +1876,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-done-ring { width: 92px; height: 92px; border-radius: 50%; margin: 0 auto 22px; display: grid; place-items: center; transform-style: preserve-3d; }
 .survey-done-card h2 { font-size: 22px; margin: 0 0 10px; }
 .survey-done-card p { color: var(--muted); max-width: 440px; margin: 0 auto; }
+
+.survey-score-summary { max-width: 380px; margin: 22px auto 0; text-align: left; }
+.survey-score-total { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px; border-radius: 14px; background: var(--surface-soft, #f2f5f9); text-align: center; margin-bottom: 12px; }
+.survey-score-total-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.survey-score-total-value { font-size: 22px; font-weight: 800; }
+.survey-score-blocks { display: flex; flex-direction: column; gap: 6px; }
+.survey-score-block-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1.5px solid var(--line); }
 
 /* ---- Fase 2: tipos interactivos avanzados ---- */
 

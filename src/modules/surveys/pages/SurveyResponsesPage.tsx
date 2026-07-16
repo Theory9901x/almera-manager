@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, BarChart3, Loader2, Search, Trash2, X } from 'lucide-react'
-import { Badge, Button, Card, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, useToast } from '@/design-system'
+import { Badge, Button, Card, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, semaphoreColor, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { surveysService } from '../services/surveysService'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -100,6 +100,7 @@ function SurveyResponsesContent() {
   if (!survey) return null
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const hasScores = rows.some(row => row.score)
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -168,6 +169,7 @@ function SurveyResponsesContent() {
               <th>Fecha y hora</th>
               <th>Encuestado</th>
               <th>Estado</th>
+              {hasScores && <th>Puntaje</th>}
               <th style={{ width: 100 }}>Acciones</th>
             </tr>
           </thead>
@@ -180,6 +182,9 @@ function SurveyResponsesContent() {
                 <td>{new Date(row.submitted_at || row.started_at).toLocaleString()}</td>
                 <td>{row.respondent_name || `Respuesta #${row.id}`}</td>
                 <td><Badge tone={row.completed ? 'info' : 'neutral'}>{row.completed ? 'Completa' : 'Abandonada'}</Badge></td>
+                {hasScores && (
+                  <td>{row.score ? <strong style={{ color: semaphoreColor(row.score.percent) }}>{row.score.earned}/{row.score.possible} ({row.score.percent}%)</strong> : '—'}</td>
+                )}
                 <td>
                   <div className="flex gap-2">
                     <button className="survey-icon-button" title="Ver detalle" onClick={() => setDetailId(row.id)}><Search size={14} /></button>
@@ -191,7 +196,7 @@ function SurveyResponsesContent() {
               </tr>
             ))}
             {!rows.length && !loading && (
-              <tr><td colSpan={isSuperadmin ? 5 : 4} className="py-8 text-center text-sm text-[var(--muted)]">Sin respuestas para estos filtros.</td></tr>
+              <tr><td colSpan={(isSuperadmin ? 5 : 4) + (hasScores ? 1 : 0)} className="py-8 text-center text-sm text-[var(--muted)]">Sin respuestas para estos filtros.</td></tr>
             )}
           </tbody>
         </Table>

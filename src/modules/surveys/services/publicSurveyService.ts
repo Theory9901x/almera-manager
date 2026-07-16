@@ -1,4 +1,4 @@
-import type { PublicSurvey } from '../types'
+import type { PublicSurvey, SurveyScoring } from '../types'
 
 export class PublicSurveyError extends Error {
   constructor(message: string, public status: number, public alreadyResponded = false) { super(message) }
@@ -20,5 +20,8 @@ export interface SubmitResponseInput {
 
 export const publicSurveyService = {
   bySlug: (slug: string, deviceId: string) => call<PublicSurvey>(`/${slug}?deviceId=${encodeURIComponent(deviceId)}`),
-  submit: (slug: string, data: SubmitResponseInput) => call<{ ok: true; responseId: string; thankYouMessage: string }>(`/${slug}/responses`, { method: 'POST', body: JSON.stringify(data) }),
+  // score: solo viene poblado si la encuesta tiene preguntas con clave de calificacion Y
+  // show_score_to_respondent esta activo — de lo contrario el backend simplemente no lo incluye.
+  submit: (slug: string, data: SubmitResponseInput) =>
+    call<{ ok: true; responseId: string; thankYouMessage: string; score?: SurveyScoring }>(`/${slug}/responses`, { method: 'POST', body: JSON.stringify(data) }),
 }

@@ -205,6 +205,23 @@ function SurveyResultsContent() {
         </Card>
       )}
 
+      {stats.scoring && stats.scoring.byBlock.length > 0 && (
+        <Card accent={identity.color} className="p-5">
+          <h3 className="mb-3 text-base font-bold">Puntaje por bloque</h3>
+          <div className="space-y-3">
+            {stats.scoring.byBlock.map(block => (
+              <div key={block.pageId}>
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <span>{block.title}</span>
+                  <strong style={{ color: semaphoreColor(block.percent) }}>{block.earned}/{block.possible} ({block.percent}%)</strong>
+                </div>
+                <ProgressBar percent={block.percent ?? 0} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {stats.demographics.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-2">
           {stats.demographics.map(cross => (
@@ -265,7 +282,11 @@ function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: stri
       )}
 
       {stat.breakdown && stat.breakdown.length > 0 && (
-        <div className="h-56 w-full">
+        <>
+          {stat.accuracyPercent != null && (
+            <Badge tone="info">Aciertos: {stat.accuracyPercent}%</Badge>
+          )}
+          <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stat.breakdown.map(item => ({ name: item.label ?? String(item.value), count: item.count, percent: item.percent }))} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
               <defs>
@@ -281,7 +302,8 @@ function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: stri
               <Bar dataKey="count" fill={`url(#survey-bar-${stat.id})`} radius={[8, 8, 0, 0]} isAnimationActive animationDuration={600} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+          </div>
+        </>
       )}
 
       {stat.average != null && !stat.rows && (
