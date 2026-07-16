@@ -94,6 +94,11 @@ function SurveyBuilderContent() {
 
   async function saveMeta(patch: Record<string, unknown>) {
     if (!survey) return
+    // Optimista solo para que escribir en el titulo/descripcion se sienta instantaneo: el patch
+    // usa claves camelCase (requireLogin, themeColor...) que NO coinciden con los campos
+    // snake_case del tipo SurveyDetail (require_login, theme_color...), asi que este spread por si
+    // solo NO actualiza esos campos — de ahi que un Select de configuracion pareciera "no cambiar".
+    // La correccion real llega abajo, al fusionar la respuesta del servidor tras guardar.
     setSurvey({ ...survey, ...patch as Partial<SurveyDetail> })
     // Se acumulan los cambios pendientes en vez de reemplazarlos: si se edita el título y luego,
     // dentro de la misma ventana de espera, se sube la portada (o viceversa), ambos cambios se
@@ -102,7 +107,10 @@ function SurveyBuilderContent() {
     debounced('meta', async () => {
       const toSend = pendingMetaPatch.current
       pendingMetaPatch.current = {}
-      try { await surveysService.update(survey.id, toSend) }
+      try {
+        const updated = await surveysService.update(survey.id, toSend)
+        setSurvey(current => current ? { ...current, ...updated } : current)
+      }
       catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar') }
     })
   }

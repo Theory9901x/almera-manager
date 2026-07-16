@@ -50,7 +50,10 @@ export const surveysService = {
   list: (filters: { status?: string; audience?: string; q?: string; template?: string } = {}) => call<Survey[]>(`${toQueryString(filters)}`),
   create: (data: { title: string; description?: string; audience?: string }) => call<Survey>('', { method: 'POST', body: JSON.stringify(data) }),
   detail: (id: string) => call<SurveyDetail>(`/${id}`),
-  update: (id: string, data: Record<string, unknown>) => call<Survey>(`/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  // El backend devuelve la fila completa de surveys (loadSurveyMeta), no solo los campos de Survey
+  // — incluye cover_image/require_login/etc, que es justo lo que el modal de configuracion necesita
+  // para reflejar el guardado real en vez de un patch optimista con claves camelCase distintas.
+  update: (id: string, data: Record<string, unknown>) => call<Omit<SurveyDetail, 'pages'>>(`/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   duplicate: (id: string, data: { title?: string; asTemplate?: boolean } = {}) => call<Survey>(`/${id}/duplicate`, { method: 'POST', body: JSON.stringify(data) }),
   remove: (id: string) => call<{ ok: true }>(`/${id}`, { method: 'DELETE' }),
   publish: (id: string) => call<Survey>(`/${id}/publish`, { method: 'POST' }),
