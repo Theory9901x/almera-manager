@@ -1703,13 +1703,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-question-body { display: flex; flex-direction: column; gap: 10px; }
 .survey-field-error { margin: 0; font-size: 12px; font-weight: 600; color: #DC2626; }
 .survey-input {
-  width: 100%; min-height: 44px; padding: 14px 16px; border: 1.5px solid #e2e7f0; border-radius: 12px;
+  width: 100%; min-height: 44px; padding: 14px 16px; border: 1.75px solid #aab6c7; border-radius: 12px;
   /* 16px minimo: por debajo de eso, iOS Safari hace zoom automatico al enfocar el campo. */
   font-size: 16px; font-family: inherit;
   color: var(--ink); background: #fff; box-shadow: 0 1px 2px rgba(21,34,56,.04); transition: border-color .15s ease, box-shadow .15s ease;
 }
 .survey-input::placeholder { color: #9aa5b8; }
-.survey-input:hover:not(:focus):not(:disabled) { border-color: #c4cede; }
+.survey-input:hover:not(:focus):not(:disabled) { border-color: #8d9bb0; }
 .survey-input:focus { outline: none; border-color: var(--survey-accent, #0F7A54); box-shadow: 0 0 0 4px color-mix(in srgb, var(--survey-accent, #0F7A54) 12%, transparent); }
 .survey-textarea { min-height: 96px; resize: vertical; }
 
@@ -1718,14 +1718,14 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-options-stack { display: flex; flex-direction: column; gap: 9px; }
 
 .survey-option {
-  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 13px 15px; border: 1.5px solid var(--line);
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 13px 15px; border: 1.75px solid #aab6c7;
   border-radius: 13px; cursor: pointer; background: #fff; font-size: 14.5px; text-align: left;
   transition: transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .16s ease, border-color .16s ease, background .16s ease;
 }
-.survey-option:hover:not(:disabled) { border-color: #b9c6dc; }
+.survey-option:hover:not(:disabled) { border-color: #8d9bb0; }
 .survey-option.is-selected { transform: translateZ(0) scale(1.01); }
 .survey-option:disabled { opacity: .7; cursor: not-allowed; }
-.survey-option-mark { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border: 2px solid var(--line); color: #fff; transition: .16s ease; }
+.survey-option-mark { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border: 2px solid #aab6c7; color: #fff; transition: .16s ease; }
 .survey-option-mark.is-round { border-radius: 999px; }
 .survey-option-mark.is-square { border-radius: 6px; }
 .survey-option-emoji { font-size: 20px; line-height: 1; }
