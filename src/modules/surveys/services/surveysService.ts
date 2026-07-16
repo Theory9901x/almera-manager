@@ -48,6 +48,15 @@ export const surveysService = {
   duplicateQuestion: (surveyId: string, questionId: string) => call(`/${surveyId}/questions/${questionId}/duplicate`, { method: 'POST' }),
   reorderQuestions: (surveyId: string, pageId: string, order: string[]) => call<{ ok: true }>(`/${surveyId}/pages/${pageId}/questions/reorder`, { method: 'PUT', body: JSON.stringify({ order }) }),
 
+  uploadMedia: async (surveyId: string, file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    const response = await fetch(`/api/surveys/${surveyId}/media`, { method: 'POST', credentials: 'same-origin', body })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'No fue posible subir la imagen')
+    return data as { url: string }
+  },
+
   responses: (surveyId: string, filters: { month?: string; respondentMembershipId?: string } = {}) => call<SurveyResponseSummary[]>(`/${surveyId}/responses${toQueryString(filters)}`),
   responseDetail: (surveyId: string, responseId: string) => call<SurveyResponseDetail>(`/${surveyId}/responses/${responseId}`),
   stats: (surveyId: string, filters: { month?: string; respondentMembershipId?: string } = {}) => call<SurveyStats>(`/${surveyId}/stats${toQueryString(filters)}`),

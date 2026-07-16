@@ -1,10 +1,33 @@
 import { randomUUID } from 'node:crypto'
+import { mkdir } from 'node:fs/promises'
+import { extname, resolve } from 'node:path'
 import { Router } from 'express'
+import multer from 'multer'
 import QRCode from 'qrcode'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 
 export const surveysRouter = Router()
+
+// Imagenes de opciones (seleccion con imagenes, emparejamiento): se sirven publicas y sin auth
+// desde /uploads/surveys (montado en server/index.mjs), a diferencia de las evidencias de otros
+// modulos que solo se descargan autenticadas. Son contenido pensado para verse en el enlace publico.
+const mediaRoot = resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys')
+await mkdir(mediaRoot, { recursive: true })
+const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const mediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: mediaRoot,
+    filename: (_request, file, callback) => callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase().slice(0, 6)}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_request, file, callback) => {
+    if (allowedImageTypes.has(file.mimetype)) return callback(null, true)
+    const error = new Error('Solo se permiten imágenes PNG, JPEG, WEBP o GIF de hasta 5MB')
+    error.status = 415
+    callback(error)
+  },
+})
 
 const oid = request => request.auth.organization.id
 const uid = request => request.auth.user.id
@@ -41,21 +64,26 @@ function publicOrigin(request) {
   return process.env.PUBLIC_ORIGIN || `${request.protocol}://${request.get('host')}`
 }
 
+function normalizeOption(option) {
+  return {
+    id: option.id || `opt_${slugToken()}`,
+    label: String(option.label || '').trim(),
+    imageUrl: option.imageUrl || undefined,
+    emoji: option.emoji || undefined,
+  }
+}
+
 function normalizeConfig(type, config = {}) {
   const base = config && typeof config === 'object' ? config : {}
   if (CHOICE_TYPES.has(type) && type !== 'YES_NO') {
     const options = Array.isArray(base.options) ? base.options : []
     return {
       ...base,
-      options: options.map(option => ({
-        id: option.id || `opt_${slugToken()}`,
-        label: String(option.label || '').trim(),
-        imageUrl: option.imageUrl || undefined,
-        emoji: option.emoji || undefined,
-      })),
+      options: options.map(normalizeOption),
       randomize: Boolean(base.randomize),
       minSelected: base.minSelected != null ? Number(base.minSelected) : null,
       maxSelected: base.maxSelected != null ? Number(base.maxSelected) : null,
+      multiple: type === 'IMAGE_CHOICE' ? Boolean(base.multiple) : undefined,
     }
   }
   if (type === 'SCALE') {
@@ -77,6 +105,32 @@ function normalizeConfig(type, config = {}) {
   }
   if (type === 'NUMBER') {
     return { min: base.min != null ? Number(base.min) : null, max: base.max != null ? Number(base.max) : null }
+  }
+  if (type === 'RANKING') {
+    const options = Array.isArray(base.options) ? base.options : []
+    return { options: options.map(normalizeOption) }
+  }
+  if (type === 'MATCHING') {
+    const items = Array.isArray(base.items) ? base.items : []
+    const targets = Array.isArray(base.targets) ? base.targets : []
+    const normalizedItems = items.map(normalizeOption)
+    const normalizedTargets = targets.map(target => ({ id: target.id || `tgt_${slugToken()}`, label: String(target.label || '').trim() }))
+    const validItemIds = new Set(normalizedItems.map(item => item.id))
+    const validTargetIds = new Set(normalizedTargets.map(target => target.id))
+    const correctPairs = {}
+    if (base.correctPairs && typeof base.correctPairs === 'object') {
+      for (const [itemId, targetId] of Object.entries(base.correctPairs)) {
+        if (validItemIds.has(itemId) && validTargetIds.has(targetId)) correctPairs[itemId] = targetId
+      }
+    }
+    return { items: normalizedItems, targets: normalizedTargets, correctPairs }
+  }
+  if (type === 'EMOJI_SCALE') {
+    const steps = Array.isArray(base.steps) ? base.steps : []
+    return { steps: steps.map(step => ({ emoji: String(step.emoji || '🙂'), label: String(step.label || '') })) }
+  }
+  if (type === 'RATING') {
+    return { max: Math.max(3, Math.min(10, Number(base.max) || 5)) }
   }
   return base
 }
@@ -312,6 +366,16 @@ surveysRouter.get('/:id/link', surveysModule, view, async (request, response, ne
     const url = `${publicOrigin(request)}/e/${survey.slug}`
     const qrDataUrl = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: '#152238', light: '#ffffff' } })
     response.json({ url, qrDataUrl })
+  } catch (error) { next(error) }
+})
+
+// Imagen para una opcion (seleccion con imagenes / emparejamiento). Devuelve una URL publica y
+// estable que luego se guarda dentro del config JSON de la pregunta.
+surveysRouter.post('/:id/media', surveysModule, edit, mediaUpload.single('file'), async (request, response, next) => {
+  try {
+    await assertSurvey(request)
+    if (!request.file) fail(400, 'Adjunta una imagen')
+    response.status(201).json({ url: `/uploads/surveys/${request.file.filename}` })
   } catch (error) { next(error) }
 })
 
@@ -594,10 +658,11 @@ function computeQuestionStats(question, items) {
     const options = question.type === 'YES_NO'
       ? [{ id: 'SI', label: 'Sí' }, { id: 'NO', label: 'No' }]
       : (config.options || [])
+    const isMultiple = question.type === 'MULTIPLE_CHOICE' || (question.type === 'IMAGE_CHOICE' && config.multiple)
     const counts = new Map(options.map(option => [option.id, 0]))
     for (const item of items) {
       const value = item.value || {}
-      const ids = question.type === 'MULTIPLE_CHOICE' ? (value.optionIds || []) : [value.optionId].filter(Boolean)
+      const ids = isMultiple ? (value.optionIds || []) : [value.optionId].filter(Boolean)
       for (const id of ids) counts.set(id, (counts.get(id) || 0) + 1)
     }
     const breakdown = options.map(option => {
@@ -607,9 +672,9 @@ function computeQuestionStats(question, items) {
     return { totalAnswered, breakdown }
   }
 
-  if (question.type === 'SCALE' || question.type === 'NPS' || question.type === 'RATING') {
-    const min = question.type === 'NPS' ? 0 : (Number(config.min) || 1)
-    const max = question.type === 'NPS' ? 10 : (Number(config.max) || 5)
+  if (question.type === 'SCALE' || question.type === 'NPS' || question.type === 'RATING' || question.type === 'EMOJI_SCALE') {
+    const min = question.type === 'NPS' ? 0 : 1
+    const max = question.type === 'NPS' ? 10 : question.type === 'EMOJI_SCALE' ? ((config.steps || []).length || 5) : (Number(config.max) || 5)
     const counts = new Map()
     for (let value = min; value <= max; value += 1) counts.set(value, 0)
     let sum = 0
@@ -618,8 +683,65 @@ function computeQuestionStats(question, items) {
       const value = Number((item.value || {}).value)
       if (Number.isFinite(value)) { counts.set(value, (counts.get(value) || 0) + 1); sum += value; answered += 1 }
     }
-    const breakdown = [...counts.entries()].map(([value, count]) => ({ value, count, percent: answered ? Math.round((count / answered) * 100) : 0 }))
+    const breakdown = [...counts.entries()].map(([value, count]) => ({
+      value, count, percent: answered ? Math.round((count / answered) * 100) : 0,
+      label: question.type === 'EMOJI_SCALE' ? (config.steps || [])[value - 1]?.emoji : undefined,
+    }))
     return { totalAnswered: answered, average: answered ? Number((sum / answered).toFixed(2)) : null, breakdown }
+  }
+
+  if (question.type === 'RANKING') {
+    const options = config.options || []
+    const positions = new Map(options.map(option => [option.id, { sum: 0, count: 0 }]))
+    let answered = 0
+    for (const item of items) {
+      const order = (item.value || {}).order || []
+      if (!order.length) continue
+      answered += 1
+      order.forEach((optionId, index) => {
+        const bucket = positions.get(optionId)
+        if (bucket) { bucket.sum += index + 1; bucket.count += 1 }
+      })
+    }
+    const ranking = options
+      .map(option => {
+        const bucket = positions.get(option.id)
+        return { optionId: option.id, label: option.label, averagePosition: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null, totalAnswered: bucket.count }
+      })
+      .sort((a, b) => (a.averagePosition ?? Infinity) - (b.averagePosition ?? Infinity))
+    return { totalAnswered: answered, ranking }
+  }
+
+  if (question.type === 'MATCHING') {
+    const items_ = config.items || []
+    const targets = config.targets || []
+    const correctPairs = config.correctPairs || {}
+    const hasKey = Object.keys(correctPairs).length > 0
+    const counts = new Map(items_.map(item => [item.id, new Map(targets.map(target => [target.id, 0]))]))
+    let answered = 0
+    let correct = 0
+    let graded = 0
+    for (const responseItem of items) {
+      const pairs = (responseItem.value || {}).pairs || {}
+      if (!Object.keys(pairs).length) continue
+      answered += 1
+      for (const [itemId, targetId] of Object.entries(pairs)) {
+        const perItem = counts.get(itemId)
+        if (perItem && perItem.has(targetId)) perItem.set(targetId, perItem.get(targetId) + 1)
+        if (hasKey && correctPairs[itemId]) { graded += 1; if (correctPairs[itemId] === targetId) correct += 1 }
+      }
+    }
+    const matching = items_.map(item => {
+      const perItem = counts.get(item.id)
+      const best = [...perItem.entries()].sort((a, b) => b[1] - a[1])[0]
+      const bestTarget = best && best[1] > 0 ? targets.find(target => target.id === best[0]) : null
+      return {
+        itemId: item.id, label: item.label,
+        topTargetLabel: bestTarget?.label || null, topTargetCount: best ? best[1] : 0,
+        breakdown: targets.map(target => ({ targetId: target.id, label: target.label, count: perItem.get(target.id) || 0 })),
+      }
+    })
+    return { totalAnswered: answered, matching, accuracyPercent: graded ? Math.round((correct / graded) * 100) : null }
   }
 
   if (question.type === 'LIKERT_MATRIX') {

@@ -148,6 +148,33 @@ function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: stri
         </div>
       )}
 
+      {stat.ranking && stat.ranking.length > 0 && (
+        <ol className="survey-ranking-results">
+          {stat.ranking.map((item, index) => (
+            <li key={item.optionId}>
+              <span className="survey-ranking-results-position" style={{ background: identity.color }}>{index + 1}</span>
+              <span className="survey-ranking-results-label">{item.label}</span>
+              <span className="survey-ranking-results-avg">Posición promedio: {item.averagePosition ?? '—'}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {stat.matching && stat.matching.length > 0 && (
+        <div className="space-y-3">
+          {stat.accuracyPercent != null && <Badge tone="info">Aciertos: {stat.accuracyPercent}%</Badge>}
+          <div className="survey-matching-results">
+            {stat.matching.map(item => (
+              <div key={item.itemId} className="survey-matching-results-row">
+                <span className="survey-matching-results-label">{item.label}</span>
+                <span className="survey-matching-results-arrow">→</span>
+                <span className="survey-matching-results-target">{item.topTargetLabel || 'Sin ubicar'}{item.topTargetCount > 0 && ` (${item.topTargetCount})`}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(stat.min != null || stat.max != null) && (
         <div className="mt-2 flex gap-6 text-sm text-[var(--muted)]">
           <span>Mínimo: <strong className="text-[var(--ink)]">{stat.min}</strong></span>

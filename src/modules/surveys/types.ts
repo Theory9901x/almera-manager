@@ -14,12 +14,20 @@ export const BASIC_QUESTION_TYPES: QuestionType[] = [
 
 export interface SurveyOption { id: string; label: string; imageUrl?: string; emoji?: string }
 export interface LikertRow { id: string; label: string }
+export interface MatchingTarget { id: string; label: string }
+export interface EmojiStep { emoji: string; label?: string }
 
-export interface ChoiceConfig { options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null }
+export interface ChoiceConfig { options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null; multiple?: boolean }
 export interface ScaleConfig { min: number; max: number; minLabel?: string; maxLabel?: string }
 export interface LikertConfig { rows: LikertRow[]; scaleMin: number; scaleMax: number; scaleLabels?: string[] }
 export interface NumberConfig { min?: number | null; max?: number | null }
-export type QuestionConfig = Partial<ChoiceConfig & ScaleConfig & LikertConfig & NumberConfig> & Record<string, unknown>
+export interface MatchingConfig { items: SurveyOption[]; targets: MatchingTarget[]; correctPairs?: Record<string, string> }
+export interface RankingConfig { options: SurveyOption[] }
+export interface EmojiScaleConfig { steps: EmojiStep[] }
+export interface RatingConfig { max: number }
+export type QuestionConfig =
+  Partial<ChoiceConfig & ScaleConfig & LikertConfig & NumberConfig & MatchingConfig & RankingConfig & EmojiScaleConfig & RatingConfig>
+  & Record<string, unknown>
 
 export interface SurveyQuestion {
   id: string
@@ -90,6 +98,8 @@ export interface SurveyResponseDetail extends SurveyResponseSummary {
 
 export interface QuestionStatBreakdownItem { optionId?: string; value?: number; label?: string; count: number; percent: number }
 export interface QuestionStatRow { rowId: string; label: string; average: number | null; totalAnswered: number }
+export interface RankingStatItem { optionId: string; label: string; averagePosition: number | null; totalAnswered: number }
+export interface MatchingStatItem { itemId: string; label: string; topTargetLabel: string | null; topTargetCount: number; breakdown: { targetId: string; label: string; count: number }[] }
 
 export interface QuestionStat {
   id: string
@@ -103,6 +113,9 @@ export interface QuestionStat {
   max?: number | null
   rows?: QuestionStatRow[]
   sample?: string[]
+  ranking?: RankingStatItem[]
+  matching?: MatchingStatItem[]
+  accuracyPercent?: number | null
 }
 
 export interface SurveyStats {
@@ -158,3 +171,5 @@ export type AnswerValue =
   | { date: string | null }
   | { value: number | null }
   | { rows: Record<string, number> }
+  | { pairs: Record<string, string> }
+  | { order: string[] }

@@ -16,12 +16,25 @@ import type { QuestionConfig, QuestionType, SurveyDetail, SurveyPage, SurveyQues
 
 const identity = moduleIdentity('surveys')
 
+function newId(prefix: string) { return `${prefix}_${Math.random().toString(36).slice(2, 8)}` }
+
 function defaultConfigFor(type: QuestionType): QuestionConfig {
-  if (['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'DROPDOWN'].includes(type)) {
-    return { options: [{ id: `opt_${Math.random().toString(36).slice(2, 8)}`, label: 'Opción 1' }, { id: `opt_${Math.random().toString(36).slice(2, 8)}`, label: 'Opción 2' }] }
+  if (['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'DROPDOWN', 'IMAGE_CHOICE'].includes(type)) {
+    return { options: [{ id: newId('opt'), label: 'Opción 1' }, { id: newId('opt'), label: 'Opción 2' }] }
   }
   if (type === 'SCALE') return { min: 1, max: 5, minLabel: 'Muy insatisfecho', maxLabel: 'Muy satisfecho' }
-  if (type === 'LIKERT_MATRIX') return { rows: [{ id: `row_${Math.random().toString(36).slice(2, 8)}`, label: 'Fila 1' }], scaleMin: 1, scaleMax: 5 }
+  if (type === 'LIKERT_MATRIX') return { rows: [{ id: newId('row'), label: 'Fila 1' }], scaleMin: 1, scaleMax: 5 }
+  if (type === 'RANKING') return { options: [{ id: newId('opt'), label: 'Opción 1' }, { id: newId('opt'), label: 'Opción 2' }, { id: newId('opt'), label: 'Opción 3' }] }
+  if (type === 'MATCHING') {
+    return {
+      items: [{ id: newId('item'), label: 'Elemento 1' }, { id: newId('item'), label: 'Elemento 2' }],
+      targets: [{ id: newId('tgt'), label: 'Grupo 1' }, { id: newId('tgt'), label: 'Grupo 2' }],
+    }
+  }
+  if (type === 'EMOJI_SCALE') {
+    return { steps: [{ emoji: '😡', label: 'Muy insatisfecho' }, { emoji: '😕', label: 'Insatisfecho' }, { emoji: '😐', label: 'Neutral' }, { emoji: '🙂', label: 'Satisfecho' }, { emoji: '😄', label: 'Muy satisfecho' }] }
+  }
+  if (type === 'RATING') return { max: 5 }
   return {}
 }
 
@@ -270,7 +283,7 @@ function SurveyBuilderContent() {
                 <span>Obligatoria</span>
               </label>
               <div className="survey-builder-divider" />
-              <QuestionConfigEditor type={activeQuestion.type} config={activeQuestion.config} onChange={config => updateQuestionField(activeQuestion, { config })} />
+              <QuestionConfigEditor type={activeQuestion.type} config={activeQuestion.config} surveyId={survey.id} onChange={config => updateQuestionField(activeQuestion, { config })} />
             </div>
           )}
         </Card>
@@ -339,7 +352,7 @@ function TypePickerModal({ onSelect, onClose }: { onSelect(type: QuestionType): 
             )
           })}
         </div>
-        <p className="survey-config-empty" style={{ marginTop: 14 }}>Emparejar, ordenar, imágenes, NPS y estrellas llegan en la siguiente fase.</p>
+        <p className="survey-config-empty" style={{ marginTop: 14 }}>La carga de archivos por parte de quien responde llega en una fase siguiente.</p>
       </div>
     </div>
   )

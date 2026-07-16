@@ -33,7 +33,9 @@ export const QUESTION_TYPE_INFO: Record<QuestionType, QuestionTypeInfo> = {
   FILE_UPLOAD: { type: 'FILE_UPLOAD', label: 'Carga de archivo', description: 'Adjuntar evidencia', icon: FileUp, phase: 2 },
 }
 
+// Fase 2 ya habilitada en el constructor, salvo carga de archivo (FILE_UPLOAD): requiere un
+// endpoint publico de subida con limites de abuso propios, pendiente de una fase siguiente.
 export const BUILDER_QUESTION_TYPES: QuestionType[] = [
   'SHORT_TEXT', 'LONG_TEXT', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'DROPDOWN', 'YES_NO', 'NUMBER', 'DATE',
-  'SCALE', 'LIKERT_MATRIX',
+  'SCALE', 'LIKERT_MATRIX', 'MATCHING', 'RANKING', 'IMAGE_CHOICE', 'EMOJI_SCALE', 'NPS', 'RATING',
 ]

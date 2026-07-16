@@ -56,6 +56,10 @@ app.use('/api/surveys', requireAuth, surveysRouter)
 app.use('/api/public/surveys', surveysPublicRouter)
 app.use('/api', (_request, response) => response.status(404).json({ error: 'Ruta no encontrada' }))
 
+// Imagenes de opciones de encuestas (seleccion con imagenes / emparejamiento): a diferencia de las
+// evidencias de otros modulos, estas se muestran en el enlace publico y no requieren sesion.
+app.use('/uploads/surveys', express.static(resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys'), { maxAge: '30d' }))
+
 if (isDev) {
   const { createServer } = await import('vite')
   const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' })

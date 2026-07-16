@@ -74,25 +74,42 @@ surveysPublicRouter.get('/:slug', async (request, response, next) => {
   } catch (error) { next(error) }
 })
 
+function isMultipleChoice(question, config) {
+  return question.type === 'MULTIPLE_CHOICE' || (question.type === 'IMAGE_CHOICE' && config.multiple)
+}
+
 function deriveTextValue(question, value) {
   const config = question.config || {}
   if (question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') return String(value?.text || '')
   if (question.type === 'YES_NO') return value?.optionId === 'SI' ? 'Sí' : value?.optionId === 'NO' ? 'No' : ''
+  if (isMultipleChoice(question, config)) {
+    const ids = new Set(value?.optionIds || [])
+    return (config.options || []).filter(option => ids.has(option.id)).map(option => option.label).join(', ')
+  }
   if (question.type === 'SINGLE_CHOICE' || question.type === 'DROPDOWN' || question.type === 'IMAGE_CHOICE') {
     const option = (config.options || []).find(item => item.id === value?.optionId)
     return option?.label || ''
   }
-  if (question.type === 'MULTIPLE_CHOICE') {
-    const ids = new Set(value?.optionIds || [])
-    return (config.options || []).filter(option => ids.has(option.id)).map(option => option.label).join(', ')
-  }
   if (question.type === 'NUMBER') return value?.number != null ? String(value.number) : ''
   if (question.type === 'DATE') return value?.date || ''
   if (question.type === 'SCALE' || question.type === 'NPS' || question.type === 'RATING') return value?.value != null ? String(value.value) : ''
+  if (question.type === 'EMOJI_SCALE') {
+    const step = (config.steps || [])[(value?.value || 0) - 1]
+    return step ? `${step.emoji} ${step.label || ''}`.trim() : ''
+  }
   if (question.type === 'LIKERT_MATRIX') {
     const rows = config.rows || []
     const values = value?.rows || {}
     return rows.map(row => `${row.label}: ${values[row.id] ?? '—'}`).join(' | ')
+  }
+  if (question.type === 'RANKING') {
+    const optionsById = new Map((config.options || []).map(option => [option.id, option.label]))
+    return (value?.order || []).map((id, index) => `${index + 1}. ${optionsById.get(id) || id}`).join(' | ')
+  }
+  if (question.type === 'MATCHING') {
+    const itemsById = new Map((config.items || []).map(item => [item.id, item.label]))
+    const targetsById = new Map((config.targets || []).map(target => [target.id, target.label]))
+    return Object.entries(value?.pairs || {}).map(([itemId, targetId]) => `${itemsById.get(itemId) || itemId} → ${targetsById.get(targetId) || targetId}`).join(' | ')
   }
   return value != null ? JSON.stringify(value) : ''
 }
@@ -110,19 +127,19 @@ function validateAndCoerceValue(question, rawValue, requireAnswer) {
     if (requireAnswer && !['SI', 'NO'].includes(value.optionId)) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
     return { optionId: ['SI', 'NO'].includes(value.optionId) ? value.optionId : null }
   }
+  if (isMultipleChoice(question, config)) {
+    const validIds = new Set((config.options || []).map(option => option.id))
+    const optionIds = Array.isArray(value.optionIds) ? [...new Set(value.optionIds.filter(id => validIds.has(id)))] : []
+    if (requireAnswer && !optionIds.length) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    if (config.minSelected && optionIds.length && optionIds.length < config.minSelected) fail(400, `Selecciona al menos ${config.minSelected} opciones en "${question.prompt}"`)
+    if (config.maxSelected && optionIds.length > config.maxSelected) fail(400, `Selecciona máximo ${config.maxSelected} opciones en "${question.prompt}"`)
+    return { optionIds }
+  }
   if (question.type === 'SINGLE_CHOICE' || question.type === 'DROPDOWN' || question.type === 'IMAGE_CHOICE') {
     const validIds = new Set((config.options || []).map(option => option.id))
     const optionId = validIds.has(value.optionId) ? value.optionId : null
     if (requireAnswer && !optionId) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
     return { optionId }
-  }
-  if (question.type === 'MULTIPLE_CHOICE') {
-    const validIds = new Set((config.options || []).map(option => option.id))
-    const optionIds = Array.isArray(value.optionIds) ? value.optionIds.filter(id => validIds.has(id)) : []
-    if (requireAnswer && !optionIds.length) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
-    if (config.minSelected && optionIds.length && optionIds.length < config.minSelected) fail(400, `Selecciona al menos ${config.minSelected} opciones en "${question.prompt}"`)
-    if (config.maxSelected && optionIds.length > config.maxSelected) fail(400, `Selecciona máximo ${config.maxSelected} opciones en "${question.prompt}"`)
-    return { optionIds }
   }
   if (question.type === 'NUMBER') {
     const number = value.number === '' || value.number == null ? null : Number(value.number)
@@ -159,8 +176,31 @@ function validateAndCoerceValue(question, rawValue, requireAnswer) {
     if (requireAnswer && rowIds.size && Object.keys(rows).length < rowIds.size) fail(400, `Completa todas las filas de "${question.prompt}"`)
     return { rows }
   }
-  // Tipos avanzados de fase 2 (matching, ranking, emoji_scale, file_upload): se guarda el valor tal
-  // cual, sin validacion fina todavia; el constructor de fase 1 no los ofrece.
+  if (question.type === 'EMOJI_SCALE') {
+    const max = (config.steps || []).length || 5
+    const scaleValue = value.value == null ? null : Number(value.value)
+    if (requireAnswer && (scaleValue === null || Number.isNaN(scaleValue))) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    if (scaleValue != null && (scaleValue < 1 || scaleValue > max)) fail(400, `El valor de "${question.prompt}" está fuera de rango`)
+    return { value: Number.isFinite(scaleValue) ? scaleValue : null }
+  }
+  if (question.type === 'RANKING') {
+    const validIds = new Set((config.options || []).map(option => option.id))
+    const order = Array.isArray(value.order) ? [...new Set(value.order.filter(id => validIds.has(id)))] : []
+    if (requireAnswer && order.length < validIds.size) fail(400, `Ordena todas las opciones de "${question.prompt}"`)
+    return { order }
+  }
+  if (question.type === 'MATCHING') {
+    const validItemIds = new Set((config.items || []).map(item => item.id))
+    const validTargetIds = new Set((config.targets || []).map(target => target.id))
+    const pairs = {}
+    for (const [itemId, targetId] of Object.entries(value.pairs || {})) {
+      if (validItemIds.has(itemId) && validTargetIds.has(targetId)) pairs[itemId] = targetId
+    }
+    if (requireAnswer && Object.keys(pairs).length < validItemIds.size) fail(400, `Ubica todos los elementos de "${question.prompt}"`)
+    return { pairs }
+  }
+  // Carga de archivo: pendiente de una siguiente fase (requiere endpoint publico de subida con
+  // limites de abuso propios); el constructor de fase 1/2 no ofrece este tipo todavia.
   return value
 }
 
