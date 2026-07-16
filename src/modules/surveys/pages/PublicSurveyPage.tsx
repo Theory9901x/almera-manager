@@ -230,10 +230,16 @@ function PublicSurveyContent() {
   }
 
   const themeColor = survey.theme_color || '#1F6F4A'
-  const progressPercent = phase === 'done' ? 100 : totalPages ? (pageIndex / totalPages) * 100 : 0
+  // Progreso incluye el paso actual (no solo los completados): en el paso 1 de 5 ya se ve un 20%
+  // de avance en vez de una barra vacia — refuerza que la persona ya empezo, no que no ha hecho nada.
+  const progressPercent = phase === 'done' ? 100 : totalPages ? ((pageIndex + 1) / totalPages) * 100 : 0
 
   return (
     <div className="survey-public-shell" style={{ ['--survey-accent' as string]: themeColor }}>
+      <div className="survey-bg-blob survey-bg-blob--1" />
+      <div className="survey-bg-blob survey-bg-blob--2" />
+      <div className="survey-bg-blob survey-bg-blob--3" />
+
       <div className="survey-public-topbar">
         <div className="survey-public-topbar-inner">
           <div className="survey-progress-track"><div className="survey-progress-fill" style={{ width: `${progressPercent}%` }} /></div>
@@ -245,7 +251,12 @@ function PublicSurveyContent() {
       </div>
 
       <div className="survey-public-content">
-        {survey.cover_image && <div className="survey-public-banner"><img src={survey.cover_image} alt="" /></div>}
+        {survey.cover_image && (
+          <div className="survey-public-banner">
+            <div className="survey-public-banner-dots" />
+            <div className="survey-public-banner-frame"><img src={survey.cover_image} alt="" /></div>
+          </div>
+        )}
         <header className="survey-public-hero">
           <h1>{survey.title}</h1>
           {survey.description && <p>{survey.description}</p>}
