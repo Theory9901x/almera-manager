@@ -1745,13 +1745,21 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* ---- Pagina publica ---- */
 .survey-public-shell {
-  position: relative; min-height: 100vh; overflow-x: hidden; font-family: var(--font-body, inherit);
+  position: relative; min-height: 100vh; font-family: var(--font-body, inherit);
   background: #f6f8fc;
 }
 
 /* Fondo vivo: formas grandes muy difuminadas que se desplazan despacio (18-26s), sin competir
-   nunca con la legibilidad — todo el contenido real va en z-index:1 por encima. */
-.survey-bg-blob { position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none; z-index: 0; }
+   nunca con la legibilidad — todo el contenido real va en z-index:1 por encima.
+   IMPORTANTE: position:fixed (no absolute) a proposito. Un position:absolute con offsets negativos
+   grandes SI cuenta dentro del scroll interno del contenedor que lo posiciona; combinado con
+   overflow-x:hidden en ese contenedor (que por la spec de CSS fuerza overflow-y:auto si no se
+   declara), eso convertia .survey-public-shell en su PROPIO contenedor de scroll anidado, con una
+   altura de scroll distinta a la del documento real — y eso es lo que rompia el scroll tactil en
+   movil. Con position:fixed los blobs quedan fuera del flujo y del calculo de scroll de cualquier
+   ancestro, sin necesidad de overflow-x:hidden en ningun contenedor de la pagina.
+*/
+.survey-bg-blob { position: fixed; border-radius: 50%; filter: blur(60px); pointer-events: none; z-index: 0; }
 .survey-bg-blob--1 {
   width: 480px; height: 480px; top: -140px; left: -100px; opacity: .3;
   background: radial-gradient(circle, var(--survey-accent, #0F7A54), transparent 70%);
@@ -1782,6 +1790,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   50% { transform: translate(-40px, 50px); }
 }
 @media (prefers-reduced-motion: reduce) { .survey-bg-blob { animation: none !important; } }
+/* Movil: solo 1 blob (detras del banner) para no gastar batería/GPU en 3 blurs animados a la vez
+   en un celular gama media, ni "seguir" al usuario en cada scroll con 3 formas pesadas a la vista. */
+@media (max-width: 640px) {
+  .survey-bg-blob--2, .survey-bg-blob--3 { display: none; }
+  .survey-bg-blob--1 { opacity: .18; }
+}
 .survey-public-center { display: grid; place-items: center; padding: 24px; }
 .survey-public-spinner { width: 32px; height: 32px; border-radius: 999px; border: 3px solid rgba(15,122,84,.2); border-top-color: #0F7A54; animation: survey-spin .8s linear infinite; }
 @keyframes survey-spin { to { transform: rotate(360deg); } }
