@@ -1876,3 +1876,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .survey-nav-button.is-primary { margin-left: 0; }
   .survey-matching-targets { grid-template-columns: 1fr; }
 }
+
+/* ---- Fase 3: analitica avanzada (resultados) ---- */
+.survey-live-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: rgba(15,122,84,.1); color: #0F7A54; font-size: 12.5px; font-weight: 700; width: fit-content; }
+.survey-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #0F7A54; animation: survey-live-pulse 1.6s ease-in-out infinite; }
+@keyframes survey-live-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(15,122,84,.5); } 50% { box-shadow: 0 0 0 6px rgba(15,122,84,0); } }
+.survey-comparison-note { display: flex; align-items: center; gap: 6px; margin: -8px 0 0; font-size: 12.5px; font-weight: 600; }
+.survey-comparison-note.is-up { color: #059669; }
+.survey-comparison-note.is-down { color: #DC2626; }
+@media (prefers-reduced-motion: reduce) { .survey-live-dot { animation: none !important; } }

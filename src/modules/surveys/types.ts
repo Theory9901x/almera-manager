@@ -116,12 +116,17 @@ export interface QuestionStat {
   ranking?: RankingStatItem[]
   matching?: MatchingStatItem[]
   accuracyPercent?: number | null
+  npsScore?: number | null
 }
+
+export interface StatsComparison { previousMonth: string; previousCompletedResponses: number; deltaPercent: number | null }
+export interface Respondent { membership_id: string; full_name: string }
 
 export interface SurveyStats {
   survey: { id: string; title: string; status: SurveyStatus }
   totals: { totalResponses: number; completedResponses: number; partialResponses: number; completionRate: number }
   months: string[]
+  comparison: StatsComparison | null
   questions: QuestionStat[]
 }
 

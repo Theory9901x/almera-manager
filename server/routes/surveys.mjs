@@ -553,6 +553,26 @@ surveysRouter.put('/:id/pages/:pageId/questions/reorder', surveysModule, edit, a
 function buildResponseFilters(request, params, where) {
   if (request.query.month) { params.push(request.query.month); where.push(`r.month_reported = $${params.length}`) }
   if (request.query.respondentMembershipId) { params.push(Number(request.query.respondentMembershipId)); where.push(`r.respondent_membership_id = $${params.length}`) }
+  // Cruce basico por pregunta de perfil (ej. sexo, area, linea de beneficio): solo cuenta la
+  // respuesta si tambien contesto esa otra pregunta con el valor exacto indicado.
+  if (request.query.segmentQuestionId && request.query.segmentValue) {
+    params.push(Number(request.query.segmentQuestionId))
+    const questionParam = params.length
+    params.push(String(request.query.segmentValue))
+    const valueParam = params.length
+    where.push(`EXISTS (
+      SELECT 1 FROM survey_response_items si
+      WHERE si.response_id = r.id AND si.question_id = $${questionParam}
+        AND COALESCE(si.value->>'optionId', '') = $${valueParam}
+    )`)
+  }
+}
+
+function previousMonth(month) {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const date = new Date(Date.UTC(year, monthNumber - 1, 1))
+  date.setUTCMonth(date.getUTCMonth() - 1)
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
 surveysRouter.get('/:id/responses', surveysModule, view, async (request, response, next) => {
@@ -598,6 +618,40 @@ surveysRouter.get('/:id/responses/:responseId', surveysModule, view, async (requ
   } catch (error) { next(error) }
 })
 
+surveysRouter.get('/:id/respondents', surveysModule, view, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const result = await query(
+      `SELECT DISTINCT m.id AS membership_id, u.full_name
+       FROM survey_responses r JOIN memberships m ON m.id = r.respondent_membership_id JOIN users u ON u.id = m.user_id
+       WHERE r.survey_id = $1 ORDER BY u.full_name`,
+      [survey.id],
+    )
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+// Contador liviano para el "en vivo" del panel de resultados mientras la encuesta esta abierta:
+// evita recalcular toda la tabulacion en cada sondeo periodico del frontend.
+surveysRouter.get('/:id/live-count', surveysModule, view, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const result = await query(
+      `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE completed)::int AS completed FROM survey_responses WHERE survey_id = $1`,
+      [survey.id],
+    )
+    response.json({ totalResponses: result.rows[0].total, completedResponses: result.rows[0].completed })
+  } catch (error) { next(error) }
+})
+
+async function countCompleted(surveyId, month) {
+  const result = await query(
+    `SELECT COUNT(*)::int AS completed FROM survey_responses WHERE survey_id = $1 AND month_reported = $2 AND completed = TRUE`,
+    [surveyId, month],
+  )
+  return result.rows[0].completed
+}
+
 surveysRouter.get('/:id/stats', surveysModule, view, async (request, response, next) => {
   try {
     const survey = await assertSurvey(request)
@@ -636,6 +690,19 @@ surveysRouter.get('/:id/stats', surveysModule, view, async (request, response, n
       return { id: question.id, type: question.type, prompt: question.prompt, pageId: question.page_id, ...computeQuestionStats(question, items) }
     })
 
+    // Comparacion entre periodos: solo tiene sentido cuando se esta mirando un mes puntual.
+    let comparison = null
+    if (request.query.month) {
+      const previous = previousMonth(String(request.query.month))
+      const previousCompleted = await countCompleted(survey.id, previous)
+      const currentCompleted = totalsResult.rows[0].completed
+      comparison = {
+        previousMonth: previous,
+        previousCompletedResponses: previousCompleted,
+        deltaPercent: previousCompleted ? Math.round(((currentCompleted - previousCompleted) / previousCompleted) * 100) : null,
+      }
+    }
+
     response.json({
       survey: { id: survey.id, title: survey.title, status: survey.status },
       totals: {
@@ -645,6 +712,7 @@ surveysRouter.get('/:id/stats', surveysModule, view, async (request, response, n
         completionRate: totalsResult.rows[0].total ? Math.round((totalsResult.rows[0].completed / totalsResult.rows[0].total) * 100) : 0,
       },
       months: monthsResult.rows.map(row => row.month_reported),
+      comparison,
       questions: questionStats,
     })
   } catch (error) { next(error) }
@@ -687,7 +755,13 @@ function computeQuestionStats(question, items) {
       value, count, percent: answered ? Math.round((count / answered) * 100) : 0,
       label: question.type === 'EMOJI_SCALE' ? (config.steps || [])[value - 1]?.emoji : undefined,
     }))
-    return { totalAnswered: answered, average: answered ? Number((sum / answered).toFixed(2)) : null, breakdown }
+    let npsScore = null
+    if (question.type === 'NPS' && answered) {
+      const promoters = items.filter(item => Number((item.value || {}).value) >= 9).length
+      const detractors = items.filter(item => Number((item.value || {}).value) <= 6).length
+      npsScore = Math.round(((promoters - detractors) / answered) * 100)
+    }
+    return { totalAnswered: answered, average: answered ? Number((sum / answered).toFixed(2)) : null, breakdown, npsScore }
   }
 
   if (question.type === 'RANKING') {

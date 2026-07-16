@@ -1,6 +1,14 @@
 import type {
-  QuestionType, Survey, SurveyDetail, SurveyLink, SurveyResponseDetail, SurveyResponseSummary, SurveyStats,
+  QuestionType, Respondent, Survey, SurveyDetail, SurveyLink, SurveyResponseDetail, SurveyResponseSummary, SurveyStats,
 } from '../types'
+
+export interface StatsFilters {
+  month?: string
+  respondentMembershipId?: string
+  segmentQuestionId?: string
+  segmentValue?: string
+  [key: string]: string | undefined
+}
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/surveys${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) }, ...init })
@@ -59,7 +67,9 @@ export const surveysService = {
 
   responses: (surveyId: string, filters: { month?: string; respondentMembershipId?: string } = {}) => call<SurveyResponseSummary[]>(`/${surveyId}/responses${toQueryString(filters)}`),
   responseDetail: (surveyId: string, responseId: string) => call<SurveyResponseDetail>(`/${surveyId}/responses/${responseId}`),
-  stats: (surveyId: string, filters: { month?: string; respondentMembershipId?: string } = {}) => call<SurveyStats>(`/${surveyId}/stats${toQueryString(filters)}`),
+  stats: (surveyId: string, filters: StatsFilters = {}) => call<SurveyStats>(`/${surveyId}/stats${toQueryString(filters)}`),
+  respondents: (surveyId: string) => call<Respondent[]>(`/${surveyId}/respondents`),
+  liveCount: (surveyId: string) => call<{ totalResponses: number; completedResponses: number }>(`/${surveyId}/live-count`),
   exportCsv: async (surveyId: string, code: string, filters: { month?: string } = {}) => {
     const response = await fetch(`/api/surveys/${surveyId}/export.csv${toQueryString(filters)}`, { credentials: 'same-origin' })
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
