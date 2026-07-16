@@ -41,7 +41,12 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
     switch (question.type) {
       case 'SHORT_TEXT': {
         const text = (value as { text?: string } | undefined)?.text || ''
-        return <input className="survey-input" value={text} disabled={disabled} placeholder="Tu respuesta" onChange={event => onChange({ text: event.target.value })} />
+        return (
+          <input
+            className="survey-input" value={text} disabled={disabled} placeholder="Tu respuesta" autoCapitalize="words"
+            onChange={event => onChange({ text: event.target.value })}
+          />
+        )
       }
       case 'LONG_TEXT': {
         const text = (value as { text?: string } | undefined)?.text || ''
@@ -52,6 +57,7 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
         return (
           <input
             type="number"
+            inputMode="numeric"
             className="survey-input"
             value={number ?? ''}
             disabled={disabled}
@@ -64,7 +70,18 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
       }
       case 'DATE': {
         const date = (value as { date?: string | null } | undefined)?.date || ''
-        return <input type="date" className="survey-input" value={date} disabled={disabled} onChange={event => onChange({ date: event.target.value || null })} />
+        // min/max evitan el año roto (ej. "0123") que el picker nativo permite si se escribe a
+        // mano sin limites — un rango amplio (120 años atras, 20 adelante) cubre cualquier fecha
+        // real de cualquier encuesta (nacimiento, hoy, cita futura) sin bloquear casos legitimos.
+        const currentYear = new Date().getFullYear()
+        const minIso = `${currentYear - 120}-01-01`
+        const maxIso = `${currentYear + 20}-12-31`
+        return (
+          <input
+            type="date" className="survey-input" value={date} disabled={disabled} min={minIso} max={maxIso}
+            onChange={event => onChange({ date: event.target.value || null })}
+          />
+        )
       }
       case 'YES_NO': {
         const optionId = (value as { optionId?: string | null } | undefined)?.optionId || null

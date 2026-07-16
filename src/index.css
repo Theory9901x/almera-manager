@@ -1703,7 +1703,9 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-question-body { display: flex; flex-direction: column; gap: 10px; }
 .survey-field-error { margin: 0; font-size: 12px; font-weight: 600; color: #DC2626; }
 .survey-input {
-  width: 100%; padding: 14px 16px; border: 1.5px solid #e2e7f0; border-radius: 12px; font-size: 15px; font-family: inherit;
+  width: 100%; min-height: 44px; padding: 14px 16px; border: 1.5px solid #e2e7f0; border-radius: 12px;
+  /* 16px minimo: por debajo de eso, iOS Safari hace zoom automatico al enfocar el campo. */
+  font-size: 16px; font-family: inherit;
   color: var(--ink); background: #fff; box-shadow: 0 1px 2px rgba(21,34,56,.04); transition: border-color .15s ease, box-shadow .15s ease;
 }
 .survey-input::placeholder { color: #9aa5b8; }
@@ -1716,7 +1718,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-options-stack { display: flex; flex-direction: column; gap: 9px; }
 
 .survey-option {
-  display: flex; align-items: center; gap: 12px; padding: 13px 15px; border: 1.5px solid var(--line);
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 13px 15px; border: 1.5px solid var(--line);
   border-radius: 13px; cursor: pointer; background: #fff; font-size: 14.5px; text-align: left;
   transition: transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .16s ease, border-color .16s ease, background .16s ease;
 }
@@ -1858,7 +1860,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-line-card-badge { padding: 5px 12px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
 
 .survey-public-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; }
-.survey-nav-button { display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 13px; padding: 14px 24px; font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease; }
+.survey-nav-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: none; border-radius: 13px; padding: 14px 24px; font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease; }
 .survey-nav-button.is-primary { color: #fff; box-shadow: 0 10px 22px color-mix(in srgb, var(--survey-accent, #0F7A54) 38%, transparent); margin-left: auto; }
 .survey-nav-button.is-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 14px 28px color-mix(in srgb, var(--survey-accent, #0F7A54) 44%, transparent); }
 .survey-nav-button.is-primary:active:not(:disabled) { transform: translateY(0); }
@@ -1938,10 +1940,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-matching-pool { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px; align-content: flex-start; max-height: 300px; overflow-y: auto; }
 
 .survey-matching-chip {
-  display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px 7px 7px; border-radius: 11px; border: 1.5px solid var(--line);
+  display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 7px 14px 7px 8px; border-radius: 11px; border: 1.5px solid var(--line);
   background: #fff; font-size: 12.5px; font-weight: 600; cursor: grab; position: relative; box-shadow: var(--shadow-xs);
   transition: transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .16s ease, border-color .16s ease;
 }
+/* Las fichas ya colocadas (dentro de una linea) no son el objetivo principal de toque — solo se
+   tocan para quitarlas — asi que se mantienen compactas para no desbordar la tarjeta de linea. */
+.survey-matching-chip.is-placed { min-height: 36px; }
 .survey-matching-chip:hover:not(.is-placed) { transform: translateY(-2px); box-shadow: var(--shadow-sm); border-color: #b9c6dc; }
 .survey-matching-chip:active { cursor: grabbing; }
 .survey-matching-chip.is-dragging { box-shadow: 0 18px 30px rgba(20,34,56,.24); z-index: 5; }
@@ -1953,7 +1958,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   box-shadow: inset 0 -2px 4px rgba(0,0,0,.18);
 }
 .survey-matching-chip-count { display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 9.5px; font-weight: 800; }
-.survey-matching-chip-remove { display: grid; place-items: center; width: 15px; height: 15px; border-radius: 999px; background: var(--surface-soft, #f2f5f9); color: var(--muted); margin-left: 2px; flex: none; }
+.survey-matching-chip-remove { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: var(--surface-soft, #f2f5f9); color: var(--muted); margin-left: 2px; flex: none; }
 .survey-matching-chip-remove:hover { background: #DC2626; color: #fff; }
 
 .survey-matching-targets { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -1987,6 +1992,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .survey-nav-button.is-primary { margin-left: 0; }
   .survey-matching-targets { grid-template-columns: 1fr; }
   .survey-matching-scene-row { grid-template-columns: 1fr; }
+  /* El banner (formato ancho, pensado para desktop) recortaria el texto central si se le sigue
+     aplicando object-fit:cover en una pantalla angosta — se prioriza verlo completo y legible por
+     sobre llenar el recuadro de borde a borde. */
+  .survey-public-banner-frame img { max-height: none; object-fit: contain; background: #fff; }
 }
 
 /* ---- Fase 3: analitica avanzada (resultados) ---- */
