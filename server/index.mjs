@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import express from 'express'
 import { requireAuth } from './auth.mjs'
@@ -59,6 +59,43 @@ app.use('/api', (_request, response) => response.status(404).json({ error: 'Ruta
 // Imagenes de opciones de encuestas (seleccion con imagenes / emparejamiento): a diferencia de las
 // evidencias de otros modulos, estas se muestran en el enlace publico y no requieren sesion.
 app.use('/uploads/surveys', express.static(resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys'), { maxAge: '30d' }))
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
+}
+
+// El HTML que sirve el SPA es siempre el mismo (title/meta genericos): un crawler de enlaces
+// (WhatsApp, Telegram, etc.) no ejecuta JS, asi que sin esto toda encuesta compartida muestra
+// "SGIMR" generico en la vista previa. Solo aplica en produccion (dist ya construido); en dev el
+// SPA de Vite sirve su propio index.html sin esta capa.
+if (!isDev) {
+  app.get('/e/:slug', async (request, response, next) => {
+    try {
+      const result = await pool.query('SELECT title, description, cover_image FROM surveys WHERE slug = $1', [request.params.slug])
+      const survey = result.rows[0]
+      let html = readFileSync(resolve('dist', 'index.html'), 'utf8')
+      if (survey) {
+        const origin = process.env.PUBLIC_ORIGIN || `${request.protocol}://${request.get('host')}`
+        const title = `Encuesta: ${survey.title}`
+        const description = (survey.description || 'Responde esta encuesta de SGIMR.').slice(0, 200)
+        const imageUrl = survey.cover_image ? `${origin}${survey.cover_image}` : null
+        const metaTags = [
+          `<meta property="og:title" content="${escapeHtml(title)}" />`,
+          `<meta property="og:description" content="${escapeHtml(description)}" />`,
+          '<meta property="og:type" content="website" />',
+          imageUrl && `<meta property="og:image" content="${escapeHtml(imageUrl)}" />`,
+          `<meta name="twitter:card" content="${imageUrl ? 'summary_large_image' : 'summary'}" />`,
+          `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+          `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+        ].filter(Boolean).join('\n    ')
+        html = html
+          .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
+          .replace('</head>', `${metaTags}\n  </head>`)
+      }
+      response.set('Content-Type', 'text/html').send(html)
+    } catch (cause) { next(cause) }
+  })
+}
 
 if (isDev) {
   const { createServer } = await import('vite')

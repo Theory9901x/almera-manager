@@ -88,6 +88,12 @@ function PublicSurveyContent() {
       })
   }, [slug])
 
+  useEffect(() => {
+    if (!survey) return
+    document.title = `Encuesta: ${survey.title}`
+    return () => { document.title = 'SGIMR' }
+  }, [survey])
+
   const totalPages = survey?.pages.length || 0
   const totalQuestions = useMemo(() => survey?.pages.reduce((total, page) => total + page.questions.length, 0) || 0, [survey])
   const estimatedMinutes = Math.max(1, Math.round(totalQuestions * 0.25))
