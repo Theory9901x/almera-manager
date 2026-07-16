@@ -6,6 +6,8 @@ import multer from 'multer'
 import QRCode from 'qrcode'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
+import { renderPdf } from '../pdf.mjs'
+import { renderSurveyReportHtml } from '../templates/surveyReport.mjs'
 
 export const surveysRouter = Router()
 
@@ -586,18 +588,30 @@ surveysRouter.put('/:id/pages/:pageId/questions/reorder', surveysModule, edit, a
 
 function buildResponseFilters(request, params, where) {
   if (request.query.month) { params.push(request.query.month); where.push(`r.month_reported = $${params.length}`) }
+  if (request.query.dateFrom) { params.push(request.query.dateFrom); where.push(`COALESCE(r.submitted_at, r.started_at) >= $${params.length}::date`) }
+  if (request.query.dateTo) { params.push(request.query.dateTo); where.push(`COALESCE(r.submitted_at, r.started_at) < ($${params.length}::date + interval '1 day')`) }
   if (request.query.respondentMembershipId) { params.push(Number(request.query.respondentMembershipId)); where.push(`r.respondent_membership_id = $${params.length}`) }
-  // Cruce basico por pregunta de perfil (ej. sexo, area, linea de beneficio): solo cuenta la
-  // respuesta si tambien contesto esa otra pregunta con el valor exacto indicado.
+  // Busqueda libre (ej. nombre del encuestado): la encuesta puede ser anonima o capturar el nombre
+  // en una pregunta de texto normal, asi que se busca en el texto de CUALQUIER respuesta de esa
+  // respuesta, no en una columna fija de "nombre".
+  if (request.query.search) {
+    params.push(`%${String(request.query.search).trim()}%`)
+    where.push(`EXISTS (SELECT 1 FROM survey_response_items si WHERE si.response_id = r.id AND si.text_value ILIKE $${params.length})`)
+  }
+  // Cruce basico por pregunta de perfil (ej. sexo, area, linea de beneficio, CAPS, proceso): acepta
+  // tanto opciones (optionId exacto) como texto libre (ILIKE), ya que campos como "proceso" o "CAPS"
+  // suelen capturarse como texto y no como opcion de seleccion.
   if (request.query.segmentQuestionId && request.query.segmentValue) {
     params.push(Number(request.query.segmentQuestionId))
     const questionParam = params.length
     params.push(String(request.query.segmentValue))
-    const valueParam = params.length
+    const exactParam = params.length
+    params.push(`%${String(request.query.segmentValue)}%`)
+    const likeParam = params.length
     where.push(`EXISTS (
       SELECT 1 FROM survey_response_items si
       WHERE si.response_id = r.id AND si.question_id = $${questionParam}
-        AND COALESCE(si.value->>'optionId', '') = $${valueParam}
+        AND (COALESCE(si.value->>'optionId', '') = $${exactParam} OR si.text_value ILIKE $${likeParam})
     )`)
   }
 }
@@ -617,17 +631,76 @@ surveysRouter.get('/:id/responses', surveysModule, view, async (request, respons
     buildResponseFilters(request, params, where)
     const limit = Math.min(200, Number(request.query.limit) || 50)
     const offset = Math.max(0, Number(request.query.offset) || 0)
-    const result = await query(
-      `SELECT r.id, r.month_reported, r.channel, r.completed, r.started_at, r.submitted_at,
-              m.id AS membership_id, u.full_name AS respondent_name
-       FROM survey_responses r
-       LEFT JOIN memberships m ON m.id = r.respondent_membership_id
-       LEFT JOIN users u ON u.id = m.user_id
-       WHERE ${where.join(' AND ')} ORDER BY COALESCE(r.submitted_at, r.started_at) DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      params,
+    const [rowsResult, countResult] = await Promise.all([
+      query(
+        `SELECT r.id, r.month_reported, r.channel, r.completed, r.started_at, r.submitted_at,
+                m.id AS membership_id, u.full_name AS respondent_name
+         FROM survey_responses r
+         LEFT JOIN memberships m ON m.id = r.respondent_membership_id
+         LEFT JOIN users u ON u.id = m.user_id
+         WHERE ${where.join(' AND ')} ORDER BY COALESCE(r.submitted_at, r.started_at) DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+        params,
+      ),
+      query(`SELECT COUNT(*)::int AS total FROM survey_responses r WHERE ${where.join(' AND ')}`, params),
+    ])
+    response.json({ rows: rowsResult.rows, total: countResult.rows[0].total, limit, offset })
+  } catch (error) { next(error) }
+})
+
+// El borrado de una respuesta (no de la ENCUESTA) es exclusivo del rol superadmin — a diferencia
+// del resto de acciones de este router, que usan permisos de modulo (surveys.*), esta es una
+// verificacion directa de rol: ni auditor ni administrador de modulo deben poder borrar datos de
+// respuesta, aunque tengan el permiso surveys.delete para borrar preguntas/paginas.
+function requireSuperadmin(request, response, next) {
+  if (request.auth?.role?.key !== 'SUPERADMIN') {
+    return response.status(403).json({ error: 'Solo un superadministrador puede eliminar respuestas' })
+  }
+  next()
+}
+
+async function logResponseDeletion(request, survey, responseRow) {
+  await query(
+    `INSERT INTO activity_logs (organization_id, entity_type, entity_id, action, changes, actor_user_id)
+     VALUES ($1, 'SURVEY_RESPONSE', $2, 'DELETED', $3, $4)`,
+    [oid(request), responseRow.id, JSON.stringify({ surveyId: survey.id, surveyTitle: survey.title, respondentName: responseRow.respondent_name || null }), uid(request)],
+  )
+}
+
+surveysRouter.delete('/:id/responses/:responseId', surveysModule, view, requireSuperadmin, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const responseId = Number(request.params.responseId)
+    const existing = await query(
+      `SELECT r.id, u.full_name AS respondent_name FROM survey_responses r
+       LEFT JOIN memberships m ON m.id = r.respondent_membership_id LEFT JOIN users u ON u.id = m.user_id
+       WHERE r.id = $1 AND r.survey_id = $2`,
+      [responseId, survey.id],
     )
-    response.json(result.rows)
+    if (!existing.rows[0]) fail(404, 'Respuesta no encontrada')
+    // ON DELETE CASCADE en survey_response_items retira tambien las respuestas individuales; las
+    // estadisticas se calculan siempre en vivo desde la tabla, asi que no queda ningun residuo.
+    await query('DELETE FROM survey_responses WHERE id = $1 AND survey_id = $2', [responseId, survey.id])
+    await logResponseDeletion(request, survey, existing.rows[0])
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+surveysRouter.post('/:id/responses/bulk-delete', surveysModule, view, requireSuperadmin, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const ids = Array.isArray(request.body?.ids) ? [...new Set(request.body.ids.map(Number).filter(Number.isFinite))] : []
+    if (!ids.length) fail(400, 'No se indicaron respuestas para eliminar')
+    const existing = await query(
+      `SELECT r.id, u.full_name AS respondent_name FROM survey_responses r
+       LEFT JOIN memberships m ON m.id = r.respondent_membership_id LEFT JOIN users u ON u.id = m.user_id
+       WHERE r.survey_id = $1 AND r.id = ANY($2::bigint[])`,
+      [survey.id, ids],
+    )
+    if (!existing.rows.length) fail(404, 'Ninguna de las respuestas indicadas existe en esta encuesta')
+    await query('DELETE FROM survey_responses WHERE survey_id = $1 AND id = ANY($2::bigint[])', [survey.id, existing.rows.map(row => row.id)])
+    for (const row of existing.rows) await logResponseDeletion(request, survey, row)
+    response.json({ ok: true, deleted: existing.rows.length })
   } catch (error) { next(error) }
 })
 
@@ -686,69 +759,190 @@ async function countCompleted(surveyId, month) {
   return result.rows[0].completed
 }
 
-surveysRouter.get('/:id/stats', surveysModule, view, async (request, response, next) => {
-  try {
-    const survey = await assertSurvey(request)
-    const pages = await loadStructure(survey.id)
-    const questions = pages.flatMap(page => page.questions)
+// % de acierto (preguntas con clave de calificacion, ej. ODS) si existe alguna; si ninguna
+// pregunta tiene clave de calificacion, "cumplimiento" no aplica y se usa la tasa de finalizacion
+// en su lugar — nunca se fuerza una metrica de acierto donde no hay respuesta correcta posible.
+function computeCompliance(questionStats, completionRate) {
+  const accuracyScores = questionStats.map(question => question.accuracyPercent).filter(value => value != null)
+  if (accuracyScores.length) {
+    return { percent: Math.round(accuracyScores.reduce((sum, value) => sum + value, 0) / accuracyScores.length), basis: 'accuracy' }
+  }
+  return { percent: completionRate, basis: 'completion' }
+}
 
-    const params = [survey.id]
-    const where = ['r.survey_id = $1']
-    buildResponseFilters(request, params, where)
+function ageBucketLabel(age) {
+  if (age < 20) return '<20'
+  if (age < 30) return '20-29'
+  if (age < 40) return '30-39'
+  if (age < 50) return '40-49'
+  return '50+'
+}
 
-    const totalsResult = await query(
-      `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE r.completed)::int AS completed
-       FROM survey_responses r WHERE ${where.join(' AND ')}`,
-      params,
-    )
-    const monthsResult = await query(
-      `SELECT DISTINCT month_reported FROM survey_responses WHERE survey_id = $1 ORDER BY month_reported DESC`,
-      [survey.id],
-    )
+// Cruces demograficos: solo se calculan si la encuesta realmente tiene los tipos de pregunta que
+// los hacen posibles (una de escala + una categorica/de edad) — nunca se fuerza un campo que no
+// todas las encuestas van a tener.
+function buildDemographics(questions, itemsByResponse) {
+  const scaleQuestion = questions.find(question => question.type === 'SCALE')
+  const numberQuestion = questions.find(question => question.type === 'NUMBER')
+  const categoryQuestion = questions.find(question => question.type === 'YES_NO' || (question.type === 'SINGLE_CHOICE' && (question.config.options || []).length <= 6))
+  const crosses = []
 
-    const itemsResult = await query(
-      `SELECT i.question_id, i.value, i.text_value
+  function scaleValueFor(responseId) {
+    if (!scaleQuestion) return null
+    const value = Number((itemsByResponse.get(responseId)?.get(scaleQuestion.id)?.value || {}).value)
+    return Number.isFinite(value) ? value : null
+  }
+
+  if (scaleQuestion && categoryQuestion) {
+    const options = categoryQuestion.type === 'YES_NO' ? [{ id: 'SI', label: 'Sí' }, { id: 'NO', label: 'No' }] : (categoryQuestion.config.options || [])
+    const buckets = new Map(options.map(option => [option.id, { sum: 0, count: 0 }]))
+    for (const [responseId, answers] of itemsByResponse) {
+      const optionId = (answers.get(categoryQuestion.id)?.value || {}).optionId
+      const bucket = optionId && buckets.get(optionId)
+      const scaleValue = scaleValueFor(responseId)
+      if (bucket && scaleValue != null) { bucket.sum += scaleValue; bucket.count += 1 }
+    }
+    crosses.push({
+      label: `Promedio de "${scaleQuestion.prompt}" por "${categoryQuestion.prompt}"`,
+      rows: options.map(option => {
+        const bucket = buckets.get(option.id)
+        return { label: option.label, average: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null, count: bucket.count }
+      }),
+    })
+  }
+
+  if (numberQuestion) {
+    const order = ['<20', '20-29', '30-39', '40-49', '50+']
+    const buckets = new Map(order.map(bucket => [bucket, { count: 0, scaleSum: 0, scaleCount: 0 }]))
+    for (const [responseId, answers] of itemsByResponse) {
+      const age = Number((answers.get(numberQuestion.id)?.value || {}).number)
+      if (!Number.isFinite(age)) continue
+      const bucket = buckets.get(ageBucketLabel(age))
+      bucket.count += 1
+      const scaleValue = scaleValueFor(responseId)
+      if (scaleValue != null) { bucket.scaleSum += scaleValue; bucket.scaleCount += 1 }
+    }
+    crosses.push({
+      label: scaleQuestion ? `Promedio de "${scaleQuestion.prompt}" por rango de "${numberQuestion.prompt}"` : `Participación por rango de "${numberQuestion.prompt}"`,
+      rows: order.map(bucket => {
+        const data = buckets.get(bucket)
+        return { label: bucket, average: scaleQuestion && data.scaleCount ? Number((data.scaleSum / data.scaleCount).toFixed(2)) : null, count: data.count }
+      }),
+    })
+  }
+
+  return crosses
+}
+
+async function buildStatsPayload(survey, request) {
+  const pages = await loadStructure(survey.id)
+  const questions = pages.flatMap(page => page.questions)
+
+  const params = [survey.id]
+  const where = ['r.survey_id = $1']
+  buildResponseFilters(request, params, where)
+
+  const [totalsResult, monthsResult, itemsResult, timelineResult, durationResult] = await Promise.all([
+    query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE r.completed)::int AS completed FROM survey_responses r WHERE ${where.join(' AND ')}`, params),
+    query(`SELECT DISTINCT month_reported FROM survey_responses WHERE survey_id = $1 ORDER BY month_reported DESC`, [survey.id]),
+    query(
+      `SELECT i.response_id, i.question_id, i.value, i.text_value
        FROM survey_response_items i JOIN survey_responses r ON r.id = i.response_id
        WHERE ${where.join(' AND ')} AND r.completed = TRUE`,
       params,
-    )
-    const itemsByQuestion = new Map()
-    for (const row of itemsResult.rows) {
-      const list = itemsByQuestion.get(row.question_id) || []
-      list.push(row)
-      itemsByQuestion.set(row.question_id, list)
+    ),
+    query(
+      `SELECT to_char(date_trunc('day', COALESCE(r.submitted_at, r.started_at)), 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+       FROM survey_responses r WHERE ${where.join(' AND ')} GROUP BY 1 ORDER BY 1`,
+      params,
+    ),
+    query(
+      `SELECT AVG(EXTRACT(EPOCH FROM (r.submitted_at - r.started_at)))::int AS avg_seconds
+       FROM survey_responses r WHERE ${where.join(' AND ')} AND r.completed = TRUE AND r.submitted_at IS NOT NULL`,
+      params,
+    ),
+  ])
+
+  const itemsByQuestion = new Map()
+  const itemsByResponse = new Map()
+  for (const row of itemsResult.rows) {
+    const list = itemsByQuestion.get(row.question_id) || []
+    list.push(row)
+    itemsByQuestion.set(row.question_id, list)
+
+    const answers = itemsByResponse.get(row.response_id) || new Map()
+    answers.set(row.question_id, row)
+    itemsByResponse.set(row.response_id, answers)
+  }
+
+  const questionStats = questions.map(question => {
+    const items = itemsByQuestion.get(question.id) || []
+    return { id: question.id, type: question.type, prompt: question.prompt, pageId: question.page_id, ...computeQuestionStats(question, items) }
+  })
+
+  const completionRate = totalsResult.rows[0].total ? Math.round((totalsResult.rows[0].completed / totalsResult.rows[0].total) * 100) : 0
+
+  // Comparacion entre periodos: solo tiene sentido cuando se esta mirando un mes puntual.
+  let comparison = null
+  if (request.query.month) {
+    const previous = previousMonth(String(request.query.month))
+    const previousCompleted = await countCompleted(survey.id, previous)
+    const currentCompleted = totalsResult.rows[0].completed
+    comparison = {
+      previousMonth: previous,
+      previousCompletedResponses: previousCompleted,
+      deltaPercent: previousCompleted ? Math.round(((currentCompleted - previousCompleted) / previousCompleted) * 100) : null,
     }
+  }
 
-    const questionStats = questions.map(question => {
-      const items = itemsByQuestion.get(question.id) || []
-      return { id: question.id, type: question.type, prompt: question.prompt, pageId: question.page_id, ...computeQuestionStats(question, items) }
-    })
+  return {
+    survey: { id: survey.id, title: survey.title, status: survey.status },
+    totals: {
+      totalResponses: totalsResult.rows[0].total,
+      completedResponses: totalsResult.rows[0].completed,
+      partialResponses: totalsResult.rows[0].total - totalsResult.rows[0].completed,
+      completionRate,
+    },
+    compliance: computeCompliance(questionStats, completionRate),
+    timeline: timelineResult.rows,
+    avgCompletionSeconds: durationResult.rows[0].avg_seconds,
+    demographics: buildDemographics(questions, itemsByResponse),
+    months: monthsResult.rows.map(row => row.month_reported),
+    comparison,
+    questions: questionStats,
+  }
+}
 
-    // Comparacion entre periodos: solo tiene sentido cuando se esta mirando un mes puntual.
-    let comparison = null
-    if (request.query.month) {
-      const previous = previousMonth(String(request.query.month))
-      const previousCompleted = await countCompleted(survey.id, previous)
-      const currentCompleted = totalsResult.rows[0].completed
-      comparison = {
-        previousMonth: previous,
-        previousCompletedResponses: previousCompleted,
-        deltaPercent: previousCompleted ? Math.round(((currentCompleted - previousCompleted) / previousCompleted) * 100) : null,
-      }
-    }
+surveysRouter.get('/:id/stats', surveysModule, view, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    response.json(await buildStatsPayload(survey, request))
+  } catch (error) { next(error) }
+})
 
-    response.json({
-      survey: { id: survey.id, title: survey.title, status: survey.status },
-      totals: {
-        totalResponses: totalsResult.rows[0].total,
-        completedResponses: totalsResult.rows[0].completed,
-        partialResponses: totalsResult.rows[0].total - totalsResult.rows[0].completed,
-        completionRate: totalsResult.rows[0].total ? Math.round((totalsResult.rows[0].completed / totalsResult.rows[0].total) * 100) : 0,
-      },
-      months: monthsResult.rows.map(row => row.month_reported),
-      comparison,
-      questions: questionStats,
-    })
+// Respuestas de texto libre completas (la tabulacion principal solo trae una muestra de 8): para
+// el boton "ver todas" del panel de resultados, paginado para no cargar miles de filas de una vez.
+surveysRouter.get('/:id/questions/:questionId/text-answers', surveysModule, view, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const questionId = Number(request.params.questionId)
+    const limit = Math.min(200, Number(request.query.limit) || 50)
+    const offset = Math.max(0, Number(request.query.offset) || 0)
+    const [rowsResult, countResult] = await Promise.all([
+      query(
+        `SELECT i.text_value, r.submitted_at, r.started_at
+         FROM survey_response_items i JOIN survey_responses r ON r.id = i.response_id
+         WHERE r.survey_id = $1 AND i.question_id = $2 AND i.text_value <> '' AND r.completed = TRUE
+         ORDER BY COALESCE(r.submitted_at, r.started_at) DESC LIMIT $3 OFFSET $4`,
+        [survey.id, questionId, limit, offset],
+      ),
+      query(
+        `SELECT COUNT(*)::int AS total FROM survey_response_items i JOIN survey_responses r ON r.id = i.response_id
+         WHERE r.survey_id = $1 AND i.question_id = $2 AND i.text_value <> '' AND r.completed = TRUE`,
+        [survey.id, questionId],
+      ),
+    ])
+    response.json({ rows: rowsResult.rows, total: countResult.rows[0].total, limit, offset })
   } catch (error) { next(error) }
 })
 
@@ -829,6 +1023,7 @@ function computeQuestionStats(question, items) {
     const correctPairs = config.correctPairs || {}
     const totalExpected = Object.values(correctPairs).reduce((sum, list) => sum + list.length, 0)
     const counts = new Map(items_.map(item => [item.id, new Map(targets.map(target => [target.id, 0]))]))
+    const correctByTarget = new Map(targets.map(target => [target.id, 0]))
     let answered = 0
     let correct = 0
     for (const responseItem of items) {
@@ -839,7 +1034,10 @@ function computeQuestionStats(question, items) {
         const perItem = counts.get(itemId)
         for (const targetId of (Array.isArray(targetIds) ? targetIds : [])) {
           if (perItem && perItem.has(targetId)) perItem.set(targetId, perItem.get(targetId) + 1)
-          if ((correctPairs[targetId] || []).includes(itemId)) correct += 1
+          if ((correctPairs[targetId] || []).includes(itemId)) {
+            correct += 1
+            correctByTarget.set(targetId, (correctByTarget.get(targetId) || 0) + 1)
+          }
         }
       }
     }
@@ -854,7 +1052,17 @@ function computeQuestionStats(question, items) {
       }
     })
     const accuracyPercent = totalExpected && answered ? Math.round((correct / (totalExpected * answered)) * 100) : null
-    return { totalAnswered: answered, matching, accuracyPercent }
+    // % de acierto promedio POR LINEA (no solo el global): permite ver si la gente falla mas al
+    // relacionar una linea especifica con sus ODS correctos.
+    const perTarget = targets.map(target => {
+      const expected = (correctPairs[target.id] || []).length
+      const targetCorrect = correctByTarget.get(target.id) || 0
+      return {
+        targetId: target.id, label: target.label, color: target.color || null,
+        accuracyPercent: expected && answered ? Math.round((targetCorrect / (expected * answered)) * 100) : null,
+      }
+    })
+    return { totalAnswered: answered, matching, accuracyPercent, perTarget }
   }
 
   if (question.type === 'LIKERT_MATRIX') {
@@ -930,5 +1138,25 @@ surveysRouter.get('/:id/export.csv', surveysModule, exportPerm, async (request, 
     response.setHeader('Content-Type', 'text/csv; charset=utf-8')
     response.setHeader('Content-Disposition', `attachment; filename="encuesta-${survey.code}.csv"`)
     response.send(csv)
+  } catch (error) { next(error) }
+})
+
+// Informe PDF institucional: misma gating que el CSV (surveys.export) — es una necesidad
+// operativa normal, no una accion destructiva, asi que NO se restringe a superadmin (a diferencia
+// del borrado de respuestas de arriba).
+surveysRouter.get('/:id/report.pdf', surveysModule, exportPerm, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const payload = await buildStatsPayload(survey, request)
+    const html = renderSurveyReportHtml({
+      ...payload,
+      dateFrom: request.query.dateFrom || null,
+      dateTo: request.query.dateTo || null,
+      generatedAt: new Date().toISOString(),
+    })
+    const pdf = await renderPdf(html)
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', `attachment; filename="informe-encuesta-${survey.code}.pdf"`)
+    response.send(pdf)
   } catch (error) { next(error) }
 })

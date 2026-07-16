@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ArrowDown, ArrowLeft, ArrowUp, Download, FileDown, ListChecks, Loader2, Pencil, Users } from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Download, FileDown, FileText, ListChecks, Loader2, Pencil, Users } from 'lucide-react'
 import {
-  Badge, Button, Card, EmptyState, Field, PageHeader, ProgressBar, Select, StatCard, ToastProvider, moduleIdentity,
-  semaphoreColor, useCountUp, useToast,
+  Badge, Button, Card, EmptyState, Field, Input, PageHeader, ProgressBar, Select, SemaphoreBadge, StatCard, ToastProvider,
+  moduleIdentity, semaphoreColor, semaphoreLevel, useCountUp, useToast,
 } from '@/design-system'
 import { surveysService } from '../services/surveysService'
 import { QUESTION_TYPE_INFO } from '../components/questionTypeMeta'
@@ -39,10 +39,13 @@ function SurveyResultsContent() {
   const [respondents, setRespondents] = useState<Respondent[]>([])
   const [liveTotals, setLiveTotals] = useState<{ totalResponses: number; completedResponses: number } | null>(null)
   const [month, setMonth] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [respondentId, setRespondentId] = useState('')
   const [segmentQuestionId, setSegmentQuestionId] = useState('')
   const [segmentValue, setSegmentValue] = useState('')
   const [loading, setLoading] = useState(true)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const questions = useMemo(() => survey?.pages.flatMap(page => page.questions) || [], [survey])
   const segmentCandidates = useMemo(() => questions.filter(question => SEGMENT_TYPES.has(question.type) && segmentOptions(question).length > 0), [questions])
@@ -55,7 +58,7 @@ function SurveyResultsContent() {
       const [detail, statsResult, respondentsResult] = await Promise.all([
         survey ? Promise.resolve(survey) : surveysService.detail(surveyId),
         surveysService.stats(surveyId, {
-          month: month || undefined, respondentMembershipId: respondentId || undefined,
+          month: month || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, respondentMembershipId: respondentId || undefined,
           segmentQuestionId: segmentQuestionId || undefined, segmentValue: segmentValue || undefined,
         }),
         respondents.length ? Promise.resolve(respondents) : surveysService.respondents(surveyId),
@@ -67,7 +70,15 @@ function SurveyResultsContent() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { void load() }, [surveyId, month, respondentId, segmentQuestionId, segmentValue])
+  useEffect(() => { void load() }, [surveyId, month, dateFrom, dateTo, respondentId, segmentQuestionId, segmentValue])
+
+  async function handleExportPdf() {
+    if (!survey) return
+    setExportingPdf(true)
+    try { await surveysService.exportPdf(survey.id, survey.code, { dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }) }
+    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar el informe') }
+    finally { setExportingPdf(false) }
+  }
 
   // Contador en vivo: sondeo liviano mientras la encuesta esta publicada, independiente de los
   // filtros aplicados a la tabulacion (siempre refleja el total real de la encuesta completa).
@@ -99,6 +110,8 @@ function SurveyResultsContent() {
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={() => navigate('/app/encuestas')}><ArrowLeft size={15} /> Encuestas</Button>
             <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/constructor`)}><Pencil size={15} /> Constructor</Button>
+            <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/respuestas`)}><ListChecks size={15} /> Respuestas</Button>
+            <Button variant="secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileText size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
             <Button identity={identity} onClick={() => surveysService.exportCsv(survey.id, survey.code, { month: month || undefined })}><Download size={15} /> Exportar CSV</Button>
           </div>
         }
@@ -114,6 +127,8 @@ function SurveyResultsContent() {
         {stats.months.length > 0 && (
           <Field label="Mes"><Select value={month} onChange={setMonth} placeholder="Todos los meses" options={[{ value: '', label: 'Todos los meses' }, ...stats.months.map(item => ({ value: item, label: item }))]} /></Field>
         )}
+        <Field label="Corte desde"><Input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></Field>
+        <Field label="Corte hasta"><Input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></Field>
         {respondents.length > 0 && (
           <Field label="Usuario">
             <Select value={respondentId} onChange={setRespondentId} placeholder="Todos los usuarios" options={[{ value: '', label: 'Todos los usuarios' }, ...respondents.map(item => ({ value: item.membership_id, label: item.full_name }))]} />
@@ -143,6 +158,16 @@ function SurveyResultsContent() {
         )}
       </Card>
 
+      <Card accent={identity.color} className="flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+            {stats.compliance.basis === 'accuracy' ? 'Cumplimiento general (acierto)' : 'Cumplimiento general (finalización)'}
+          </p>
+          <p className="text-4xl font-black" style={{ color: semaphoreColor(stats.compliance.percent) }}><CountUpValue value={stats.compliance.percent} suffix="%" /></p>
+        </div>
+        <SemaphoreBadge level={semaphoreLevel(stats.compliance.percent)} />
+      </Card>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Users} label="Respuestas totales" value={<CountUpValue value={stats.totals.totalResponses} />} identity={identity} />
         <StatCard
@@ -150,7 +175,10 @@ function SurveyResultsContent() {
           detail={comparison ? `${comparison.deltaPercent == null ? 'Sin datos' : `${comparison.deltaPercent >= 0 ? '+' : ''}${comparison.deltaPercent}%`} vs ${comparison.previousMonth}` : undefined}
         />
         <StatCard icon={FileDown} label="Parciales" value={<CountUpValue value={stats.totals.partialResponses} />} detail="Formularios abandonados" identity={identity} />
-        <StatCard label="Tasa de finalización" value={<CountUpValue value={stats.totals.completionRate} suffix="%" />} identity={identity} />
+        <StatCard
+          label="Tasa de finalización" value={<CountUpValue value={stats.totals.completionRate} suffix="%" />} identity={identity}
+          detail={stats.avgCompletionSeconds != null ? `${Math.round(stats.avgCompletionSeconds / 60)} min promedio` : undefined}
+        />
       </section>
 
       {comparison && comparison.deltaPercent != null && (
@@ -158,6 +186,41 @@ function SurveyResultsContent() {
           {comparison.deltaPercent >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
           {Math.abs(comparison.deltaPercent)}% respecto a {comparison.previousMonth} ({comparison.previousCompletedResponses} respuestas completadas)
         </p>
+      )}
+
+      {stats.timeline.length > 1 && (
+        <Card accent={identity.color} className="p-5">
+          <h3 className="mb-3 text-base font-bold">Evolución de respuestas</h3>
+          <div className="h-52 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.timeline} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line, #e2e7f0)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                <Tooltip labelStyle={{ fontWeight: 700 }} />
+                <Line type="monotone" dataKey="count" stroke={identity.color} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive animationDuration={600} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      {stats.demographics.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {stats.demographics.map(cross => (
+            <Card key={cross.label} accent={identity.color} className="p-5">
+              <h3 className="mb-3 text-sm font-bold">{cross.label}</h3>
+              <div className="space-y-2">
+                {cross.rows.map(row => (
+                  <div key={row.label} className="flex items-center justify-between text-sm">
+                    <span>{row.label}</span>
+                    <span className="text-[var(--muted)]">{row.average != null ? row.average : `${row.count} resp.`}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
       {!stats.totals.totalResponses ? (
@@ -256,6 +319,20 @@ function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: stri
       {stat.matching && stat.matching.length > 0 && (
         <div className="space-y-3">
           {stat.accuracyPercent != null && <Badge tone="info">Aciertos: {stat.accuracyPercent}%</Badge>}
+          {stat.perTarget && stat.perTarget.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">% de acierto por línea</p>
+              {stat.perTarget.map(target => (
+                <div key={target.targetId}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span>{target.label}</span>
+                    <strong>{target.accuracyPercent == null ? 'N/A' : `${target.accuracyPercent}%`}</strong>
+                  </div>
+                  <ProgressBar percent={target.accuracyPercent ?? 0} color={target.color || identity.color} />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="survey-matching-results">
             {stat.matching.map(item => (
               <div key={item.itemId} className="survey-matching-results-row">
@@ -275,11 +352,39 @@ function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: stri
         </div>
       )}
 
-      {stat.sample && (
-        <ul className="survey-sample-list">
-          {stat.sample.length ? stat.sample.map((text, index) => <li key={index}>“{text}”</li>) : <li className="survey-config-empty">Sin respuestas de texto todavía.</li>}
-        </ul>
-      )}
+      {stat.sample && <TextAnswersSection stat={stat} />}
     </Card>
+  )
+}
+
+function TextAnswersSection({ stat }: { stat: QuestionStat }) {
+  const { surveyId } = useParams()
+  const [expanded, setExpanded] = useState(false)
+  const [allAnswers, setAllAnswers] = useState<string[] | null>(null)
+  const [loadingAll, setLoadingAll] = useState(false)
+
+  async function showAll() {
+    if (!surveyId) return
+    setExpanded(true)
+    if (allAnswers) return
+    setLoadingAll(true)
+    try {
+      const result = await surveysService.textAnswers(surveyId, stat.id, { limit: '200' })
+      setAllAnswers(result.rows.map(row => row.text_value))
+    } finally { setLoadingAll(false) }
+  }
+
+  const list = expanded ? allAnswers : stat.sample
+
+  return (
+    <div>
+      <ul className="survey-sample-list">
+        {list && list.length ? list.map((text, index) => <li key={index}>“{text}”</li>) : <li className="survey-config-empty">Sin respuestas de texto todavía.</li>}
+      </ul>
+      {!expanded && (stat.sample?.length || 0) >= 8 && (
+        <Button variant="ghost" onClick={showAll}><ChevronDown size={14} /> Ver todas</Button>
+      )}
+      {loadingAll && <Loader2 className="mt-2 animate-spin" size={16} />}
+    </div>
   )
 }

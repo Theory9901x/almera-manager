@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  BarChart3, BookmarkPlus, Check, Copy, ExternalLink, Layers, Link2, Loader2, Pencil, Plus, QrCode,
+  BarChart3, BookmarkPlus, Check, Copy, ExternalLink, Layers, Link2, ListChecks, Loader2, Pencil, Plus, QrCode,
   RotateCcw, Send, Sparkles, Square, Trash2, X,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -135,6 +135,7 @@ function SurveysListContent() {
                 ) : (
                   <>
                     <button className="survey-icon-button" title="Resultados" onClick={() => navigate(`/app/encuestas/${survey.id}/resultados`)}><BarChart3 size={15} /></button>
+                    <button className="survey-icon-button" title="Respuestas" onClick={() => navigate(`/app/encuestas/${survey.id}/respuestas`)}><ListChecks size={15} /></button>
                     {survey.status !== 'BORRADOR' && <button className="survey-icon-button" title="Enlace y QR" onClick={() => setLinkSurvey(survey)}><QrCode size={15} /></button>}
                     {canCreate && <button className="survey-icon-button" title="Duplicar" disabled={busyId === survey.id} onClick={() => runAction(survey, () => surveysService.duplicate(survey.id), 'Encuesta duplicada')}><Copy size={15} /></button>}
                     {canCreate && <button className="survey-icon-button" title="Guardar como plantilla" disabled={busyId === survey.id} onClick={() => runAction(survey, () => surveysService.duplicate(survey.id, { title: `${survey.title} (plantilla)`, asTemplate: true }), 'Guardada como plantilla')}><BookmarkPlus size={15} /></button>}

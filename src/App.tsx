@@ -13,6 +13,7 @@ import DesignSystemGalleryPage from '@/platform/pages/DesignSystemGalleryPage'
 import SurveysListPage from '@/modules/surveys/pages/SurveysListPage'
 import SurveyBuilderPage from '@/modules/surveys/pages/SurveyBuilderPage'
 import SurveyResultsPage from '@/modules/surveys/pages/SurveyResultsPage'
+import SurveyResponsesPage from '@/modules/surveys/pages/SurveyResponsesPage'
 import SurveyConsolidatedPage from '@/modules/surveys/pages/SurveyConsolidatedPage'
 import PublicSurveyPage from '@/modules/surveys/pages/PublicSurveyPage'
 
@@ -66,6 +67,12 @@ function SurveyConsolidatedRoute() {
   return <SurveyConsolidatedPage />
 }
 
+function SurveyResponsesRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('surveys.view')) return <Navigate to="/app" replace />
+  return <SurveyResponsesPage />
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -86,6 +93,7 @@ function AppRoutes() {
         <Route path="encuestas/consolidado" element={<SurveyConsolidatedRoute />} />
         <Route path="encuestas/:surveyId/constructor" element={<SurveyBuilderRoute />} />
         <Route path="encuestas/:surveyId/resultados" element={<SurveyResultsRoute />} />
+        <Route path="encuestas/:surveyId/respuestas" element={<SurveyResponsesRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/app' : '/login'} replace />} />

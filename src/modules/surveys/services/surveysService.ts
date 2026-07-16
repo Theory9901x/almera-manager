@@ -1,12 +1,25 @@
 import type {
-  QuestionType, Respondent, Survey, SurveyDetail, SurveyLink, SurveyResponseDetail, SurveyResponseSummary, SurveyStats,
+  QuestionType, Respondent, Survey, SurveyDetail, SurveyLink, SurveyResponseDetail, SurveyResponseListResult, SurveyStats, TextAnswersResult,
 } from '../types'
 
 export interface StatsFilters {
   month?: string
+  dateFrom?: string
+  dateTo?: string
   respondentMembershipId?: string
   segmentQuestionId?: string
   segmentValue?: string
+  [key: string]: string | undefined
+}
+
+export interface ResponseFilters {
+  dateFrom?: string
+  dateTo?: string
+  search?: string
+  segmentQuestionId?: string
+  segmentValue?: string
+  limit?: string
+  offset?: string
   [key: string]: string | undefined
 }
 
@@ -65,8 +78,12 @@ export const surveysService = {
     return data as { url: string }
   },
 
-  responses: (surveyId: string, filters: { month?: string; respondentMembershipId?: string } = {}) => call<SurveyResponseSummary[]>(`/${surveyId}/responses${toQueryString(filters)}`),
+  responses: (surveyId: string, filters: ResponseFilters = {}) => call<SurveyResponseListResult>(`/${surveyId}/responses${toQueryString(filters)}`),
   responseDetail: (surveyId: string, responseId: string) => call<SurveyResponseDetail>(`/${surveyId}/responses/${responseId}`),
+  deleteResponse: (surveyId: string, responseId: string) => call<{ ok: true }>(`/${surveyId}/responses/${responseId}`, { method: 'DELETE' }),
+  bulkDeleteResponses: (surveyId: string, ids: string[]) => call<{ ok: true; deleted: number }>(`/${surveyId}/responses/bulk-delete`, { method: 'POST', body: JSON.stringify({ ids }) }),
+  textAnswers: (surveyId: string, questionId: string, filters: { limit?: string; offset?: string } = {}) =>
+    call<TextAnswersResult>(`/${surveyId}/questions/${questionId}/text-answers${toQueryString(filters)}`),
   stats: (surveyId: string, filters: StatsFilters = {}) => call<SurveyStats>(`/${surveyId}/stats${toQueryString(filters)}`),
   respondents: (surveyId: string) => call<Respondent[]>(`/${surveyId}/respondents`),
   liveCount: (surveyId: string) => call<{ totalResponses: number; completedResponses: number }>(`/${surveyId}/live-count`),
@@ -78,6 +95,17 @@ export const surveysService = {
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = `encuesta-${code}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
+  exportPdf: async (surveyId: string, code: string, filters: { dateFrom?: string; dateTo?: string } = {}) => {
+    const response = await fetch(`/api/surveys/${surveyId}/report.pdf${toQueryString(filters)}`, { credentials: 'same-origin' })
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `informe-encuesta-${code}.pdf`
     anchor.click()
     URL.revokeObjectURL(url)
   },

@@ -111,6 +111,7 @@ export interface QuestionStatBreakdownItem { optionId?: string; value?: number; 
 export interface QuestionStatRow { rowId: string; label: string; average: number | null; totalAnswered: number }
 export interface RankingStatItem { optionId: string; label: string; averagePosition: number | null; totalAnswered: number }
 export interface MatchingStatItem { itemId: string; label: string; topTargetLabel: string | null; topTargetCount: number; breakdown: { targetId: string; label: string; count: number }[] }
+export interface MatchingTargetAccuracy { targetId: string; label: string; color: string | null; accuracyPercent: number | null }
 
 export interface QuestionStat {
   id: string
@@ -126,20 +127,33 @@ export interface QuestionStat {
   sample?: string[]
   ranking?: RankingStatItem[]
   matching?: MatchingStatItem[]
+  perTarget?: MatchingTargetAccuracy[]
   accuracyPercent?: number | null
   npsScore?: number | null
 }
 
 export interface StatsComparison { previousMonth: string; previousCompletedResponses: number; deltaPercent: number | null }
 export interface Respondent { membership_id: string; full_name: string }
+export interface ComplianceIndicator { percent: number; basis: 'accuracy' | 'completion' }
+export interface TimelinePoint { date: string; count: number }
+export interface DemographicCrossRow { label: string; average: number | null; count: number }
+export interface DemographicCross { label: string; rows: DemographicCrossRow[] }
 
 export interface SurveyStats {
   survey: { id: string; title: string; status: SurveyStatus }
   totals: { totalResponses: number; completedResponses: number; partialResponses: number; completionRate: number }
+  compliance: ComplianceIndicator
+  timeline: TimelinePoint[]
+  avgCompletionSeconds: number | null
+  demographics: DemographicCross[]
   months: string[]
   comparison: StatsComparison | null
   questions: QuestionStat[]
 }
+
+export interface SurveyResponseListResult { rows: SurveyResponseSummary[]; total: number; limit: number; offset: number }
+export interface TextAnswerRow { text_value: string; submitted_at: string | null; started_at: string }
+export interface TextAnswersResult { rows: TextAnswerRow[]; total: number; limit: number; offset: number }
 
 // ---- Superficie pública (sin autenticación) ----
 
