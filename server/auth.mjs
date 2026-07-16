@@ -12,7 +12,10 @@ const USUARIO_MODULE_PERMISSIONS = {
   'internal-audits': [],
   almera: ['almera.assistance.view'],
   dashboard: ['dashboard.view'],
-  surveys: ['surveys.view', 'surveys.export'],
+  // Encuestas es un constructor: cualquier USUARIO al que se le habilite el modulo debe poder
+  // crear, editar, publicar y exportar, no solo ver resultados (a diferencia de otros modulos
+  // operativos donde el USUARIO es de solo consulta salvo que el rol sea Admin/Superadmin).
+  surveys: ['surveys.view', 'surveys.create', 'surveys.edit', 'surveys.delete', 'surveys.export'],
 }
 
 // adherence-matrix es un caso especial: el permiso depende de la funcion elegida al habilitar
