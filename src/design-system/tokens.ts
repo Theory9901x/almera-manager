@@ -46,6 +46,7 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   'internal-audits': { key: 'internal-audits', color: '#B08900', gradientFrom: '#B08900', gradientTo: '#E0B84D' },
   audits: { key: 'audits', color: '#B08900', gradientFrom: '#B08900', gradientTo: '#E0B84D' },
   'adherence-matrix': { key: 'adherence-matrix', color: '#4F46E5', gradientFrom: '#4F46E5', gradientTo: '#7C3AED' },
+  surveys: { key: 'surveys', color: '#0F7A54', gradientFrom: '#0F7A54', gradientTo: '#2FAE74' },
   admin: { key: 'admin', color: '#9C36B5', gradientFrom: '#9C36B5', gradientTo: '#BE4BDB' },
   users: { key: 'users', color: '#9C36B5', gradientFrom: '#9C36B5', gradientTo: '#BE4BDB' },
 }

@@ -10,6 +10,10 @@ import AdherenceOperationPage from '@/platform/pages/AdherenceOperationPage'
 import AdherenceMyPlansPage from '@/platform/pages/AdherenceMyPlansPage'
 import MyAccountPage from '@/platform/pages/MyAccountPage'
 import DesignSystemGalleryPage from '@/platform/pages/DesignSystemGalleryPage'
+import SurveysListPage from '@/modules/surveys/pages/SurveysListPage'
+import SurveyBuilderPage from '@/modules/surveys/pages/SurveyBuilderPage'
+import SurveyResultsPage from '@/modules/surveys/pages/SurveyResultsPage'
+import PublicSurveyPage from '@/modules/surveys/pages/PublicSurveyPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -37,11 +41,31 @@ function AdherenceMyPlansRoute() {
   return <AdherenceMyPlansPage />
 }
 
+function SurveysRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('surveys.view')) return <Navigate to="/app" replace />
+  return <SurveysListPage />
+}
+
+function SurveyBuilderRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('surveys.edit')) return <Navigate to="/app/encuestas" replace />
+  return <SurveyBuilderPage />
+}
+
+function SurveyResultsRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('surveys.view')) return <Navigate to="/app" replace />
+  return <SurveyResultsPage />
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
     <Routes>
       <Route path="/login" element={ready && session ? <Navigate to="/app" replace /> : <LoginPage />} />
+      {/* Unica superficie sin login: cualquiera con el enlace responde una encuesta externa. */}
+      <Route path="/e/:slug" element={<PublicSurveyPage />} />
       <Route path="/app" element={<ProtectedApp />}>
         <Route index element={<DashboardPage />} />
         <Route path="administracion" element={<AdminPage />} />
@@ -51,6 +75,9 @@ function AppRoutes() {
         <Route path="adherencia/configuracion" element={<AdherenceConfigRoute />} />
         <Route path="adherencia/operacion" element={<AdherenceOperationRoute />} />
         <Route path="adherencia/mis-planes" element={<AdherenceMyPlansRoute />} />
+        <Route path="encuestas" element={<SurveysRoute />} />
+        <Route path="encuestas/:surveyId/constructor" element={<SurveyBuilderRoute />} />
+        <Route path="encuestas/:surveyId/resultados" element={<SurveyResultsRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/app' : '/login'} replace />} />

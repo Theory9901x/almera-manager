@@ -8,6 +8,8 @@ import { authRouter } from './routes/auth.mjs'
 import { adminRouter } from './routes/admin.mjs'
 import { almeraRouter } from './routes/almera.mjs'
 import { adherenceRouter } from './routes/adherence.mjs'
+import { surveysRouter } from './routes/surveys.mjs'
+import { surveysPublicRouter } from './routes/surveysPublic.mjs'
 
 const isDev = process.argv.includes('--dev')
 if (isDev) process.env.NODE_ENV = 'development'
@@ -48,6 +50,10 @@ app.get('/api/platform', requireAuth, (request, response) => response.json(reque
 app.use('/api/admin', requireAuth, adminRouter)
 app.use('/api/almera', requireAuth, almeraRouter)
 app.use('/api/adherence', requireAuth, adherenceRouter)
+app.use('/api/surveys', requireAuth, surveysRouter)
+// Sin requireAuth: es la unica superficie publica del sistema, para que cualquiera con el
+// enlace pueda responder una encuesta externa sin iniciar sesion.
+app.use('/api/public/surveys', surveysPublicRouter)
 app.use('/api', (_request, response) => response.status(404).json({ error: 'Ruta no encontrada' }))
 
 if (isDev) {

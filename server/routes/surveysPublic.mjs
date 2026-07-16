@@ -1,0 +1,239 @@
+import { Router } from 'express'
+import { pool, query } from '../db.mjs'
+import { getSessionContext } from '../auth.mjs'
+
+// Router público: sin requireAuth. Cualquiera con el enlace responde una encuesta CLIENTE_EXTERNO
+// sin iniciar sesión. La respuesta siempre queda almacenada en la plataforma.
+export const surveysPublicRouter = Router()
+
+const CHOICE_TYPES = new Set(['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'DROPDOWN', 'YES_NO', 'IMAGE_CHOICE'])
+
+function fail(status, message) {
+  const error = new Error(message)
+  error.status = status
+  throw error
+}
+
+function sanitizeConfigForPublic(config = {}) {
+  const clean = {}
+  for (const [key, value] of Object.entries(config || {})) {
+    if (/^correct/i.test(key) || /answerkey/i.test(key)) continue
+    clean[key] = value
+  }
+  return clean
+}
+
+async function loadPublicSurvey(slug) {
+  const surveyResult = await query(
+    `SELECT id, code, title, description, cover_image, audience, status, theme_color, thank_you_message,
+            allow_multiple_responses, require_login, opens_at, closes_at
+     FROM surveys WHERE slug = $1`,
+    [slug],
+  )
+  const survey = surveyResult.rows[0]
+  if (!survey) return null
+  const pagesResult = await query('SELECT id, order_index, title, description FROM survey_pages WHERE survey_id = $1 ORDER BY order_index, id', [survey.id])
+  const questionsResult = await query(
+    `SELECT q.id, q.page_id, q.order_index, q.type, q.prompt, q.description, q.image_url, q.required, q.config
+     FROM survey_questions q JOIN survey_pages p ON p.id = q.page_id
+     WHERE p.survey_id = $1 ORDER BY q.order_index, q.id`,
+    [survey.id],
+  )
+  return {
+    ...survey,
+    pages: pagesResult.rows.map(page => ({
+      ...page,
+      questions: questionsResult.rows
+        .filter(question => question.page_id === page.id)
+        .map(question => ({ ...question, config: sanitizeConfigForPublic(question.config) })),
+    })),
+  }
+}
+
+function isWithinWindow(survey) {
+  const now = Date.now()
+  if (survey.opens_at && now < new Date(survey.opens_at).getTime()) return false
+  if (survey.closes_at && now > new Date(survey.closes_at).getTime()) return false
+  return true
+}
+
+surveysPublicRouter.get('/:slug', async (request, response, next) => {
+  try {
+    const survey = await loadPublicSurvey(String(request.params.slug))
+    if (!survey) return response.status(404).json({ error: 'Encuesta no encontrada' })
+    if (survey.status === 'BORRADOR') return response.status(404).json({ error: 'Esta encuesta todavía no ha sido publicada' })
+    if (survey.status === 'CERRADA') return response.status(410).json({ error: 'Esta encuesta ya fue cerrada. Gracias por tu interés.' })
+    if (!isWithinWindow(survey)) return response.status(410).json({ error: 'Esta encuesta no está disponible en este momento' })
+
+    let requiresSession = false
+    if (survey.require_login) {
+      const context = await getSessionContext(request)
+      requiresSession = !context
+    }
+    response.json({ ...survey, requiresLogin: requiresSession })
+  } catch (error) { next(error) }
+})
+
+function deriveTextValue(question, value) {
+  const config = question.config || {}
+  if (question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') return String(value?.text || '')
+  if (question.type === 'YES_NO') return value?.optionId === 'SI' ? 'Sí' : value?.optionId === 'NO' ? 'No' : ''
+  if (question.type === 'SINGLE_CHOICE' || question.type === 'DROPDOWN' || question.type === 'IMAGE_CHOICE') {
+    const option = (config.options || []).find(item => item.id === value?.optionId)
+    return option?.label || ''
+  }
+  if (question.type === 'MULTIPLE_CHOICE') {
+    const ids = new Set(value?.optionIds || [])
+    return (config.options || []).filter(option => ids.has(option.id)).map(option => option.label).join(', ')
+  }
+  if (question.type === 'NUMBER') return value?.number != null ? String(value.number) : ''
+  if (question.type === 'DATE') return value?.date || ''
+  if (question.type === 'SCALE' || question.type === 'NPS' || question.type === 'RATING') return value?.value != null ? String(value.value) : ''
+  if (question.type === 'LIKERT_MATRIX') {
+    const rows = config.rows || []
+    const values = value?.rows || {}
+    return rows.map(row => `${row.label}: ${values[row.id] ?? '—'}`).join(' | ')
+  }
+  return value != null ? JSON.stringify(value) : ''
+}
+
+function validateAndCoerceValue(question, rawValue, requireAnswer) {
+  const config = question.config || {}
+  const value = rawValue && typeof rawValue === 'object' ? rawValue : {}
+
+  if (question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') {
+    const text = String(value.text || '').trim()
+    if (requireAnswer && !text) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    return { text }
+  }
+  if (question.type === 'YES_NO') {
+    if (requireAnswer && !['SI', 'NO'].includes(value.optionId)) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    return { optionId: ['SI', 'NO'].includes(value.optionId) ? value.optionId : null }
+  }
+  if (question.type === 'SINGLE_CHOICE' || question.type === 'DROPDOWN' || question.type === 'IMAGE_CHOICE') {
+    const validIds = new Set((config.options || []).map(option => option.id))
+    const optionId = validIds.has(value.optionId) ? value.optionId : null
+    if (requireAnswer && !optionId) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    return { optionId }
+  }
+  if (question.type === 'MULTIPLE_CHOICE') {
+    const validIds = new Set((config.options || []).map(option => option.id))
+    const optionIds = Array.isArray(value.optionIds) ? value.optionIds.filter(id => validIds.has(id)) : []
+    if (requireAnswer && !optionIds.length) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    if (config.minSelected && optionIds.length && optionIds.length < config.minSelected) fail(400, `Selecciona al menos ${config.minSelected} opciones en "${question.prompt}"`)
+    if (config.maxSelected && optionIds.length > config.maxSelected) fail(400, `Selecciona máximo ${config.maxSelected} opciones en "${question.prompt}"`)
+    return { optionIds }
+  }
+  if (question.type === 'NUMBER') {
+    const number = value.number === '' || value.number == null ? null : Number(value.number)
+    if (requireAnswer && (number === null || Number.isNaN(number))) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    if (number != null && config.min != null && number < config.min) fail(400, `El valor de "${question.prompt}" debe ser mayor o igual a ${config.min}`)
+    if (number != null && config.max != null && number > config.max) fail(400, `El valor de "${question.prompt}" debe ser menor o igual a ${config.max}`)
+    return { number: Number.isFinite(number) ? number : null }
+  }
+  if (question.type === 'DATE') {
+    const date = value.date ? String(value.date) : null
+    if (requireAnswer && !date) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    return { date }
+  }
+  if (question.type === 'SCALE' || question.type === 'RATING') {
+    const min = Number(config.min) || 1
+    const max = Number(config.max) || 5
+    const scaleValue = value.value == null ? null : Number(value.value)
+    if (requireAnswer && (scaleValue === null || Number.isNaN(scaleValue))) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    if (scaleValue != null && (scaleValue < min || scaleValue > max)) fail(400, `El valor de "${question.prompt}" está fuera de rango`)
+    return { value: Number.isFinite(scaleValue) ? scaleValue : null }
+  }
+  if (question.type === 'NPS') {
+    const scaleValue = value.value == null ? null : Number(value.value)
+    if (requireAnswer && (scaleValue === null || Number.isNaN(scaleValue))) fail(400, `La pregunta "${question.prompt}" es obligatoria`)
+    if (scaleValue != null && (scaleValue < 0 || scaleValue > 10)) fail(400, `El valor de "${question.prompt}" está fuera de rango`)
+    return { value: Number.isFinite(scaleValue) ? scaleValue : null }
+  }
+  if (question.type === 'LIKERT_MATRIX') {
+    const rowIds = new Set((config.rows || []).map(row => row.id))
+    const rows = {}
+    for (const [rowId, rowValue] of Object.entries(value.rows || {})) {
+      if (rowIds.has(rowId)) rows[rowId] = Number(rowValue)
+    }
+    if (requireAnswer && rowIds.size && Object.keys(rows).length < rowIds.size) fail(400, `Completa todas las filas de "${question.prompt}"`)
+    return { rows }
+  }
+  // Tipos avanzados de fase 2 (matching, ranking, emoji_scale, file_upload): se guarda el valor tal
+  // cual, sin validacion fina todavia; el constructor de fase 1 no los ofrece.
+  return value
+}
+
+surveysPublicRouter.post('/:slug/responses', async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    const survey = await loadPublicSurvey(String(request.params.slug))
+    if (!survey) return response.status(404).json({ error: 'Encuesta no encontrada' })
+    if (survey.status !== 'PUBLICADA') return response.status(410).json({ error: 'Esta encuesta no está disponible para recibir respuestas' })
+    if (!isWithinWindow(survey)) return response.status(410).json({ error: 'Esta encuesta no está disponible en este momento' })
+
+    let membershipId = null
+    if (survey.require_login) {
+      const context = await getSessionContext(request)
+      if (!context) return response.status(401).json({ error: 'Debes iniciar sesión para responder esta encuesta' })
+      membershipId = context.membershipId
+    } else {
+      const context = await getSessionContext(request).catch(() => null)
+      if (context) membershipId = context.membershipId
+    }
+
+    const body = request.body || {}
+    const completed = Boolean(body.completed)
+    const questions = survey.pages.flatMap(page => page.questions)
+    const incoming = new Map((Array.isArray(body.items) ? body.items : []).map(item => [Number(item.questionId), item.value]))
+
+    const prepared = questions.map(question => {
+      const rawValue = incoming.get(question.id)
+      const value = validateAndCoerceValue(question, rawValue, completed && question.required)
+      return { question, value }
+    })
+
+    await client.query('BEGIN')
+
+    // Si el cliente ya trae un responseId (guardado parcial de un paso anterior), se actualiza el
+    // mismo registro en vez de crear uno nuevo — asi se distinguen respuestas completas de parciales
+    // sin duplicar filas por cada paso del formulario.
+    let responseId = null
+    if (body.responseId) {
+      const existing = await client.query('SELECT id FROM survey_responses WHERE id = $1 AND survey_id = $2', [Number(body.responseId), survey.id])
+      if (existing.rows[0]) responseId = existing.rows[0].id
+    }
+
+    if (responseId) {
+      await client.query(
+        `UPDATE survey_responses SET completed = $1, submitted_at = CASE WHEN $1 THEN NOW() ELSE submitted_at END,
+                respondent_membership_id = COALESCE(respondent_membership_id, $2)
+         WHERE id = $3`,
+        [completed, membershipId, responseId],
+      )
+    } else {
+      const monthReported = new Date().toISOString().slice(0, 7)
+      const inserted = await client.query(
+        `INSERT INTO survey_responses (survey_id, respondent_membership_id, month_reported, channel, device_fingerprint, completed, submitted_at, ip_address, user_agent)
+         VALUES ($1,$2,$3,'PUBLIC_LINK',$4,$5,$6,$7,$8) RETURNING id`,
+        [survey.id, membershipId, monthReported, body.deviceId || null, completed, completed ? new Date() : null, request.ip, String(request.headers['user-agent'] || '').slice(0, 500)],
+      )
+      responseId = inserted.rows[0].id
+    }
+
+    for (const { question, value } of prepared) {
+      const hasValue = value && Object.values(value).some(entry => entry != null && entry !== '' && !(Array.isArray(entry) && !entry.length) && !(typeof entry === 'object' && !Array.isArray(entry) && !Object.keys(entry).length))
+      if (!hasValue) continue
+      await client.query(
+        `INSERT INTO survey_response_items (response_id, question_id, value, text_value) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (response_id, question_id) DO UPDATE SET value = EXCLUDED.value, text_value = EXCLUDED.text_value`,
+        [responseId, question.id, JSON.stringify(value), deriveTextValue(question, value)],
+      )
+    }
+    await client.query('COMMIT')
+    response.status(201).json({ ok: true, responseId: String(responseId), thankYouMessage: survey.thank_you_message })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    next(error)
+  } finally { client.release() }
+})

@@ -409,3 +409,101 @@ CREATE TABLE IF NOT EXISTS adherence_plan_followup_evidence (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS adherence_plan_followup_evidence_followup_idx ON adherence_plan_followup_evidence(followup_id);
+
+-- Encuestas: constructor tipo formulario, publicacion con enlace publico estable y analitica.
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('surveys', 'Encuestas', 'Constructor de encuestas, enlace publico de captacion y analitica de respuestas', '/app/encuestas', 'clipboard-list', 14, TRUE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
+INSERT INTO permissions (key, name, description) VALUES
+  ('surveys.view', 'Ver encuestas', 'Consultar encuestas, respuestas y resultados'),
+  ('surveys.create', 'Crear encuestas', 'Crear nuevas encuestas y duplicar existentes'),
+  ('surveys.edit', 'Editar encuestas', 'Construir la estructura, publicar, cerrar y reabrir encuestas'),
+  ('surveys.delete', 'Eliminar encuestas', 'Eliminar encuestas y su contenido'),
+  ('surveys.export', 'Exportar encuestas', 'Exportar respuestas a Excel/CSV')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+CREATE TABLE IF NOT EXISTS surveys (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  cover_image TEXT,
+  audience TEXT NOT NULL DEFAULT 'CLIENTE_EXTERNO' CHECK (audience IN ('CLIENTE_INTERNO', 'CLIENTE_EXTERNO')),
+  status TEXT NOT NULL DEFAULT 'BORRADOR' CHECK (status IN ('BORRADOR', 'PUBLICADA', 'CERRADA')),
+  allow_multiple_responses BOOLEAN NOT NULL DEFAULT FALSE,
+  require_login BOOLEAN NOT NULL DEFAULT FALSE,
+  theme_color TEXT NOT NULL DEFAULT '#1F6F4A',
+  thank_you_message TEXT NOT NULL DEFAULT 'Gracias por participar. Tu respuesta fue registrada correctamente.',
+  opens_at TIMESTAMPTZ,
+  closes_at TIMESTAMPTZ,
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  published_at TIMESTAMPTZ,
+  closed_at TIMESTAMPTZ,
+  UNIQUE (organization_id, code)
+);
+CREATE INDEX IF NOT EXISTS surveys_org_idx ON surveys(organization_id, status);
+
+CREATE TABLE IF NOT EXISTS survey_pages (
+  id BIGSERIAL PRIMARY KEY,
+  survey_id BIGINT NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  title TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS survey_pages_survey_idx ON survey_pages(survey_id, order_index);
+
+-- El enum de tipos ya incluye los tipos avanzados de fase 2 (matching, ranking, imagenes, NPS, estrellas,
+-- archivo) para no rehacer el modelo de datos; el constructor de la fase 1 solo ofrece los tipos basicos.
+CREATE TABLE IF NOT EXISTS survey_questions (
+  id BIGSERIAL PRIMARY KEY,
+  page_id BIGINT NOT NULL REFERENCES survey_pages(id) ON DELETE CASCADE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  type TEXT NOT NULL CHECK (type IN (
+    'SHORT_TEXT', 'LONG_TEXT', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'DROPDOWN', 'YES_NO', 'NUMBER', 'DATE',
+    'SCALE', 'LIKERT_MATRIX', 'MATCHING', 'RANKING', 'IMAGE_CHOICE', 'EMOJI_SCALE', 'NPS', 'RATING', 'FILE_UPLOAD'
+  )),
+  prompt TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  image_url TEXT,
+  required BOOLEAN NOT NULL DEFAULT FALSE,
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  logic JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS survey_questions_page_idx ON survey_questions(page_id, order_index);
+
+CREATE TABLE IF NOT EXISTS survey_responses (
+  id BIGSERIAL PRIMARY KEY,
+  survey_id BIGINT NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+  respondent_membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL,
+  month_reported TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT 'PUBLIC_LINK',
+  device_fingerprint TEXT,
+  completed BOOLEAN NOT NULL DEFAULT FALSE,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  submitted_at TIMESTAMPTZ,
+  ip_address TEXT,
+  user_agent TEXT
+);
+CREATE INDEX IF NOT EXISTS survey_responses_survey_idx ON survey_responses(survey_id, completed, month_reported);
+
+-- El valor tipado vive en "value" (JSON segun el tipo de pregunta); "text_value" es una proyeccion
+-- de solo lectura para exportacion/CSV y busqueda, nunca la fuente de verdad.
+CREATE TABLE IF NOT EXISTS survey_response_items (
+  id BIGSERIAL PRIMARY KEY,
+  response_id BIGINT NOT NULL REFERENCES survey_responses(id) ON DELETE CASCADE,
+  question_id BIGINT NOT NULL REFERENCES survey_questions(id) ON DELETE CASCADE,
+  value JSONB NOT NULL,
+  text_value TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (response_id, question_id)
+);
+CREATE INDEX IF NOT EXISTS survey_response_items_question_idx ON survey_response_items(question_id);

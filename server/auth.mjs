@@ -12,6 +12,7 @@ const USUARIO_MODULE_PERMISSIONS = {
   'internal-audits': [],
   almera: ['almera.assistance.view'],
   dashboard: ['dashboard.view'],
+  surveys: ['surveys.view', 'surveys.export'],
 }
 
 // adherence-matrix es un caso especial: el permiso depende de la funcion elegida al habilitar

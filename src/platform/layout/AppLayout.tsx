@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck,
+  Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck, ClipboardList,
   FileBarChart2, Headphones, LayoutDashboard, LogOut, Menu, Search, Settings,
   ShieldCheck, Sparkles, Users, X,
 } from 'lucide-react'
@@ -12,6 +12,7 @@ import { Badge, moduleIdentity } from '@/design-system'
 const icons = {
   'layout-dashboard': LayoutDashboard,
   'clipboard-check': ClipboardCheck,
+  'clipboard-list': ClipboardList,
   'check-square': CheckSquare,
   headphones: Headphones,
   archive: Archive,
