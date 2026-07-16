@@ -206,6 +206,7 @@ function PublicSurveyContent() {
       </div>
 
       <div className="survey-public-content">
+        {survey.cover_image && <div className="survey-public-banner"><img src={survey.cover_image} alt="" /></div>}
         <header className="survey-public-hero">
           <h1>{survey.title}</h1>
           {survey.description && <p>{survey.description}</p>}

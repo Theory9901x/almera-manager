@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, BarChart3, Copy, GripVertical, Loader2, Monitor, Plus, Rocket, RotateCcw,
+  ArrowLeft, BarChart3, Copy, GripVertical, ImagePlus, Loader2, Monitor, Plus, Rocket, RotateCcw,
   Settings, Smartphone, Square, Trash2, X,
 } from 'lucide-react'
 import {
-  Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, ToastProvider, moduleIdentity, useToast,
+  Badge, Button, Card, Field, Input, Select, Textarea, ToastProvider, moduleIdentity, useToast,
 } from '@/design-system'
 import { surveysService } from '../services/surveysService'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -63,7 +63,9 @@ function SurveyBuilderContent() {
   const [deletePage, setDeletePage] = useState<SurveyPage | null>(null)
   const [deleteQuestion, setDeleteQuestion] = useState<SurveyQuestion | null>(null)
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('mobile')
+  const [coverUploading, setCoverUploading] = useState(false)
   const timers = useRef<Record<string, number>>({})
+  const pendingMetaPatch = useRef<Record<string, unknown>>({})
 
   async function load(preserveSelection = true) {
     if (!surveyId) return
@@ -93,10 +95,26 @@ function SurveyBuilderContent() {
   async function saveMeta(patch: Record<string, unknown>) {
     if (!survey) return
     setSurvey({ ...survey, ...patch as Partial<SurveyDetail> })
+    // Se acumulan los cambios pendientes en vez de reemplazarlos: si se edita el título y luego,
+    // dentro de la misma ventana de espera, se sube la portada (o viceversa), ambos cambios se
+    // guardan juntos en vez de que el ultimo cambio descarte al anterior.
+    pendingMetaPatch.current = { ...pendingMetaPatch.current, ...patch }
     debounced('meta', async () => {
-      try { await surveysService.update(survey.id, patch) }
+      const toSend = pendingMetaPatch.current
+      pendingMetaPatch.current = {}
+      try { await surveysService.update(survey.id, toSend) }
       catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar') }
     })
+  }
+
+  async function uploadCoverImage(file: File | undefined) {
+    if (!survey || !file) return
+    setCoverUploading(true)
+    try {
+      const result = await surveysService.uploadMedia(survey.id, file)
+      await saveMeta({ coverImage: result.url })
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible subir la imagen') }
+    finally { setCoverUploading(false) }
   }
 
   async function addPage() {
@@ -178,25 +196,42 @@ function SurveyBuilderContent() {
 
   return (
     <div className="survey-builder mx-auto max-w-[1500px] space-y-2">
-      <PageHeader
-        eyebrow="Constructor"
-        title={survey.title}
-        identity={identity}
-        description={`${survey.code} · ${survey.pages.reduce((total, page) => total + page.questions.length, 0)} preguntas`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={survey.status === 'PUBLICADA' ? 'info' : 'neutral'}>{survey.status === 'BORRADOR' ? 'Borrador' : survey.status === 'PUBLICADA' ? 'Publicada' : 'Cerrada'}</Badge>
-            <Button variant="secondary" onClick={() => navigate('/app/encuestas')}><ArrowLeft size={15} /> Encuestas</Button>
-            <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/resultados`)}><BarChart3 size={15} /> Resultados</Button>
-            <Button variant="secondary" onClick={() => setShowSettings(true)}><Settings size={15} /> Configuración</Button>
-            <Button identity={identity} onClick={publishToggle}>
-              {survey.status === 'BORRADOR' && <><Rocket size={15} /> Publicar</>}
-              {survey.status === 'PUBLICADA' && <><Square size={15} /> Cerrar</>}
-              {survey.status === 'CERRADA' && <><RotateCcw size={15} /> Reabrir</>}
-            </Button>
+      <header className="survey-builder-header" style={{ ['--ds-accent-from' as string]: identity.gradientFrom, ['--ds-accent-to' as string]: identity.gradientTo }}>
+        <div className="survey-builder-header-main">
+          <div className={`survey-cover-picker ${survey.cover_image ? 'has-image' : ''}`}>
+            {survey.cover_image && <img src={survey.cover_image} alt="" />}
+            <label className="survey-cover-picker-button">
+              <input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onChange={event => uploadCoverImage(event.target.files?.[0])} />
+              {coverUploading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+              {survey.cover_image ? 'Cambiar' : 'Imagen de portada'}
+            </label>
+            {survey.cover_image && (
+              <button type="button" className="survey-cover-remove" title="Quitar imagen" onClick={() => saveMeta({ coverImage: null })}><X size={12} /></button>
+            )}
           </div>
-        }
-      />
+          <div className="min-w-0 flex-1">
+            <p className="ds-eyebrow" style={{ color: identity.color }}>Constructor</p>
+            <input
+              className="survey-title-input"
+              value={survey.title}
+              placeholder="Título de la encuesta"
+              onChange={event => saveMeta({ title: event.target.value })}
+            />
+            <p className="survey-builder-subtitle">{survey.code} · {survey.pages.reduce((total, page) => total + page.questions.length, 0)} preguntas</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={survey.status === 'PUBLICADA' ? 'info' : 'neutral'}>{survey.status === 'BORRADOR' ? 'Borrador' : survey.status === 'PUBLICADA' ? 'Publicada' : 'Cerrada'}</Badge>
+          <Button variant="secondary" onClick={() => navigate('/app/encuestas')}><ArrowLeft size={15} /> Encuestas</Button>
+          <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/resultados`)}><BarChart3 size={15} /> Resultados</Button>
+          <Button variant="secondary" onClick={() => setShowSettings(true)}><Settings size={15} /> Configuración</Button>
+          <Button identity={identity} onClick={publishToggle}>
+            {survey.status === 'BORRADOR' && <><Rocket size={15} /> Publicar</>}
+            {survey.status === 'PUBLICADA' && <><Square size={15} /> Cerrar</>}
+            {survey.status === 'CERRADA' && <><RotateCcw size={15} /> Reabrir</>}
+          </Button>
+        </div>
+      </header>
 
       <div className="survey-builder-grid">
         <Card accent={identity.color} className="survey-builder-nav">
