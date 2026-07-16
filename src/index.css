@@ -1822,7 +1822,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-public-content { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 24px 20px 80px; }
 .survey-public-hero {
   position: relative; overflow: hidden; border-radius: 24px; padding: 40px 28px; margin-bottom: 18px; color: #fff; text-align: center;
-  background: linear-gradient(135deg, var(--survey-accent, #0F7A54), color-mix(in srgb, var(--survey-accent, #0F7A54) 55%, #12314f));
+  /* El extremo oscuro del degradado se deriva del MISMO acento (mezclado con negro), no de un azul
+     marino fijo — asi combina bien con cualquier color de marca (verde, morado, el que sea) en vez
+     de asumir que siempre va a ser verde. */
+  background: linear-gradient(135deg, var(--survey-accent, #0F7A54), color-mix(in srgb, var(--survey-accent, #0F7A54) 62%, black));
   box-shadow: 0 1px 2px color-mix(in srgb, var(--survey-accent, #0F7A54) 20%, transparent), 0 20px 40px color-mix(in srgb, var(--survey-accent, #0F7A54) 25%, transparent);
 }
 .survey-public-hero::before {
