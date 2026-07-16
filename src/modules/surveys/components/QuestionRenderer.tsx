@@ -240,8 +240,14 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
       case 'MATCHING': {
         const items = (config.items as SurveyOption[]) || []
         const targets = (config.targets as MatchingTarget[]) || []
-        const pairs = (value as { pairs?: Record<string, string> } | undefined)?.pairs || {}
-        return <MatchingControl items={items} targets={targets} pairs={pairs} color={color} disabled={disabled} onChange={next => onChange({ pairs: next })} />
+        const pairs = (value as { pairs?: Record<string, string[]> } | undefined)?.pairs || {}
+        return (
+          <MatchingControl
+            items={items} targets={targets} pairs={pairs} color={color} disabled={disabled}
+            sceneImage={config.sceneImage as string | undefined} sceneCaption={config.sceneCaption as string | undefined}
+            onChange={next => onChange({ pairs: next })}
+          />
+        )
       }
       default:
         return <p className="survey-unsupported">Este tipo de pregunta se habilita en una fase siguiente.</p>

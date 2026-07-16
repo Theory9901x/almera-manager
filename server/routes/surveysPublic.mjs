@@ -136,7 +136,9 @@ function deriveTextValue(question, value) {
   if (question.type === 'MATCHING') {
     const itemsById = new Map((config.items || []).map(item => [item.id, item.label]))
     const targetsById = new Map((config.targets || []).map(target => [target.id, target.label]))
-    return Object.entries(value?.pairs || {}).map(([itemId, targetId]) => `${itemsById.get(itemId) || itemId} → ${targetsById.get(targetId) || targetId}`).join(' | ')
+    return Object.entries(value?.pairs || {})
+      .map(([itemId, targetIds]) => `${itemsById.get(itemId) || itemId} → ${(Array.isArray(targetIds) ? targetIds : []).map(id => targetsById.get(id) || id).join(', ')}`)
+      .join(' | ')
   }
   return value != null ? JSON.stringify(value) : ''
 }
@@ -217,11 +219,15 @@ function validateAndCoerceValue(question, rawValue, requireAnswer) {
     return { order }
   }
   if (question.type === 'MATCHING') {
+    // Cada elemento se puede ubicar en varias lineas a la vez (se clona, no se consume): el
+    // valor por elemento es la LISTA de grupos donde quedo colocado, no un unico grupo.
     const validItemIds = new Set((config.items || []).map(item => item.id))
     const validTargetIds = new Set((config.targets || []).map(target => target.id))
     const pairs = {}
-    for (const [itemId, targetId] of Object.entries(value.pairs || {})) {
-      if (validItemIds.has(itemId) && validTargetIds.has(targetId)) pairs[itemId] = targetId
+    for (const [itemId, targetIds] of Object.entries(value.pairs || {})) {
+      if (!validItemIds.has(itemId)) continue
+      const list = Array.isArray(targetIds) ? [...new Set(targetIds.filter(id => validTargetIds.has(id)))] : []
+      if (list.length) pairs[itemId] = list
     }
     if (requireAnswer && Object.keys(pairs).length < validItemIds.size) fail(400, `Ubica todos los elementos de "${question.prompt}"`)
     return { pairs }

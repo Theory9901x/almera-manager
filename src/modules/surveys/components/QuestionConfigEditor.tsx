@@ -170,6 +170,15 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
           {items.map((item, index) => (
             <div key={item.id} className="survey-config-option-row">
               <GripVertical size={14} className="survey-config-drag" />
+              <input
+                type="color" className="survey-config-color" title="Color del elemento"
+                value={item.color || '#94a3b8'}
+                onChange={event => {
+                  const next = items.slice()
+                  next[index] = { ...item, color: event.target.value }
+                  onChange({ ...config, items: next })
+                }}
+              />
               <ImageUploadButton surveyId={surveyId} value={item.imageUrl} onChange={url => {
                 const next = items.slice()
                 next[index] = { ...item, imageUrl: url }
@@ -201,6 +210,15 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
           {targets.map((target, index) => (
             <div key={target.id} className="survey-config-option-row">
               <GripVertical size={14} className="survey-config-drag" />
+              <input
+                type="color" className="survey-config-color" title="Color del grupo"
+                value={target.color || '#0F7A54'}
+                onChange={event => {
+                  const next = targets.slice()
+                  next[index] = { ...target, color: event.target.value }
+                  onChange({ ...config, targets: next })
+                }}
+              />
               <Input
                 value={target.label}
                 placeholder={`Grupo ${index + 1}`}
@@ -219,7 +237,17 @@ export function QuestionConfigEditor({ type, config, surveyId, onChange }: {
         <button type="button" className="survey-config-add" onClick={() => onChange({ ...config, targets: [...targets, { id: newId('tgt'), label: '' }] })}>
           <Plus size={14} /> Agregar grupo
         </button>
-        <p className="survey-config-empty">La calificación automática (respuesta correcta) llega en una fase siguiente; por ahora se tabulan las combinaciones más frecuentes.</p>
+
+        <p className="survey-config-label" style={{ marginTop: 8 }}>Escena decorativa (opcional)</p>
+        <div className="survey-config-option-row">
+          <ImageUploadButton surveyId={surveyId} value={config.sceneImage as string | undefined} onChange={url => onChange({ ...config, sceneImage: url })} />
+          <Input
+            value={(config.sceneCaption as string) || ''}
+            placeholder="Leyenda bajo la imagen (opcional)"
+            onChange={event => onChange({ ...config, sceneCaption: event.target.value })}
+          />
+        </div>
+        <p className="survey-config-empty">Cada elemento puede ubicarse en varios grupos a la vez. La clave de calificación (respuesta correcta) se administra por API/base de datos; aquí se tabulan las combinaciones más frecuentes.</p>
       </div>
     )
   }

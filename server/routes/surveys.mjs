@@ -70,6 +70,7 @@ function normalizeOption(option) {
     label: String(option.label || '').trim(),
     imageUrl: option.imageUrl || undefined,
     emoji: option.emoji || undefined,
+    color: option.color || undefined,
   }
 }
 
@@ -114,16 +115,26 @@ function normalizeConfig(type, config = {}) {
     const items = Array.isArray(base.items) ? base.items : []
     const targets = Array.isArray(base.targets) ? base.targets : []
     const normalizedItems = items.map(normalizeOption)
-    const normalizedTargets = targets.map(target => ({ id: target.id || `tgt_${slugToken()}`, label: String(target.label || '').trim() }))
+    const normalizedTargets = targets.map(target => ({ id: target.id || `tgt_${slugToken()}`, label: String(target.label || '').trim(), color: target.color || undefined }))
     const validItemIds = new Set(normalizedItems.map(item => item.id))
     const validTargetIds = new Set(normalizedTargets.map(target => target.id))
+    // correctPairs: targetId -> lista de itemIds correctos ahi (un item puede ser correcto en
+    // varios grupos a la vez).
     const correctPairs = {}
     if (base.correctPairs && typeof base.correctPairs === 'object') {
-      for (const [itemId, targetId] of Object.entries(base.correctPairs)) {
-        if (validItemIds.has(itemId) && validTargetIds.has(targetId)) correctPairs[itemId] = targetId
+      for (const [targetId, itemIds] of Object.entries(base.correctPairs)) {
+        if (!validTargetIds.has(targetId)) continue
+        const list = Array.isArray(itemIds) ? itemIds.filter(id => validItemIds.has(id)) : []
+        if (list.length) correctPairs[targetId] = list
       }
     }
-    return { items: normalizedItems, targets: normalizedTargets, correctPairs }
+    return {
+      items: normalizedItems,
+      targets: normalizedTargets,
+      correctPairs,
+      sceneImage: base.sceneImage || undefined,
+      sceneCaption: base.sceneCaption || undefined,
+    }
   }
   if (type === 'EMOJI_SCALE') {
     const steps = Array.isArray(base.steps) ? base.steps : []
@@ -792,22 +803,26 @@ function computeQuestionStats(question, items) {
   }
 
   if (question.type === 'MATCHING') {
+    // Cada elemento puede quedar en varias lineas a la vez (pairs[itemId] es una LISTA de
+    // targetIds), asi que un solo elemento puede sumar conteo/aciertos en mas de un grupo por
+    // respuesta. La clave de calificacion tambien es por grupo: correctPairs[targetId] = [itemIds].
     const items_ = config.items || []
     const targets = config.targets || []
     const correctPairs = config.correctPairs || {}
-    const hasKey = Object.keys(correctPairs).length > 0
+    const totalExpected = Object.values(correctPairs).reduce((sum, list) => sum + list.length, 0)
     const counts = new Map(items_.map(item => [item.id, new Map(targets.map(target => [target.id, 0]))]))
     let answered = 0
     let correct = 0
-    let graded = 0
     for (const responseItem of items) {
       const pairs = (responseItem.value || {}).pairs || {}
       if (!Object.keys(pairs).length) continue
       answered += 1
-      for (const [itemId, targetId] of Object.entries(pairs)) {
+      for (const [itemId, targetIds] of Object.entries(pairs)) {
         const perItem = counts.get(itemId)
-        if (perItem && perItem.has(targetId)) perItem.set(targetId, perItem.get(targetId) + 1)
-        if (hasKey && correctPairs[itemId]) { graded += 1; if (correctPairs[itemId] === targetId) correct += 1 }
+        for (const targetId of (Array.isArray(targetIds) ? targetIds : [])) {
+          if (perItem && perItem.has(targetId)) perItem.set(targetId, perItem.get(targetId) + 1)
+          if ((correctPairs[targetId] || []).includes(itemId)) correct += 1
+        }
       }
     }
     const matching = items_.map(item => {
@@ -820,7 +835,8 @@ function computeQuestionStats(question, items) {
         breakdown: targets.map(target => ({ targetId: target.id, label: target.label, count: perItem.get(target.id) || 0 })),
       }
     })
-    return { totalAnswered: answered, matching, accuracyPercent: graded ? Math.round((correct / graded) * 100) : null }
+    const accuracyPercent = totalExpected && answered ? Math.round((correct / (totalExpected * answered)) * 100) : null
+    return { totalAnswered: answered, matching, accuracyPercent }
   }
 
   if (question.type === 'LIKERT_MATRIX') {

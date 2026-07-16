@@ -12,16 +12,20 @@ export const BASIC_QUESTION_TYPES: QuestionType[] = [
   'SCALE', 'LIKERT_MATRIX',
 ]
 
-export interface SurveyOption { id: string; label: string; imageUrl?: string; emoji?: string }
+export interface SurveyOption { id: string; label: string; imageUrl?: string; emoji?: string; color?: string }
 export interface LikertRow { id: string; label: string }
-export interface MatchingTarget { id: string; label: string }
+export interface MatchingTarget { id: string; label: string; color?: string }
 export interface EmojiStep { emoji: string; label?: string }
 
 export interface ChoiceConfig { options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null; multiple?: boolean }
 export interface ScaleConfig { min: number; max: number; minLabel?: string; maxLabel?: string }
 export interface LikertConfig { rows: LikertRow[]; scaleMin: number; scaleMax: number; scaleLabels?: string[] }
 export interface NumberConfig { min?: number | null; max?: number | null }
-export interface MatchingConfig { items: SurveyOption[]; targets: MatchingTarget[]; correctPairs?: Record<string, string> }
+// correctPairs: targetId -> lista de itemIds correctos para ese grupo (un mismo item puede ser
+// correcto en varios grupos a la vez, ej. un ODS valido en dos lineas del programa).
+// sceneImage/sceneCaption: escena decorativa opcional (ej. imagen + leyenda) junto al banco de
+// elementos — pensada para ilustraciones tipo "mundo con manos", no obligatoria para todo matching.
+export interface MatchingConfig { items: SurveyOption[]; targets: MatchingTarget[]; correctPairs?: Record<string, string[]>; sceneImage?: string; sceneCaption?: string }
 export interface RankingConfig { options: SurveyOption[] }
 export interface EmojiScaleConfig { steps: EmojiStep[] }
 export interface RatingConfig { max: number }
@@ -178,5 +182,5 @@ export type AnswerValue =
   | { date: string | null }
   | { value: number | null }
   | { rows: Record<string, number> }
-  | { pairs: Record<string, string> }
+  | { pairs: Record<string, string[]> }
   | { order: string[] }

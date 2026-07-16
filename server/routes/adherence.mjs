@@ -11,7 +11,9 @@ import { renderAdherenceDashboardHtml } from '../templates/adherenceDashboardRep
 
 export const adherenceRouter = Router()
 
-const uploadRoot = resolve(process.env.UPLOAD_DIR || 'uploads/adherence')
+// Nombre de variable propio (antes UPLOAD_DIR, compartido por error con almera.mjs): si se
+// configuraba una sola vez, ambos modulos apuntaban a la misma carpeta.
+const uploadRoot = resolve(process.env.ADHERENCE_UPLOAD_DIR || 'uploads/adherence')
 await mkdir(uploadRoot, { recursive: true })
 
 const allowedEvidenceMimeTypes = new Set([

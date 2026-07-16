@@ -25,7 +25,9 @@ function fail(status, message) {
   throw error
 }
 
-const uploadRoot = resolve(process.env.UPLOAD_DIR || 'uploads/almera')
+// Nombre de variable propio (antes UPLOAD_DIR, compartido por error con adherence.mjs): si se
+// configuraba una sola vez, ambos modulos apuntaban a la misma carpeta.
+const uploadRoot = resolve(process.env.ALMERA_UPLOAD_DIR || 'uploads/almera')
 await mkdir(uploadRoot, { recursive: true })
 
 const allowedMimeTypes = new Set([
