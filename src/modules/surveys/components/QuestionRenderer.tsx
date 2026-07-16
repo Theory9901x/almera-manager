@@ -100,7 +100,10 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
         return (
           <div className="survey-options-stack">
             {options.map(option => (
-              <OptionCard key={option.id} label={option.label} emoji={option.emoji} selected={optionId === option.id} color={color} disabled={disabled} shape={optionShape} onClick={() => onChange({ optionId: option.id })} />
+              <OptionCard
+                key={option.id} label={option.label} emoji={option.emoji} selected={optionId === option.id} color={color} disabled={disabled}
+                shape={optionShape} lineColor={option.color} onClick={() => onChange({ optionId: option.id })}
+              />
             ))}
           </div>
         )
@@ -115,6 +118,7 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
               return (
                 <OptionCard
                   key={option.id} label={option.label} emoji={option.emoji} selected={selected} multiple color={color} disabled={disabled} shape={optionShape}
+                  lineColor={option.color}
                   onClick={() => {
                     const next = new Set(optionIds)
                     if (selected) next.delete(option.id); else next.add(option.id)
