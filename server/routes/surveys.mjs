@@ -74,6 +74,17 @@ function normalizeOption(option) {
   }
 }
 
+// cardAccent: activa el estilo de tarjeta de linea (borde, icono, pastilla) sobre una pregunta de
+// opciones ya existente — puramente visual, no afecta validacion ni calculo de puntaje.
+function normalizeCardAccent(cardAccent) {
+  if (!cardAccent || typeof cardAccent !== 'object' || !cardAccent.color) return undefined
+  return {
+    color: String(cardAccent.color),
+    icon: cardAccent.icon ? String(cardAccent.icon) : undefined,
+    badge: cardAccent.badge ? String(cardAccent.badge) : undefined,
+  }
+}
+
 function normalizeConfig(type, config = {}) {
   const base = config && typeof config === 'object' ? config : {}
   if (CHOICE_TYPES.has(type) && type !== 'YES_NO') {
@@ -85,6 +96,7 @@ function normalizeConfig(type, config = {}) {
       minSelected: base.minSelected != null ? Number(base.minSelected) : null,
       maxSelected: base.maxSelected != null ? Number(base.maxSelected) : null,
       multiple: type === 'IMAGE_CHOICE' ? Boolean(base.multiple) : undefined,
+      cardAccent: normalizeCardAccent(base.cardAccent),
     }
   }
   if (type === 'SCALE') {
@@ -115,7 +127,13 @@ function normalizeConfig(type, config = {}) {
     const items = Array.isArray(base.items) ? base.items : []
     const targets = Array.isArray(base.targets) ? base.targets : []
     const normalizedItems = items.map(normalizeOption)
-    const normalizedTargets = targets.map(target => ({ id: target.id || `tgt_${slugToken()}`, label: String(target.label || '').trim(), color: target.color || undefined }))
+    const normalizedTargets = targets.map(target => ({
+      id: target.id || `tgt_${slugToken()}`,
+      label: String(target.label || '').trim(),
+      color: target.color || undefined,
+      icon: target.icon || undefined,
+      badge: target.badge || undefined,
+    }))
     const validItemIds = new Set(normalizedItems.map(item => item.id))
     const validTargetIds = new Set(normalizedTargets.map(target => target.id))
     // correctPairs: targetId -> lista de itemIds correctos ahi (un item puede ser correcto en

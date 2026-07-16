@@ -14,10 +14,16 @@ export const BASIC_QUESTION_TYPES: QuestionType[] = [
 
 export interface SurveyOption { id: string; label: string; imageUrl?: string; emoji?: string; color?: string }
 export interface LikertRow { id: string; label: string }
-export interface MatchingTarget { id: string; label: string; color?: string }
+// icon: nombre de icono decorativo (ver lineIcons.ts) para la tarjeta de la linea/grupo.
+// badge: texto corto de la pastilla de categoria mostrada en la tarjeta (ej. "SOLIDARIDAD").
+export interface MatchingTarget { id: string; label: string; color?: string; icon?: string; badge?: string }
 export interface EmojiStep { emoji: string; label?: string }
 
-export interface ChoiceConfig { options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null; multiple?: boolean }
+// cardAccent: activa el estilo de "tarjeta de linea" (borde superior de color, icono en cuadro
+// redondeado, pastilla de categoria y checks circulares de color) sobre una pregunta de opciones
+// existente, sin alterar su logica de seleccion/validacion.
+export interface CardAccent { color: string; icon?: string; badge?: string }
+export interface ChoiceConfig { options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null; multiple?: boolean; cardAccent?: CardAccent }
 export interface ScaleConfig { min: number; max: number; minLabel?: string; maxLabel?: string }
 export interface LikertConfig { rows: LikertRow[]; scaleMin: number; scaleMax: number; scaleLabels?: string[] }
 export interface NumberConfig { min?: number | null; max?: number | null }

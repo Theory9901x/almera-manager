@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { MatchingTarget, SurveyOption } from '../types'
+import { resolveLineIcon } from './lineIcons'
 
 function leadingMark(label: string): string | null {
   const match = label.match(/^(\d{1,3})[.)]/)
@@ -110,22 +111,34 @@ export function MatchingControl({ items, targets, pairs, onChange, color, disabl
         {targets.map(target => {
           const placedItems = items.filter(item => placementsOf(item.id).includes(target.id))
           const targetColor = target.color || color
+          const TargetIcon = resolveLineIcon(target.icon)
           return (
             <div
               key={target.id}
               className={`survey-matching-target ${overTarget === target.id ? 'is-over' : ''}`}
-              style={overTarget === target.id ? { borderColor: targetColor, boxShadow: `0 0 0 4px ${targetColor}22` } : undefined}
+              style={{
+                borderTopColor: targetColor,
+                ...(overTarget === target.id ? { borderColor: targetColor, boxShadow: `0 0 0 4px ${targetColor}22` } : {}),
+              }}
               onDragOver={event => { event.preventDefault(); setOverTarget(target.id) }}
               onDragLeave={() => setOverTarget(current => current === target.id ? null : current)}
               onDrop={event => { event.preventDefault(); setOverTarget(null); if (draggingId) assign(draggingId, target.id) }}
               onClick={() => { if (armedId) assign(armedId, target.id) }}
             >
               <h4 style={{ backgroundImage: `linear-gradient(135deg, ${targetColor}, ${targetColor}cc)` }}>
-                <span className="survey-matching-target-eyebrow">Línea</span>
-                {target.label}
+                <span className="survey-matching-target-icon"><TargetIcon size={18} /></span>
+                <span className="survey-matching-target-heading">
+                  <span className="survey-matching-target-eyebrow">Línea</span>
+                  {target.label}
+                </span>
               </h4>
               <div className="survey-matching-target-body">
-                {placedItems.length ? placedItems.map(item => placedChip(item, target.id)) : null}
+                {target.badge && (
+                  <span className="survey-matching-target-badge" style={{ background: `${targetColor}1a`, color: targetColor }}>{target.badge}</span>
+                )}
+                {placedItems.length
+                  ? placedItems.map(item => placedChip(item, target.id))
+                  : <span className="survey-matching-target-empty">Suelta aquí</span>}
               </div>
             </div>
           )

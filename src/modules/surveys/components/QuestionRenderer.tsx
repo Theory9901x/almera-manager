@@ -18,13 +18,15 @@ export interface RenderableQuestion {
 
 // Renderiza la pregunta interactiva real (no una maqueta): usado tanto en la pagina publica como en
 // la vista previa en vivo del constructor, para que ambas siempre coincidan pixel a pixel.
-export function QuestionRenderer({ question, value, onChange, color, error, disabled }: {
+export function QuestionRenderer({ question, value, onChange, color, error, disabled, optionShape }: {
   question: RenderableQuestion
   value: unknown
   onChange(value: unknown): void
   color: string
   error?: string
   disabled?: boolean
+  // Ver OptionCard: fuerza check circular de color en preguntas envueltas en una tarjeta de linea.
+  optionShape?: 'round' | 'square'
 }) {
   const config = question.config || {}
 
@@ -80,7 +82,7 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
         return (
           <div className="survey-options-stack">
             {options.map(option => (
-              <OptionCard key={option.id} label={option.label} emoji={option.emoji} selected={optionId === option.id} color={color} disabled={disabled} onClick={() => onChange({ optionId: option.id })} />
+              <OptionCard key={option.id} label={option.label} emoji={option.emoji} selected={optionId === option.id} color={color} disabled={disabled} shape={optionShape} onClick={() => onChange({ optionId: option.id })} />
             ))}
           </div>
         )
@@ -94,7 +96,7 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
               const selected = optionIds.has(option.id)
               return (
                 <OptionCard
-                  key={option.id} label={option.label} emoji={option.emoji} selected={selected} multiple color={color} disabled={disabled}
+                  key={option.id} label={option.label} emoji={option.emoji} selected={selected} multiple color={color} disabled={disabled} shape={optionShape}
                   onClick={() => {
                     const next = new Set(optionIds)
                     if (selected) next.delete(option.id); else next.add(option.id)

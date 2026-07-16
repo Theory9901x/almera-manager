@@ -6,7 +6,8 @@ import { ToastProvider, fadeSlideUp, useToast } from '@/design-system'
 import { publicSurveyService, PublicSurveyError } from '../services/publicSurveyService'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { useTilt } from '../components/useTilt'
-import type { PublicSurvey, PublicSurveyQuestion } from '../types'
+import { resolveLineIcon } from '../components/lineIcons'
+import type { CardAccent, PublicSurvey, PublicSurveyQuestion } from '../types'
 
 function deviceId() {
   const key = 'sgimr_survey_device_id'
@@ -293,20 +294,44 @@ function StepCard({ page, answers, fieldErrors, color, onAnswer }: {
     <div ref={tiltRef} className="survey-step-card">
       {(page.title || page.description) && (
         <div className="survey-step-card-head">
+          {page.title && (
+            <p className="survey-section-eyebrow" style={{ color }}>
+              <span className="survey-section-eyebrow-dash" style={{ background: color }} />
+              {page.title}
+            </p>
+          )}
           {page.title && <h2>{page.title}</h2>}
           {page.description && <p>{page.description}</p>}
         </div>
       )}
-      {page.questions.map((question, index) => (
-        <div key={question.id} className="survey-question">
-          <p className="survey-question-prompt">
-            <span className="survey-question-index">{index + 1}.</span> {question.prompt}
-            {question.required && <span className="survey-required-mark">*</span>}
-          </p>
-          {question.description && <p className="survey-question-hint">{question.description}</p>}
-          <QuestionRenderer question={question} value={answers[question.id]} onChange={value => onAnswer(question.id, value)} color={color} error={fieldErrors[question.id]} />
-        </div>
-      ))}
+      {page.questions.map((question, index) => {
+        const accent = question.config?.cardAccent as CardAccent | undefined
+        const body = (
+          <>
+            <p className="survey-question-prompt">
+              <span className="survey-question-index">{index + 1}.</span> {question.prompt}
+              {question.required && <span className="survey-required-mark">*</span>}
+            </p>
+            {question.description && <p className="survey-question-hint">{question.description}</p>}
+            <QuestionRenderer
+              question={question} value={answers[question.id]} onChange={value => onAnswer(question.id, value)}
+              color={accent?.color || color} error={fieldErrors[question.id]}
+              optionShape={accent ? 'round' : undefined}
+            />
+          </>
+        )
+        if (!accent) return <div key={question.id} className="survey-question">{body}</div>
+        const LineIcon = resolveLineIcon(accent.icon)
+        return (
+          <div key={question.id} className="survey-question survey-line-card" style={{ borderTopColor: accent.color }}>
+            <div className="survey-line-card-head">
+              <span className="survey-line-card-icon" style={{ background: accent.color }}><LineIcon size={18} /></span>
+              {accent.badge && <span className="survey-line-card-badge" style={{ background: `${accent.color}1a`, color: accent.color }}>{accent.badge}</span>}
+            </div>
+            {body}
+          </div>
+        )
+      })}
     </div>
   )
 }
