@@ -3,6 +3,7 @@ import { Select } from '@/design-system'
 import type { EmojiStep, MatchingTarget, PublicSurveyQuestion, QuestionConfig, SurveyOption } from '../types'
 import { OptionCard } from './OptionCard'
 import { ImageOptionCard } from './ImageOptionCard'
+import { FaceRatingControl } from './FaceRatingControl'
 import { ScaleControl } from './ScaleControl'
 import { RankingControl } from './RankingControl'
 import { MatchingControl } from './MatchingControl'
@@ -174,6 +175,9 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
         const multiple = Boolean(config.multiple)
         const optionId = (value as { optionId?: string | null } | undefined)?.optionId || null
         const optionIds = new Set((value as { optionIds?: string[] } | undefined)?.optionIds || [])
+        if (config.presentation === 'faces') {
+          return <FaceRatingControl options={options} value={optionId} disabled={disabled} onChange={next => onChange({ optionId: next })} />
+        }
         return (
           <div className="survey-image-grid">
             {options.map(option => {

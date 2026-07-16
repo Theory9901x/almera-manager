@@ -23,7 +23,21 @@ export interface EmojiStep { emoji: string; label?: string }
 // redondeado, pastilla de categoria y checks circulares de color) sobre una pregunta de opciones
 // existente, sin alterar su logica de seleccion/validacion.
 export interface CardAccent { color: string; icon?: string; badge?: string }
-export interface ChoiceConfig { options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null; multiple?: boolean; cardAccent?: CardAccent }
+// dependsOn: hace que las OPCIONES de esta pregunta cambien segun la respuesta ya dada a otra
+// pregunta de opcion unica (ej. "estrategia" depende de la "linea" elegida antes). Si el valor
+// elegido en la pregunta disparadora no tiene entrada en optionsByValue (linea sin estrategias
+// listadas en el formato oficial), whenUnmatched decide si la pregunta se oculta por completo
+// ('hide') o se reemplaza por un campo de texto libre opcional ('text').
+export interface DependsOn { questionId: string; optionsByValue: Record<string, SurveyOption[]>; whenUnmatched: 'hide' | 'text'; fallbackPrompt?: string }
+export interface ChoiceConfig {
+  options: SurveyOption[]; randomize?: boolean; minSelected?: number | null; maxSelected?: number | null; multiple?: boolean
+  cardAccent?: CardAccent
+  // presentation: 'faces' activa la tarjeta animada de carita (flotacion idle, tilt 3D, pop y halo
+  // de color al seleccionar) en vez de la grilla de imagen generica — pensada para escalas de
+  // satisfaccion con expresiones (ej. Tabita Excelente/Regular/Malo), no para seleccion de imagenes.
+  presentation?: 'grid' | 'faces'
+  dependsOn?: DependsOn
+}
 export interface ScaleConfig { min: number; max: number; minLabel?: string; maxLabel?: string }
 export interface LikertConfig { rows: LikertRow[]; scaleMin: number; scaleMax: number; scaleLabels?: string[] }
 export interface NumberConfig { min?: number | null; max?: number | null }

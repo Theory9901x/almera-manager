@@ -87,6 +87,23 @@ function normalizeCardAccent(cardAccent) {
   }
 }
 
+// dependsOn: las opciones de esta pregunta cambian segun la respuesta ya dada a otra pregunta de
+// opcion unica (ej. "estrategia" segun la "linea" elegida). whenUnmatched decide si un valor sin
+// entrada en optionsByValue oculta la pregunta o la reemplaza por texto libre opcional.
+function normalizeDependsOn(dependsOn) {
+  if (!dependsOn || typeof dependsOn !== 'object' || !dependsOn.questionId) return undefined
+  const optionsByValue = {}
+  for (const [triggerValue, options] of Object.entries(dependsOn.optionsByValue || {})) {
+    if (Array.isArray(options)) optionsByValue[triggerValue] = options.map(normalizeOption)
+  }
+  return {
+    questionId: String(dependsOn.questionId),
+    optionsByValue,
+    whenUnmatched: dependsOn.whenUnmatched === 'text' ? 'text' : 'hide',
+    fallbackPrompt: dependsOn.fallbackPrompt ? String(dependsOn.fallbackPrompt) : undefined,
+  }
+}
+
 function normalizeConfig(type, config = {}) {
   const base = config && typeof config === 'object' ? config : {}
   if (CHOICE_TYPES.has(type) && type !== 'YES_NO') {
@@ -98,7 +115,9 @@ function normalizeConfig(type, config = {}) {
       minSelected: base.minSelected != null ? Number(base.minSelected) : null,
       maxSelected: base.maxSelected != null ? Number(base.maxSelected) : null,
       multiple: type === 'IMAGE_CHOICE' ? Boolean(base.multiple) : undefined,
+      presentation: type === 'IMAGE_CHOICE' && base.presentation === 'faces' ? 'faces' : undefined,
       cardAccent: normalizeCardAccent(base.cardAccent),
+      dependsOn: normalizeDependsOn(base.dependsOn),
     }
   }
   if (type === 'SCALE') {

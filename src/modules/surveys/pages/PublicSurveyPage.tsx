@@ -7,7 +7,7 @@ import { publicSurveyService, PublicSurveyError } from '../services/publicSurvey
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { useTilt } from '../components/useTilt'
 import { resolveLineIcon } from '../components/lineIcons'
-import type { CardAccent, PublicSurvey, PublicSurveyQuestion } from '../types'
+import type { CardAccent, DependsOn, PublicSurvey, PublicSurveyQuestion, SurveyOption } from '../types'
 
 function deviceId() {
   const key = 'sgimr_survey_device_id'
@@ -17,6 +17,20 @@ function deviceId() {
     window.localStorage.setItem(key, value)
   }
   return value
+}
+
+// Pregunta condicional (ej. "estrategia" segun la "linea" elegida antes): la respuesta a la
+// pregunta disparadora decide que opciones se muestran aqui, o si esta pregunta se oculta / se
+// reemplaza por texto libre — ver DependsOn en types.ts. Se resuelve en un solo lugar para que
+// render y validacion nunca queden desincronizados sobre que se considera "visible".
+function resolveEffectiveQuestion(question: PublicSurveyQuestion, answers: Record<string, unknown>): PublicSurveyQuestion | null {
+  const dependsOn = question.config?.dependsOn as DependsOn | undefined
+  if (!dependsOn) return question
+  const trigger = (answers[dependsOn.questionId] as { optionId?: string } | undefined)?.optionId
+  const options = trigger ? dependsOn.optionsByValue[trigger] as SurveyOption[] | undefined : undefined
+  if (options) return { ...question, config: { ...question.config, options } }
+  if (dependsOn.whenUnmatched === 'text') return { ...question, type: 'SHORT_TEXT', required: false, prompt: dependsOn.fallbackPrompt || question.prompt }
+  return null
 }
 
 function isAnswered(question: PublicSurveyQuestion, value: unknown): boolean {
@@ -108,7 +122,9 @@ function PublicSurveyContent() {
   function errorsForPage(page: PublicSurvey['pages'][number]): Record<string, string> {
     const errors: Record<string, string> = {}
     for (const question of page.questions) {
-      const message = validationError(question, answers[question.id])
+      const effective = resolveEffectiveQuestion(question, answers)
+      if (!effective) continue
+      const message = validationError(effective, answers[question.id])
       if (message) errors[question.id] = message
     }
     return errors
@@ -321,34 +337,37 @@ function StepCard({ page, answers, fieldErrors, color, onAnswer }: {
           {page.description && <p>{page.description}</p>}
         </div>
       )}
-      {page.questions.map((question, index) => {
-        const accent = question.config?.cardAccent as CardAccent | undefined
-        const body = (
-          <>
-            <p className="survey-question-prompt">
-              <span className="survey-question-index">{index + 1}.</span> {question.prompt}
-              {question.required && <span className="survey-required-mark">*</span>}
-            </p>
-            {question.description && <p className="survey-question-hint">{question.description}</p>}
-            <QuestionRenderer
-              question={question} value={answers[question.id]} onChange={value => onAnswer(question.id, value)}
-              color={accent?.color || color} error={fieldErrors[question.id]}
-              optionShape={accent ? 'round' : undefined}
-            />
-          </>
-        )
-        if (!accent) return <div key={question.id} className="survey-question">{body}</div>
-        const LineIcon = resolveLineIcon(accent.icon)
-        return (
-          <div key={question.id} className="survey-question survey-line-card" style={{ borderTopColor: accent.color }}>
-            <div className="survey-line-card-head">
-              <span className="survey-line-card-icon" style={{ background: accent.color }}><LineIcon size={18} /></span>
-              {accent.badge && <span className="survey-line-card-badge" style={{ background: `${accent.color}1a`, color: accent.color }}>{accent.badge}</span>}
+      {page.questions
+        .map(question => ({ question, effective: resolveEffectiveQuestion(question, answers) }))
+        .filter((entry): entry is { question: PublicSurveyQuestion; effective: PublicSurveyQuestion } => entry.effective !== null)
+        .map(({ question, effective }, index) => {
+          const accent = effective.config?.cardAccent as CardAccent | undefined
+          const body = (
+            <>
+              <p className="survey-question-prompt">
+                <span className="survey-question-index">{index + 1}.</span> {effective.prompt}
+                {effective.required && <span className="survey-required-mark">*</span>}
+              </p>
+              {effective.description && <p className="survey-question-hint">{effective.description}</p>}
+              <QuestionRenderer
+                question={effective} value={answers[question.id]} onChange={value => onAnswer(question.id, value)}
+                color={accent?.color || color} error={fieldErrors[question.id]}
+                optionShape={accent ? 'round' : undefined}
+              />
+            </>
+          )
+          if (!accent) return <div key={question.id} className="survey-question">{body}</div>
+          const LineIcon = resolveLineIcon(accent.icon)
+          return (
+            <div key={question.id} className="survey-question survey-line-card" style={{ borderTopColor: accent.color }}>
+              <div className="survey-line-card-head">
+                <span className="survey-line-card-icon" style={{ background: accent.color }}><LineIcon size={18} /></span>
+                {accent.badge && <span className="survey-line-card-badge" style={{ background: `${accent.color}1a`, color: accent.color }}>{accent.badge}</span>}
+              </div>
+              {body}
             </div>
-            {body}
-          </div>
-        )
-      })}
+          )
+        })}
     </div>
   )
 }
