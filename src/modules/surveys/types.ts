@@ -69,6 +69,7 @@ export interface Survey {
   created_by_name: string
   response_count: number
   completed_count: number
+  is_template: boolean
 }
 
 export interface SurveyDetail extends Survey {
@@ -165,6 +166,7 @@ export interface PublicSurvey {
   allow_multiple_responses: boolean
   require_login: boolean
   requiresLogin: boolean
+  alreadyResponded: boolean
   pages: PublicSurveyPage[]
 }
 

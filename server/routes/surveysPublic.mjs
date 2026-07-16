@@ -57,6 +57,21 @@ function isWithinWindow(survey) {
   return true
 }
 
+// Control de respuestas duplicadas por dispositivo (fase 4): cuando la encuesta no admite
+// multiples respuestas, se busca una respuesta completa previa del mismo dispositivo (localStorage
+// persistido en el navegador) o del mismo usuario interno con sesion.
+async function findExistingCompletedResponse(surveyId, deviceId, membershipId) {
+  if (!deviceId && !membershipId) return null
+  const result = await query(
+    `SELECT id FROM survey_responses
+     WHERE survey_id = $1 AND completed = TRUE
+       AND ((device_fingerprint IS NOT NULL AND device_fingerprint = $2) OR (respondent_membership_id IS NOT NULL AND respondent_membership_id = $3))
+     LIMIT 1`,
+    [surveyId, deviceId || null, membershipId || null],
+  )
+  return result.rows[0]?.id || null
+}
+
 surveysPublicRouter.get('/:slug', async (request, response, next) => {
   try {
     const survey = await loadPublicSurvey(String(request.params.slug))
@@ -66,11 +81,23 @@ surveysPublicRouter.get('/:slug', async (request, response, next) => {
     if (!isWithinWindow(survey)) return response.status(410).json({ error: 'Esta encuesta no está disponible en este momento' })
 
     let requiresSession = false
+    let membershipId = null
     if (survey.require_login) {
       const context = await getSessionContext(request)
       requiresSession = !context
+      membershipId = context?.membershipId || null
+    } else {
+      const context = await getSessionContext(request).catch(() => null)
+      membershipId = context?.membershipId || null
     }
-    response.json({ ...survey, requiresLogin: requiresSession })
+
+    let alreadyResponded = false
+    if (!survey.allow_multiple_responses) {
+      const existing = await findExistingCompletedResponse(survey.id, request.query.deviceId, membershipId)
+      alreadyResponded = Boolean(existing)
+    }
+
+    response.json({ ...survey, requiresLogin: requiresSession, alreadyResponded })
   } catch (error) { next(error) }
 })
 
@@ -223,6 +250,14 @@ surveysPublicRouter.post('/:slug/responses', async (request, response, next) => 
     }
 
     const body = request.body || {}
+
+    // Solo se valida al iniciar una respuesta nueva (sin responseId todavia): continuar un
+    // guardado parcial propio nunca se bloquea, solo un segundo intento desde cero.
+    if (!body.responseId && !survey.allow_multiple_responses) {
+      const existing = await findExistingCompletedResponse(survey.id, body.deviceId, membershipId)
+      if (existing) return response.status(409).json({ error: 'Ya enviaste una respuesta para esta encuesta', alreadyResponded: true })
+    }
+
     const completed = Boolean(body.completed)
     const questions = survey.pages.flatMap(page => page.questions)
     const incoming = new Map((Array.isArray(body.items) ? body.items : []).map(item => [Number(item.questionId), item.value]))

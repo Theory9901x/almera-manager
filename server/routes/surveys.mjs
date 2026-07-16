@@ -182,12 +182,13 @@ async function assertSurvey(request) {
 surveysRouter.get('/', surveysModule, view, async (request, response, next) => {
   try {
     const params = [oid(request)]
-    const where = ['s.organization_id = $1']
+    const where = ['s.organization_id = $1', 's.is_template = $2']
+    params.push(request.query.template === 'true')
     if (request.query.status) { params.push(request.query.status); where.push(`s.status = $${params.length}`) }
     if (request.query.audience) { params.push(request.query.audience); where.push(`s.audience = $${params.length}`) }
     if (request.query.q) { params.push(`%${request.query.q}%`); where.push(`(s.title ILIKE $${params.length} OR s.code ILIKE $${params.length})`) }
     const result = await query(
-      `SELECT s.id, s.code, s.slug, s.title, s.description, s.audience, s.status, s.theme_color,
+      `SELECT s.id, s.code, s.slug, s.title, s.description, s.audience, s.status, s.theme_color, s.is_template,
               s.opens_at, s.closes_at, s.created_at, s.updated_at, s.published_at, s.closed_at,
               u.full_name AS created_by_name,
               (SELECT COUNT(*)::int FROM survey_responses r WHERE r.survey_id = s.id) AS response_count,
@@ -266,6 +267,7 @@ surveysRouter.patch('/:id', surveysModule, edit, async (request, response, next)
     if (body.thankYouMessage !== undefined) set('thank_you_message', String(body.thankYouMessage))
     if (body.opensAt !== undefined) set('opens_at', body.opensAt || null)
     if (body.closesAt !== undefined) set('closes_at', body.closesAt || null)
+    if (body.isTemplate !== undefined) set('is_template', Boolean(body.isTemplate))
     if (!fields.length) return response.json(survey)
     params.push(survey.id, oid(request))
     await query(`UPDATE surveys SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${params.length - 1} AND organization_id = $${params.length}`, params)
@@ -278,6 +280,9 @@ surveysRouter.post('/:id/duplicate', surveysModule, create, async (request, resp
   try {
     const survey = await assertSurvey(request)
     const pages = await loadStructure(survey.id)
+    const body = request.body || {}
+    const asTemplate = Boolean(body.asTemplate)
+    const title = body.title ? String(body.title).trim() : `${survey.title} (copia)`
 
     await client.query('BEGIN')
     const sequence = await client.query(
@@ -293,10 +298,10 @@ surveysRouter.post('/:id/duplicate', surveysModule, create, async (request, resp
     }
     const inserted = await client.query(
       `INSERT INTO surveys (organization_id, code, slug, title, description, audience, theme_color, thank_you_message,
-                             allow_multiple_responses, require_login, created_by_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-      [oid(request), code, slug, `${survey.title} (copia)`, survey.description, survey.audience, survey.theme_color,
-        survey.thank_you_message, survey.allow_multiple_responses, survey.require_login, uid(request)],
+                             allow_multiple_responses, require_login, is_template, created_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+      [oid(request), code, slug, title, survey.description, survey.audience, survey.theme_color,
+        survey.thank_you_message, survey.allow_multiple_responses, survey.require_login, asTemplate, uid(request)],
     )
     const newSurveyId = inserted.rows[0].id
     for (const page of pages) {

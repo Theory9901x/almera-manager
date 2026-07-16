@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, Clock, Lock, Send } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Lock, Send } from 'lucide-react'
 import { ToastProvider, fadeSlideUp, useToast } from '@/design-system'
 import { publicSurveyService, PublicSurveyError } from '../services/publicSurveyService'
 import { QuestionRenderer } from '../components/QuestionRenderer'
@@ -64,7 +64,7 @@ function PublicSurveyContent() {
   const { slug } = useParams()
   const toast = useToast()
 
-  const [phase, setPhase] = useState<'loading' | 'error' | 'login' | 'form' | 'done'>('loading')
+  const [phase, setPhase] = useState<'loading' | 'error' | 'login' | 'already-responded' | 'form' | 'done'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [survey, setSurvey] = useState<PublicSurvey | null>(null)
   const [pageIndex, setPageIndex] = useState(0)
@@ -76,10 +76,10 @@ function PublicSurveyContent() {
 
   useEffect(() => {
     if (!slug) return
-    publicSurveyService.bySlug(slug)
+    publicSurveyService.bySlug(slug, deviceId())
       .then(data => {
         setSurvey(data)
-        setPhase(data.requiresLogin ? 'login' : 'form')
+        setPhase(data.requiresLogin ? 'login' : data.alreadyResponded ? 'already-responded' : 'form')
       })
       .catch(cause => {
         setErrorMessage(cause instanceof PublicSurveyError ? cause.message : 'No fue posible cargar la encuesta')
@@ -134,6 +134,7 @@ function PublicSurveyContent() {
       setThankYou(result.thankYouMessage || survey.thank_you_message)
       setPhase('done')
     } catch (cause) {
+      if (cause instanceof PublicSurveyError && cause.alreadyResponded) { setPhase('already-responded'); return }
       toast.push('error', cause instanceof PublicSurveyError ? cause.message : 'No fue posible enviar tu respuesta. Intenta nuevamente.')
     } finally {
       setSubmitting(false)
@@ -172,6 +173,18 @@ function PublicSurveyContent() {
           <h1>Esta encuesta requiere iniciar sesión</h1>
           <p>Inicia sesión en SGIMR y vuelve a abrir este mismo enlace para responder "{survey.title}".</p>
           <a className="survey-status-link" href="/login">Ir a iniciar sesión</a>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'already-responded') {
+    return (
+      <div className="survey-public-shell survey-public-center">
+        <div className="survey-status-card">
+          <CheckCircle2 size={30} style={{ color: survey.theme_color || '#0F7A54' }} />
+          <h1>Ya respondiste esta encuesta</h1>
+          <p>Esta encuesta solo admite una respuesta por persona. ¡Gracias por tu participación!</p>
         </div>
       </div>
     )

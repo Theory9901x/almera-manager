@@ -358,6 +358,17 @@ function TypePickerModal({ onSelect, onClose }: { onSelect(type: QuestionType): 
   )
 }
 
+function toLocalInputValue(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const offset = date.getTimezoneOffset()
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16)
+}
+
+function fromLocalInputValue(value: string): string | null {
+  return value ? new Date(value).toISOString() : null
+}
+
 function SettingsModal({ survey, onChange, onClose }: { survey: SurveyDetail; onChange(patch: Record<string, unknown>): void; onClose(): void }) {
   return (
     <div className="almera-modal" onClick={onClose}>
@@ -374,6 +385,12 @@ function SettingsModal({ survey, onChange, onClose }: { survey: SurveyDetail; on
           </Field>
           <Field label="Exigir sesión interna">
             <Select value={survey.require_login ? 'yes' : 'no'} onChange={value => onChange({ requireLogin: value === 'yes' })} options={[{ value: 'no', label: 'No, acceso anónimo' }, { value: 'yes', label: 'Sí, exigir inicio de sesión' }]} />
+          </Field>
+          <Field label="Apertura programada" hint="Vacío = disponible de inmediato">
+            <Input type="datetime-local" value={toLocalInputValue(survey.opens_at)} onChange={event => onChange({ opensAt: fromLocalInputValue(event.target.value) })} />
+          </Field>
+          <Field label="Cierre programado" hint="Vacío = sin fecha límite">
+            <Input type="datetime-local" value={toLocalInputValue(survey.closes_at)} onChange={event => onChange({ closesAt: fromLocalInputValue(event.target.value) })} />
           </Field>
           <div className="full"><Field label="Mensaje de agradecimiento"><Textarea value={survey.thank_you_message} onChange={event => onChange({ thankYouMessage: event.target.value })} /></Field></div>
           <div className="dialog-actions"><Button identity={identity} onClick={onClose}>Listo</Button></div>

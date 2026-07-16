@@ -34,11 +34,11 @@ export interface CreateQuestionInput {
 }
 
 export const surveysService = {
-  list: (filters: { status?: string; audience?: string; q?: string } = {}) => call<Survey[]>(`${toQueryString(filters)}`),
+  list: (filters: { status?: string; audience?: string; q?: string; template?: string } = {}) => call<Survey[]>(`${toQueryString(filters)}`),
   create: (data: { title: string; description?: string; audience?: string }) => call<Survey>('', { method: 'POST', body: JSON.stringify(data) }),
   detail: (id: string) => call<SurveyDetail>(`/${id}`),
   update: (id: string, data: Record<string, unknown>) => call<Survey>(`/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  duplicate: (id: string) => call<Survey>(`/${id}/duplicate`, { method: 'POST' }),
+  duplicate: (id: string, data: { title?: string; asTemplate?: boolean } = {}) => call<Survey>(`/${id}/duplicate`, { method: 'POST', body: JSON.stringify(data) }),
   remove: (id: string) => call<{ ok: true }>(`/${id}`, { method: 'DELETE' }),
   publish: (id: string) => call<Survey>(`/${id}/publish`, { method: 'POST' }),
   close: (id: string) => call<Survey>(`/${id}/close`, { method: 'POST' }),

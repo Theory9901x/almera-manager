@@ -450,6 +450,11 @@ CREATE TABLE IF NOT EXISTS surveys (
 );
 CREATE INDEX IF NOT EXISTS surveys_org_idx ON surveys(organization_id, status);
 
+-- Plantillas reutilizables (fase 4): una encuesta marcada como plantilla no recibe respuestas
+-- propias, solo se usa como base para "crear a partir de esta plantilla" (ver /duplicate).
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS is_template BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS surveys_template_idx ON surveys(organization_id, is_template);
+
 CREATE TABLE IF NOT EXISTS survey_pages (
   id BIGSERIAL PRIMARY KEY,
   survey_id BIGINT NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
