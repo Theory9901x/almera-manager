@@ -233,6 +233,7 @@ function validateAndCoerceValue(question, rawValue, requireAnswer) {
 
 surveysPublicRouter.post('/:slug/responses', async (request, response, next) => {
   const client = await pool.connect()
+  let inTransaction = false
   try {
     const survey = await loadPublicSurvey(String(request.params.slug))
     if (!survey) return response.status(404).json({ error: 'Encuesta no encontrada' })
@@ -269,6 +270,7 @@ surveysPublicRouter.post('/:slug/responses', async (request, response, next) => 
     })
 
     await client.query('BEGIN')
+    inTransaction = true
 
     // Si el cliente ya trae un responseId (guardado parcial de un paso anterior), se actualiza el
     // mismo registro en vez de crear uno nuevo — asi se distinguen respuestas completas de parciales
@@ -308,7 +310,7 @@ surveysPublicRouter.post('/:slug/responses', async (request, response, next) => 
     await client.query('COMMIT')
     response.status(201).json({ ok: true, responseId: String(responseId), thankYouMessage: survey.thank_you_message })
   } catch (error) {
-    await client.query('ROLLBACK')
+    if (inTransaction) await client.query('ROLLBACK')
     next(error)
   } finally { client.release() }
 })

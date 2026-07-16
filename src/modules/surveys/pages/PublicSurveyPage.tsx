@@ -98,15 +98,38 @@ function PublicSurveyContent() {
     setFieldErrors(current => { const next = { ...current }; delete next[questionId]; return next })
   }
 
-  function validateCurrentPage(): boolean {
-    if (!currentPage) return true
+  function errorsForPage(page: PublicSurvey['pages'][number]): Record<string, string> {
     const errors: Record<string, string> = {}
-    for (const question of currentPage.questions) {
+    for (const question of page.questions) {
       const message = validationError(question, answers[question.id])
       if (message) errors[question.id] = message
     }
+    return errors
+  }
+
+  function validateCurrentPage(): boolean {
+    if (!currentPage) return true
+    const errors = errorsForPage(currentPage)
     setFieldErrors(errors)
     return !Object.keys(errors).length
+  }
+
+  // Antes de enviar (ultimo paso), se revisan TODAS las paginas: una pregunta obligatoria sin
+  // responder en una pagina anterior no debe descubrirse recien en el servidor con un error
+  // generico sin poder volver a ese campo — se lleva al usuario directo a la primera pagina
+  // con problemas y se marca ahi.
+  function findFirstInvalidPage(): { index: number; errors: Record<string, string>; firstPrompt: string } | null {
+    if (!survey) return null
+    for (let index = 0; index < survey.pages.length; index += 1) {
+      const page = survey.pages[index]
+      const errors = errorsForPage(page)
+      const errorQuestionIds = Object.keys(errors)
+      if (errorQuestionIds.length) {
+        const firstPrompt = page.questions.find(question => errorQuestionIds.includes(question.id))?.prompt || ''
+        return { index, errors, firstPrompt }
+      }
+    }
+    return null
   }
 
   function buildItems() {
@@ -125,6 +148,15 @@ function PublicSurveyContent() {
       publicSurveyService.submit(slug, { completed: false, items: buildItems(), deviceId: deviceId(), responseId: responseId || undefined })
         .then(result => setResponseId(result.responseId))
         .catch(() => {})
+      return
+    }
+
+    const firstInvalid = findFirstInvalidPage()
+    if (firstInvalid) {
+      setPageIndex(firstInvalid.index)
+      setFieldErrors(firstInvalid.errors)
+      toast.push('error', `Falta responder "${firstInvalid.firstPrompt}" en la página "${survey.pages[firstInvalid.index].title || firstInvalid.index + 1}"`)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
 
