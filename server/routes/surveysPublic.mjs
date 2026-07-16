@@ -267,10 +267,13 @@ surveysPublicRouter.post('/:slug/responses', async (request, response, next) => 
 
     const completed = Boolean(body.completed)
     const questions = survey.pages.flatMap(page => page.questions)
-    const incoming = new Map((Array.isArray(body.items) ? body.items : []).map(item => [Number(item.questionId), item.value]))
+    // Las claves deben ser string en ambos lados: question.id llega de Postgres como texto
+    // (BIGINT se serializa como string para no perder precision), y un Map no empareja "1"
+    // (string) con 1 (numero) aunque parezcan "el mismo" id.
+    const incoming = new Map((Array.isArray(body.items) ? body.items : []).map(item => [String(item.questionId), item.value]))
 
     const prepared = questions.map(question => {
-      const rawValue = incoming.get(question.id)
+      const rawValue = incoming.get(String(question.id))
       const value = validateAndCoerceValue(question, rawValue, completed && question.required)
       return { question, value }
     })
