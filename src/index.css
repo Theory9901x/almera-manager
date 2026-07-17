@@ -135,16 +135,6 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 h1, h2, h3, .page-title, .ds-page-header h1 { text-wrap: balance; }
 p, .page-subtitle, .ds-page-header-description { text-wrap: pretty; }
 
-/* View Transitions entre navegaciones del router — activado via prop viewTransition en
-   Link/NavLink (react-router-dom 6.30+). Si el navegador no soporta la API, la navegacion
-   simplemente ocurre sin transicion, nada se rompe. */
-@supports (view-transition-name: none) {
-  ::view-transition-old(root) { animation: ds-view-fade-out 160ms ease forwards; }
-  ::view-transition-new(root) { animation: ds-view-fade-in 260ms cubic-bezier(.22,1,.36,1) forwards; }
-}
-@keyframes ds-view-fade-out { to { opacity: 0; } }
-@keyframes ds-view-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
 /* Utilidades del sistema 2.0: adoptar por clase donde aplique, no retroactivo por defecto. */
 
 /* :has() — la tarjeta de formulario se resalta cuando un campo interno tiene foco, sin JS. */
