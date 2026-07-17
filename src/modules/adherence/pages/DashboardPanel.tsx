@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardList, Download, Save } from 'lucide-react'
-import { BarChart, Button, Card, Field, LineChart, Select, moduleIdentity } from '@/design-system'
+import { BarChart, Button, Card, Field, LineChart, ModuleHero, Select, moduleIdentity } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, ConceptKey, Dashboard, Position, Professional, Threshold } from '../types'
@@ -88,21 +88,19 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
     <div className="space-y-5">
       <ToastStack notice={notice} error={error} onDismissError={() => setError('')} />
 
-      <div className="matrix-toolbar-glass">
-        <div className="matrix-toolbar-glass-top">
-          <div>
-            <p className="ds-eyebrow">Matrices de adherencia</p>
-            <h2 className="mt-1 text-xl font-black">Dashboard de cumplimiento</h2>
-          </div>
-          <GradientButton variant="ghost" onClick={() => void downloadPdf()} disabled={busy}><Download size={16} />Exportar PDF</GradientButton>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[180px]"><Field label="Área"><Select value={areaId || 'ALL'} onChange={value => setAreaId(value === 'ALL' ? '' : value)} options={[{ value: 'ALL', label: 'Todas' }, ...areas.map(area => ({ value: area.id, label: area.name }))]} /></Field></div>
-          <div className="min-w-[220px]"><Field label="Profesional"><Select value={professionalId || 'ALL'} onChange={value => setProfessionalId(value === 'ALL' ? '' : value)} options={[{ value: 'ALL', label: 'Todos' }, ...professionals.map(professional => ({ value: professional.id, label: professional.full_name }))]} /></Field></div>
-          <div className="min-w-[180px]"><Field label="Cargo"><Select value={positionId || 'ALL'} onChange={value => setPositionId(value === 'ALL' ? '' : value)} options={[{ value: 'ALL', label: 'Todos' }, ...positions.map(position => ({ value: position.id, label: position.name }))]} /></Field></div>
-          <div className="min-w-[180px]"><Field label="Mes reportado"><input className="ds-input" value={monthReported} onChange={event => setMonthReported(event.target.value)} placeholder="Ej. Julio 2026" /></Field></div>
-        </div>
-      </div>
+      <ModuleHero
+        badge="Matrices de adherencia"
+        title="Dashboard de cumplimiento"
+        accent={identity.color}
+        actions={<GradientButton variant="ghost" onClick={() => void downloadPdf()} disabled={busy}><Download size={16} />Exportar PDF</GradientButton>}
+      />
+
+      <Card className="flex flex-wrap items-end gap-3 p-4">
+        <div className="min-w-[180px]"><Field label="Área"><Select value={areaId || 'ALL'} onChange={value => setAreaId(value === 'ALL' ? '' : value)} options={[{ value: 'ALL', label: 'Todas' }, ...areas.map(area => ({ value: area.id, label: area.name }))]} /></Field></div>
+        <div className="min-w-[220px]"><Field label="Profesional"><Select value={professionalId || 'ALL'} onChange={value => setProfessionalId(value === 'ALL' ? '' : value)} options={[{ value: 'ALL', label: 'Todos' }, ...professionals.map(professional => ({ value: professional.id, label: professional.full_name }))]} /></Field></div>
+        <div className="min-w-[180px]"><Field label="Cargo"><Select value={positionId || 'ALL'} onChange={value => setPositionId(value === 'ALL' ? '' : value)} options={[{ value: 'ALL', label: 'Todos' }, ...positions.map(position => ({ value: position.id, label: position.name }))]} /></Field></div>
+        <div className="min-w-[180px]"><Field label="Mes reportado"><input className="ds-input" value={monthReported} onChange={event => setMonthReported(event.target.value)} placeholder="Ej. Julio 2026" /></Field></div>
+      </Card>
 
       {/* Bento: el cumplimiento promedio es el dato protagonista (hero 2x2) — evaluaciones y
           distribucion por concepto son secundarios, ya no una fila de cajas identicas. */}

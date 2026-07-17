@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { Badge, Button, Card, Field } from '@/shared/ui'
-import { DatePicker, PageHeader, Select, moduleIdentity } from '@/design-system'
+import { Button as DsButton, DatePicker, ModuleHero, Select, moduleIdentity } from '@/design-system'
 import { almeraService } from '../services/almeraService'
 import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AssistanceStatus } from '../types'
 
@@ -120,7 +120,13 @@ export default function AlmeraPage(){
   const exportCsv=async()=>{setBusy(true);try{await almeraService.exportCsv({...filters,q:search});setNotice('Archivo CSV generado')}catch(caught){setError(caught instanceof Error?caught.message:'No fue posible exportar')}finally{setBusy(false)}}
 
   return <div className="almera-shell mission-module mx-auto max-w-[1500px] space-y-5">
-    <PageHeader eyebrow="Control operativo" title="Asistencias Técnicas" description="Prioriza compromisos, registra avances y mantén cada solicitud bajo control." identity={moduleIdentity('almera')} actions={<>{canExport&&<Button variant="secondary" onClick={()=>void exportCsv()} disabled={busy}><Download size={16}/>Exportar CSV</Button>}{canCreate&&<Button onClick={()=>setShowCreate(true)}><Plus size={16}/>Nueva asistencia</Button>}</>}/>
+    <ModuleHero
+      badge="Control operativo"
+      title="Asistencias Técnicas"
+      subtitle="Prioriza compromisos, registra avances y mantén cada solicitud bajo control."
+      accent={moduleIdentity('almera').color}
+      actions={<>{canExport&&<DsButton variant="secondary" onClick={()=>void exportCsv()} disabled={busy}><Download size={16}/>Exportar CSV</DsButton>}{canCreate&&<DsButton identity={moduleIdentity('almera')} onClick={()=>setShowCreate(true)}><Plus size={16}/>Nueva asistencia</DsButton>}</>}
+    />
 
     <nav className="almera-nav assistance-nav" aria-label="Vistas de asistencias">{areas.map(([key,label,Icon])=><button key={key} className={`${area===key?'active ':''}${key==='pending'?'nav-primary':''}`} onClick={()=>setArea(key)}><Icon size={17}/><span>{label}</span>{key==='pending'&&urgentRows.length>0&&<b>{urgentRows.length}</b>}</button>)}</nav>
     {error&&<div className="almera-alert"><AlertTriangle size={17}/><span>{error}</span><button onClick={()=>setError('')}><X size={15}/></button></div>}

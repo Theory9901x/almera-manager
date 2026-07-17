@@ -88,6 +88,32 @@
   /* Escala de espaciado de 8pt — usar siempre estos tokens en componentes nuevos/tocados */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+  /* Paleta armonica de identidad — 11 modulos, luminosidad y croma constantes en OKLCH, solo
+     varia el tono. Ningun modulo pesa visualmente mas que otro. Usada por .module-hero y por
+     cualquier modulo nuevo; los ya existentes ademas tienen su equivalente hex en tokens.ts
+     (MODULE_IDENTITIES) para compatibilidad con el codigo JS que concatena alpha en hex. */
+  --m-asistencias:      oklch(0.55 0.16 25);    /* rojo-coral */
+  --m-asistencias-soft: oklch(0.95 0.03 25);
+  --m-matrices:         oklch(0.55 0.16 300);   /* violeta */
+  --m-matrices-soft:    oklch(0.95 0.03 300);
+  --m-auditorias:       oklch(0.55 0.16 260);   /* azul-indigo */
+  --m-auditorias-soft:  oklch(0.95 0.03 260);
+  --m-encuestas:        oklch(0.55 0.16 195);   /* cian-teal */
+  --m-encuestas-soft:   oklch(0.95 0.03 195);
+  --m-huella:           oklch(0.55 0.16 155);   /* verde */
+  --m-huella-soft:      oklch(0.95 0.03 155);
+  --m-planes:           oklch(0.55 0.16 130);   /* verde-lima — libre, sin modulo asignado aun */
+  --m-planes-soft:      oklch(0.95 0.03 130);
+  --m-documentos:       oklch(0.55 0.16 230);   /* azul — libre, sin modulo asignado aun */
+  --m-documentos-soft:  oklch(0.95 0.03 230);
+  --m-seguridad:        oklch(0.55 0.16 40);    /* naranja — libre, sin modulo asignado aun */
+  --m-seguridad-soft:   oklch(0.95 0.03 40);
+  --m-riesgos:          oklch(0.55 0.16 70);    /* ambar-dorado — libre, sin modulo asignado aun */
+  --m-riesgos-soft:     oklch(0.95 0.03 70);
+  --m-indicadores:      oklch(0.55 0.16 330);   /* magenta — libre, sin modulo asignado aun */
+  --m-indicadores-soft: oklch(0.95 0.03 330);
+  --m-usuarios:         oklch(0.55 0.16 350);   /* rosa-fucsia */
+  --m-usuarios-soft:    oklch(0.95 0.03 350);
   /* Aliases de compatibilidad; no definen colores nuevos */
   --mission-night: var(--color-navy-900);
   --mission-indigo: var(--color-navy-800);
@@ -591,11 +617,11 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .hc-chip:hover .hc-chip-remove{opacity:1}
 .hc-chip-remove:hover{background:#FEE2E2;color:#DC2626}
 
-.gradient-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:11px;padding:0 16px;height:40px;color:#fff;font-size:12.5px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(79,70,229,.28);transition:transform 150ms ease,box-shadow 150ms ease;background-size:150% 150%}
-.gradient-button:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(79,70,229,.34)}
+.gradient-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:11px;padding:0 16px;height:40px;color:#fff;font-size:12.5px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(129,86,192,.28);transition:transform 150ms ease,box-shadow 150ms ease;background-size:150% 150%}
+.gradient-button:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(129,86,192,.34)}
 .gradient-button:disabled{cursor:not-allowed;opacity:.55;transform:none;box-shadow:none}
-.gradient-button-ghost{background:transparent;color:#4F46E5;box-shadow:none;border:1px solid #E0E7FF}
-.gradient-button-ghost:hover{background:#EEF2FF;box-shadow:none}
+.gradient-button-ghost{background:transparent;color:#8156c0;box-shadow:none;border:1px solid #E7DEF7}
+.gradient-button-ghost:hover{background:#F4EFFC;box-shadow:none}
 
 .scope-header-row{position:relative;border-left-width:4px;border-left-style:solid;padding:9px 12px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
 .scope-criterion-row{border-left:3px solid transparent}
@@ -621,10 +647,10 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .plan-timeline-item:last-child{padding-bottom:0}
 .plan-timeline-item::before{content:"";position:absolute;top:16px;bottom:-4px;left:7px;width:2px;background:var(--border-hairline)}
 .plan-timeline-item:last-child::before{display:none}
-.plan-timeline-dot{position:relative;z-index:1;width:16px;height:16px;border-radius:99px;background:#4F46E5;box-shadow:0 0 0 4px rgba(79,70,229,.14);margin-top:2px}
+.plan-timeline-dot{position:relative;z-index:1;width:16px;height:16px;border-radius:99px;background:#8156c0;box-shadow:0 0 0 4px rgba(129,86,192,.14);margin-top:2px}
 .plan-timeline-card{border:1px solid var(--border-hairline);border-radius:var(--radius-card-sm);background:var(--color-surface-card);box-shadow:var(--shadow-card-sm);padding:14px 16px}
 .plan-evidence-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-hairline);border-radius:99px;background:#fff;padding:5px 10px;font-size:10.5px;font-weight:700;color:var(--ink-soft)}
-.plan-evidence-chip:hover{border-color:#4F46E5;color:#4F46E5}
+.plan-evidence-chip:hover{border-color:#8156c0;color:#8156c0}
 
 /* Asistencias tecnicas */
 .assistance-nav{grid-template-columns:repeat(5,minmax(0,1fr))}.assistance-nav button{position:relative}.assistance-nav button b{display:grid;min-width:19px;height:19px;place-items:center;border-radius:99px;background:var(--brand);padding:0 5px;color:#fff;font-size:9px}
@@ -1453,7 +1479,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .assistance-nav.almera-nav { border-color:var(--color-border);background:var(--color-surface-card);box-shadow:0 4px 12px rgba(16,24,39,.06); }
 .assistance-nav.almera-nav button,.assistance-nav.almera-nav .nav-primary { background:transparent;color:var(--color-text-muted);box-shadow:none; }
 .assistance-nav.almera-nav button:hover,.assistance-nav.almera-nav .nav-primary:hover { background:var(--color-surface-soft);color:var(--color-text); }
-.assistance-nav.almera-nav button.active,.assistance-nav.almera-nav .nav-primary.active,.assistance-nav.almera-nav button.active:not(.nav-primary) { background:var(--color-brand);color:#fff;box-shadow:0 4px 10px color-mix(in srgb,var(--color-brand) 22%,transparent); }
+.assistance-nav.almera-nav button.active,.assistance-nav.almera-nav .nav-primary.active,.assistance-nav.almera-nav button.active:not(.nav-primary) { background:var(--m-asistencias);color:#fff;box-shadow:0 4px 10px color-mix(in oklch,var(--m-asistencias) 22%,transparent); }
 
 .mission-control {
   min-height:0;
@@ -1676,24 +1702,35 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .highlight-box .ds-eyebrow, .highlight-box .dashboard-card-category { color: rgba(255,255,255,.65); }
 .highlight-box .ds-stat-card-value { color: #fff; }
 
-/* Header tipo "portada" del dashboard — seccion oscura como acento antes de las tarjetas claras de
-   contenido, en vez de un encabezado blanco plano igual al resto de pantallas del sistema. */
-.dashboard-hero {
+/* Header de identidad por modulo — mismo componente/formato en TODO el sistema (Inicio,
+   Asistencias, Adherencia, etc.), el color de acento (--module-accent) es lo UNICO que cambia
+   entre modulos. Base oscura comun; el acento entra como glow y badge, nunca tine todo el fondo
+   — asi el header se reconoce como "el mismo" en cualquier modulo, solo diferenciado por color. */
+.module-hero {
   position: relative; overflow: hidden;
-  background: linear-gradient(135deg, #0a1628 0%, #142238 60%, #1a2f4a 100%);
+  background: linear-gradient(135deg, #141a2e 0%, #1a2338 100%);
   border-radius: var(--radius-xl);
-  padding: 40px 36px;
+  padding: 32px 36px;
   color: #fff;
 }
-.dashboard-hero::after {
+.module-hero::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--hero-accent, var(--brand-2)) 22%, transparent), transparent 55%);
+  background: radial-gradient(circle at 88% 15%, color-mix(in oklch, var(--module-accent, var(--m-asistencias)) 28%, transparent), transparent 55%);
 }
-.dashboard-hero > * { position: relative; z-index: 1; }
-.dashboard-hero .pill-badge { margin-bottom: var(--space-3); background: rgba(255,255,255,.14); }
-.dashboard-hero-greeting { font-size: var(--text-h1); font-weight: var(--weight-black); letter-spacing: -.02em; margin: 0; line-height: 1.1; }
-.dashboard-hero-sub { color: rgba(255,255,255,.65); font-size: var(--text-body); margin: var(--space-2) 0 0; }
-@media (max-width: 640px) { .dashboard-hero { padding: 28px 22px; } }
+.module-hero > * { position: relative; z-index: 1; }
+.module-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.module-hero-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.module-hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 999px; margin-bottom: var(--space-3);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  background: color-mix(in oklch, var(--module-accent, var(--m-asistencias)) 22%, transparent);
+  color: #fff;
+  border: 1px solid color-mix(in oklch, var(--module-accent, var(--m-asistencias)) 40%, transparent);
+}
+.module-hero-title { font-size: var(--text-h1); font-weight: var(--weight-black); letter-spacing: -.02em; margin: 0; line-height: 1.1; }
+.module-hero-sub { color: rgba(255,255,255,.65); font-size: var(--text-body); margin: var(--space-2) 0 0; }
+@media (max-width: 640px) { .module-hero { padding: 28px 22px; } }
 
 .ds-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; border: 0; border-radius: 11px; padding: 0 16px; font-size: 12.5px; font-weight: 800; cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, color 150ms ease, border-color 150ms ease; }
 .ds-button:disabled { cursor: not-allowed; opacity: .55; transform: none; box-shadow: none; }

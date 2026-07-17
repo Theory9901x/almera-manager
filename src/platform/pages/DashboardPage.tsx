@@ -12,7 +12,7 @@ import { adherenceService } from '@/modules/adherence/services/adherenceService'
 import type { EvaluationSummary, ImprovementPlan } from '@/modules/adherence/types'
 import { PlanStatusBadge } from '@/modules/adherence/design/PlanStatusBadge'
 import {
-  Card, EmptyState, ProgressRing, SemaphoreBadge, StatCard,
+  Card, EmptyState, ModuleHero, ProgressRing, SemaphoreBadge, StatCard,
   fadeSlideUp, moduleIdentity, semaphoreLevel, staggerContainer,
 } from '@/design-system'
 
@@ -39,11 +39,12 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="dashboard-hero" style={{ ['--hero-accent' as string]: identity.color }}>
-        <span className="pill-badge">{session.organization.name}</span>
-        <h1 className="dashboard-hero-greeting">{greetingMessage(session.user.fullName)}</h1>
-        <p className="dashboard-hero-sub">{session.role.name}{session.position ? ` · ${session.position.name}` : ''} · {dateLabel}</p>
-      </div>
+      <ModuleHero
+        badge={session.organization.name}
+        title={greetingMessage(session.user.fullName)}
+        subtitle={`${session.role.name}${session.position ? ` · ${session.position.name}` : ''} · ${dateLabel}`}
+        accent={identity.color}
+      />
 
       <motion.div variants={staggerContainer()} initial="hidden" animate="visible" className="space-y-6">
         {isProfesional && <motion.div variants={fadeSlideUp}><ProfesionalHome /></motion.div>}

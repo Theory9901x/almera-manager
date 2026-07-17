@@ -1,8 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-// Gradiente propio del modulo de Matrices de Adherencia para acciones primarias — deliberadamente
-// distinto del rojo institucional del resto de SGIMR (seccion 6.3 del prompt de diseno).
-export const MODULE_GRADIENT = 'linear-gradient(135deg, #4F46E5, #7C3AED)'
+// Gradiente propio del modulo de Matrices de Adherencia para acciones primarias — el mismo violeta
+// de la paleta armonica de 11 modulos (--m-matrices), no un indigo suelto sin relacion.
+export const MODULE_GRADIENT = 'linear-gradient(135deg, #8156c0, #a682e1)'
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & { children: ReactNode; variant?: 'primary' | 'ghost' }
 
