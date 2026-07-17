@@ -44,8 +44,15 @@ export default function AppLayout() {
   const operationalKeys = ['technical-assistances', 'internal-audits', 'audits', 'almera']
   const operationalModules = session.modules.filter(module => operationalKeys.includes(module.key))
   const adherenceModule = session.modules.find(module => module.key === 'adherence-matrix')
-  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key) && module.key !== 'adherence-matrix')
+  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key) && module.key !== 'adherence-matrix' && module.key !== 'admin')
+  const adminModules = session.modules.filter(module => module.key === 'admin')
   const operationalRoute = operationalKeys.map(key => operationalModules.find(module => module.key === key)?.route).find(Boolean)
+  const adherenceRoute = adherenceModule && (
+    session.permissions.includes('adherence_matrix.manage') ? '/app/adherencia/configuracion'
+    : (session.permissions.includes('adherence_matrix.evaluate')) ? '/app/adherencia/operacion'
+    : session.permissions.includes('adherence_matrix.own_plan') ? '/app/adherencia/mis-planes'
+    : null
+  )
 
   const adherenceLinks = adherenceModule ? [
     session.permissions.includes('adherence_matrix.manage') && { to: '/app/adherencia/configuracion', label: 'Configuración' },
@@ -80,59 +87,94 @@ export default function AppLayout() {
           <span>{session.role.name}</span>
         </div>
 
-        <nav className="relative flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          <p className="sidebar-label">Espacio de trabajo</p>
-          {operationalRoute && (() => {
-            const identity = moduleIdentity('almera')
-            return (
-              <NavLink
-                to={operationalRoute}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
-                style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
-              >
-                <span className="sidebar-link-icon" style={{ background: `${identity.color}22`, color: identity.color }}><ClipboardCheck size={17} /></span>
-                <span className="min-w-0 flex-1 truncate">Gestión ALMERA</span>
-              </NavLink>
-            )
-          })()}
-          {adherenceLinks.length > 0 && (() => {
-            const identity = moduleIdentity('adherence-matrix')
-            return (
-              <div className="sidebar-group">
-                <p className="sidebar-group-label">Matrices de Adherencia</p>
-                {adherenceLinks.map(link => (
+        <nav className="relative flex-1 overflow-y-auto px-3 py-4">
+          <div className="sidebar-section">
+            <p className="sidebar-section-header">Principal</p>
+            <NavLink to="/app" end onClick={() => setOpen(false)} className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}>
+              <LayoutDashboard className="item-icon" size={20} />
+              <span className="min-w-0 flex-1 truncate">Inicio</span>
+            </NavLink>
+          </div>
+
+          <div className="sidebar-section">
+            <p className="sidebar-section-header">Módulos</p>
+            {operationalRoute && (() => {
+              const identity = moduleIdentity('almera')
+              return (
+                <NavLink
+                  to={operationalRoute}
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}
+                >
+                  <ClipboardCheck className="item-icon" size={20} style={{ color: identity.color }} />
+                  <span className="min-w-0 flex-1 truncate">Asistencias Técnicas</span>
+                </NavLink>
+              )
+            })()}
+            {adherenceModule && adherenceRoute && (() => {
+              const identity = moduleIdentity('adherence-matrix')
+              const isAdherenceActive = activeModuleKey === 'adherence-matrix'
+              return (
+                <>
                   <NavLink
-                    key={link.to}
-                    to={link.to}
+                    to={adherenceRoute}
                     onClick={() => setOpen(false)}
-                    className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
-                    style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
+                    className={`sidebar-item ${isAdherenceActive ? 'is-active' : ''}`}
                   >
-                    <span className="sidebar-link-icon" style={{ background: `${identity.color}22`, color: identity.color }}><ClipboardCheck size={17} /></span>
-                    <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                    <ClipboardCheck className="item-icon" size={20} style={{ color: identity.color }} />
+                    <span className="min-w-0 flex-1 truncate">Matrices de Adherencia</span>
                   </NavLink>
-                ))}
-              </div>
-            )
-          })()}
-          {otherModules.map(module => {
-            const Icon = icons[module.icon as keyof typeof icons] || Blocks
-            const identity = moduleIdentity(module.key)
-            return (
-              <NavLink
-                key={module.id}
-                to={module.route}
-                end={['dashboard', 'admin'].includes(module.key)}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
-                style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
-              >
-                <span className="sidebar-link-icon" style={{ background: `${identity.color}22`, color: identity.color }}><Icon size={17} /></span>
-                <span className="min-w-0 flex-1 truncate">{module.name}</span>
-              </NavLink>
-            )
-          })}
+                  {isAdherenceActive && adherenceLinks.map(link => (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      onClick={() => setOpen(false)}
+                      className={({ isActive }) => `sidebar-subitem ${isActive ? 'is-active' : ''}`}
+                    >
+                      {link.label}
+                    </NavLink>
+                  ))}
+                </>
+              )
+            })()}
+            {otherModules.map(module => {
+              const Icon = icons[module.icon as keyof typeof icons] || Blocks
+              const identity = moduleIdentity(module.key)
+              return (
+                <NavLink
+                  key={module.id}
+                  to={module.route}
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}
+                >
+                  <Icon className="item-icon" size={20} style={{ color: identity.color }} />
+                  <span className="min-w-0 flex-1 truncate">{module.name}</span>
+                </NavLink>
+              )
+            })}
+          </div>
+
+          {adminModules.length > 0 && (
+            <div className="sidebar-section">
+              <p className="sidebar-section-header">Administración</p>
+              {adminModules.map(module => {
+                const Icon = icons[module.icon as keyof typeof icons] || Blocks
+                const identity = moduleIdentity(module.key)
+                return (
+                  <NavLink
+                    key={module.id}
+                    to={module.route}
+                    end
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}
+                  >
+                    <Icon className="item-icon" size={20} style={{ color: identity.color }} />
+                    <span className="min-w-0 flex-1 truncate">{module.name}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
+          )}
         </nav>
 
         <div className="sidebar-footer">

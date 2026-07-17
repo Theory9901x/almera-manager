@@ -496,6 +496,32 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .sidebar-group-label { margin: 0; padding: 9px 10px 5px; color: #697384; font-size: 9.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .sidebar-group .sidebar-link { padding-left: 15px; }
 .sidebar-link.is-active .sidebar-link-icon { background: rgba(255,255,255,.14); color: #fff; }
+
+/* Sidebar agrupado por categoria — Principal / Modulos / Administracion, con encabezado de
+   seccion tenue y separacion real, en vez de una lista plana donde todo pesa igual. */
+.sidebar-section { margin-bottom: var(--space-5); }
+.sidebar-section-header {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
+  color: rgba(255,255,255,.38); padding: 0 16px; margin: 0 0 var(--space-2);
+}
+.sidebar-section + .sidebar-section { padding-top: var(--space-4); border-top: 1px solid rgba(255,255,255,.06); }
+.sidebar-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px;
+  color: rgba(255,255,255,.78); font-size: 14px; font-weight: 500;
+  transition: background 150ms, color 150ms;
+}
+.sidebar-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+.sidebar-item.is-active { background: rgba(255,255,255,.10); color: #fff; font-weight: 600; }
+.sidebar-item .item-icon { width: 20px; height: 20px; flex: none; }
+/* Subitem de un modulo (ej. Configuracion/Operacion/Mis planes bajo Matrices) — indentado y
+   subordinado a su padre, nunca suelto al mismo nivel que un modulo de primer nivel. */
+.sidebar-subitem {
+  display: block; padding: 8px 16px 8px 44px; border-radius: 10px;
+  font-size: 13.5px; color: rgba(255,255,255,.62); transition: background 150ms, color 150ms;
+}
+.sidebar-subitem:hover { background: rgba(255,255,255,.05); color: #fff; }
+.sidebar-subitem.is-active { background: rgba(255,255,255,.10); color: #fff; font-weight: 600; }
+
 .sidebar-footer { border-top: 1px solid rgba(255,255,255,.07); padding: 12px; }
 .sidebar-user { display: flex; align-items: center; gap: 10px; border-radius: 14px; background: rgba(255,255,255,.04); padding: 9px; color: #727c8c; }
 .sidebar-user p { overflow: hidden; margin: 0; color: #f7f8fa; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
