@@ -1481,6 +1481,19 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .mission-counts strong { font-size:22px; }
 .mission-counts span { color:var(--color-text-muted);font-size:8px; }
 
+/* "Vencidas" es el dato protagonista del panel (columna ancha, numero grande) — "por vencer" y
+   "en curso" quedan secundarios, apilados en la columna angosta. Ya no 3 cajas identicas en fila. */
+.mission-counts { grid-template-columns: 1.3fr 1fr; }
+.mission-counts-hero.is-overdue { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:var(--space-2); padding:var(--space-5); }
+.mission-counts-hero strong { font-size:40px; }
+.mission-counts-secondary { display:grid; border-left:1px solid var(--border-hairline); }
+.mission-counts-secondary article { border-left:0; }
+.mission-counts-secondary article+article { border-left:0; border-top:1px solid var(--border-hairline); }
+.mission-counts-secondary strong { font-size:17px; }
+@media (max-width:560px) {
+  .mission-counts-secondary { border-left:0; border-top:1px solid var(--border-hairline); }
+}
+
 .mission-workspace .assistance-filter-panel,.mission-queue { border:1px solid var(--border-hairline);border-radius:var(--radius-card);background:var(--color-surface-card);box-shadow:var(--shadow-card-sm); }
 .mission-workspace .filter-heading>span { background:var(--color-surface-soft);color:var(--color-text-muted); }
 .filter-heading strong { color:var(--color-text); }
@@ -1650,6 +1663,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 11px; font-size: 10.5px; font-weight: 800; }
 .ds-badge-neutral { background: var(--color-surface-soft); color: var(--muted); }
 .ds-badge-info { background: #EEF2FF; color: #4338CA; }
+.ds-badge-success { background: #ECFDF5; color: #059669; }
+.ds-badge-warning { background: #FFFBEB; color: #B45309; }
+.ds-badge-danger { background: #FEF2F2; color: #B91C1C; }
+.ds-badge-accent { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); }
 
 .ds-badge-semaphore { display: inline-flex; align-items: center; gap: 6px; border: 1px solid; border-radius: 999px; padding: 4px 11px; font-size: 11px; font-weight: 800; }
 .ds-badge-semaphore-sm { padding: 2px 9px; font-size: 10px; }

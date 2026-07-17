@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { SEMAPHORE_COLORS, SEMAPHORE_LABELS, type SemaphoreLevel } from '../tokens'
 
-type NeutralTone = 'neutral' | 'info'
+type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent'
 
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: NeutralTone }) {
+export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
   return <span className={`ds-badge ds-badge-${tone}`}>{children}</span>
 }
 

@@ -5,8 +5,8 @@ import {
   PencilLine, Plus, RotateCcw, Search, Send, Settings, Timer, Upload, X,
 } from 'lucide-react'
 import { useAuth } from '@/platform/auth/AuthContext'
-import { Badge, Button, Card, Field, PageHeader } from '@/shared/ui'
-import { DatePicker, Select } from '@/design-system'
+import { Badge, Button, Card, Field } from '@/shared/ui'
+import { DatePicker, PageHeader, Select, moduleIdentity } from '@/design-system'
 import { almeraService } from '../services/almeraService'
 import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AssistanceStatus } from '../types'
 
@@ -120,7 +120,7 @@ export default function AlmeraPage(){
   const exportCsv=async()=>{setBusy(true);try{await almeraService.exportCsv({...filters,q:search});setNotice('Archivo CSV generado')}catch(caught){setError(caught instanceof Error?caught.message:'No fue posible exportar')}finally{setBusy(false)}}
 
   return <div className="almera-shell mission-module mx-auto max-w-[1500px] space-y-5">
-    <PageHeader eyebrow="Control operativo" title="Asistencias Técnicas" description="Prioriza compromisos, registra avances y mantén cada solicitud bajo control." actions={<>{canExport&&<Button variant="secondary" onClick={()=>void exportCsv()} disabled={busy}><Download size={16}/>Exportar CSV</Button>}{canCreate&&<Button onClick={()=>setShowCreate(true)}><Plus size={16}/>Nueva asistencia</Button>}</>}/>
+    <PageHeader eyebrow="Control operativo" title="Asistencias Técnicas" description="Prioriza compromisos, registra avances y mantén cada solicitud bajo control." identity={moduleIdentity('almera')} actions={<>{canExport&&<Button variant="secondary" onClick={()=>void exportCsv()} disabled={busy}><Download size={16}/>Exportar CSV</Button>}{canCreate&&<Button onClick={()=>setShowCreate(true)}><Plus size={16}/>Nueva asistencia</Button>}</>}/>
 
     <nav className="almera-nav assistance-nav" aria-label="Vistas de asistencias">{areas.map(([key,label,Icon])=><button key={key} className={`${area===key?'active ':''}${key==='pending'?'nav-primary':''}`} onClick={()=>setArea(key)}><Icon size={17}/><span>{label}</span>{key==='pending'&&urgentRows.length>0&&<b>{urgentRows.length}</b>}</button>)}</nav>
     {error&&<div className="almera-alert"><AlertTriangle size={17}/><span>{error}</span><button onClick={()=>setError('')}><X size={15}/></button></div>}
@@ -181,9 +181,11 @@ function PendingView({rows,search,setSearch,openDetail,filters}:{rows:Assistance
     <section className="mission-control" aria-labelledby="mission-title">
       <div className="mission-copy"><p>Estado actual</p><h2 id="mission-title">Resumen de prioridad</h2><span>{rows.length} solicitudes requieren seguimiento · {assigned} aún sin iniciar</span></div>
       <div className="mission-counts" aria-label="Resumen urgente">
-        <article className={`is-overdue ${overdue>0?'has-value':''}`}><AlertTriangle size={18}/><strong>{overdue}</strong><span>vencidas</span></article>
-        <article className={`is-due ${dueSoon>0?'has-value':''}`}><Timer size={18}/><strong>{dueSoon}</strong><span>por vencer en 48 h</span></article>
-        <article className={`is-course ${inProgress>0?'has-value':''}`}><ClipboardCheck size={18}/><strong>{inProgress}</strong><span>en curso</span></article>
+        <article className={`mission-counts-hero is-overdue ${overdue>0?'has-value':''}`}><AlertTriangle size={24}/><strong>{overdue}</strong><span>vencidas</span></article>
+        <div className="mission-counts-secondary">
+          <article className={`is-due ${dueSoon>0?'has-value':''}`}><Timer size={16}/><strong>{dueSoon}</strong><span>por vencer en 48 h</span></article>
+          <article className={`is-course ${inProgress>0?'has-value':''}`}><ClipboardCheck size={16}/><strong>{inProgress}</strong><span>en curso</span></article>
+        </div>
       </div>
     </section>
 
