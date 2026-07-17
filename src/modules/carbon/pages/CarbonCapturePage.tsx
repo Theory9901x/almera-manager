@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Paperclip, Save, SlidersHorizontal, Trash2 } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, useToast } from '@/design-system'
+import { Badge, Button, Card, DatePicker, EmptyState, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
 import type { CarbonBlock, CarbonMeasurement, EmissionFactor } from '../types'
@@ -129,7 +129,7 @@ function CarbonCaptureContent() {
                   medir periodicamente nada. */}
               <div className="mt-4">
                 <Field label="Fecha del registro" hint="Determina a qué mes/trimestre/semestre/año pertenece esta medición">
-                  <Input type="date" value={recordDate} onChange={event => setRecordDate(event.target.value)} />
+                  <DatePicker value={recordDate} onChange={setRecordDate} />
                 </Field>
               </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">

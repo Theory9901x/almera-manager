@@ -5,7 +5,7 @@ import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveLine } from '@nivo/line'
 import { ResponsiveRadialBar } from '@nivo/radial-bar'
 import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
-import { Button, Card, EmptyState, Field, Input, PageHeader, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
+import { Button, Card, DatePicker, EmptyState, Field, Input, PageHeader, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
 import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
@@ -181,8 +181,8 @@ function CarbonDashboardContent() {
           )}
           {preset === 'custom' && (
             <>
-              <Field label="Desde"><Input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></Field>
-              <Field label="Hasta"><Input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></Field>
+              <Field label="Desde"><DatePicker value={dateFrom} onChange={setDateFrom} /></Field>
+              <Field label="Hasta"><DatePicker value={dateTo} onChange={setDateTo} /></Field>
             </>
           )}
           {stats.lastUpdated && (

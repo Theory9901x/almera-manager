@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Download, FileDown, FileText, ListChecks, Loader2, Pencil, Users } from 'lucide-react'
 import {
-  Badge, Button, Card, EmptyState, Field, Input, PageHeader, ProgressBar, Select, SemaphoreBadge, StatCard, ToastProvider,
+  Badge, Button, Card, DatePicker, EmptyState, Field, PageHeader, ProgressBar, Select, SemaphoreBadge, StatCard, ToastProvider,
   moduleIdentity, semaphoreColor, semaphoreLevel, useCountUp, useToast,
 } from '@/design-system'
 import { surveysService } from '../services/surveysService'
@@ -127,8 +127,8 @@ function SurveyResultsContent() {
         {stats.months.length > 0 && (
           <Field label="Mes"><Select value={month} onChange={setMonth} placeholder="Todos los meses" options={[{ value: '', label: 'Todos los meses' }, ...stats.months.map(item => ({ value: item, label: item }))]} /></Field>
         )}
-        <Field label="Corte desde"><Input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></Field>
-        <Field label="Corte hasta"><Input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></Field>
+        <Field label="Corte desde"><DatePicker value={dateFrom} onChange={setDateFrom} /></Field>
+        <Field label="Corte hasta"><DatePicker value={dateTo} onChange={setDateTo} /></Field>
         {respondents.length > 0 && (
           <Field label="Usuario">
             <Select value={respondentId} onChange={setRespondentId} placeholder="Todos los usuarios" options={[{ value: '', label: 'Todos los usuarios' }, ...respondents.map(item => ({ value: item.membership_id, label: item.full_name }))]} />

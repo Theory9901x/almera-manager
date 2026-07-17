@@ -1,5 +1,5 @@
 import { Star } from 'lucide-react'
-import { Select } from '@/design-system'
+import { DatePicker, Select } from '@/design-system'
 import type { EmojiStep, MatchingTarget, PublicSurveyQuestion, QuestionConfig, SurveyOption } from '../types'
 import { OptionCard } from './OptionCard'
 import { ImageOptionCard } from './ImageOptionCard'
@@ -78,9 +78,9 @@ export function QuestionRenderer({ question, value, onChange, color, error, disa
         const minIso = `${currentYear - 120}-01-01`
         const maxIso = `${currentYear + 20}-12-31`
         return (
-          <input
-            type="date" className="survey-input" value={date} disabled={disabled} min={minIso} max={maxIso}
-            onChange={event => onChange({ date: event.target.value || null })}
+          <DatePicker
+            value={date} disabled={disabled} min={minIso} max={maxIso}
+            onChange={value => onChange({ date: value || null })}
           />
         )
       }

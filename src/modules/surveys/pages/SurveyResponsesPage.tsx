@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, BarChart3, Loader2, Search, Trash2, X } from 'lucide-react'
-import { Badge, Button, Card, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, semaphoreColor, useToast } from '@/design-system'
+import { Badge, Button, Card, DatePicker, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, semaphoreColor, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { surveysService } from '../services/surveysService'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -119,8 +119,8 @@ function SurveyResponsesContent() {
 
       <Card accent={identity.color} className="flex flex-wrap items-end gap-3 p-4">
         <Field label="Buscar por nombre"><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre del encuestado" /></Field>
-        <Field label="Desde"><Input type="date" value={dateFrom} onChange={event => { setDateFrom(event.target.value); setPage(0) }} /></Field>
-        <Field label="Hasta"><Input type="date" value={dateTo} onChange={event => { setDateTo(event.target.value); setPage(0) }} /></Field>
+        <Field label="Desde"><DatePicker value={dateFrom} onChange={value => { setDateFrom(value); setPage(0) }} /></Field>
+        <Field label="Hasta"><DatePicker value={dateTo} onChange={value => { setDateTo(value); setPage(0) }} /></Field>
         {segmentCandidates.length > 0 && (
           <>
             <Field label="Filtrar por campo">

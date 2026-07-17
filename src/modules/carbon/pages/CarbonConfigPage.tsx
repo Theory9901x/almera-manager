@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus } from 'lucide-react'
-import { Badge, Button, Card, Field, Input, PageHeader, Table, ToastProvider, moduleIdentity, useToast } from '@/design-system'
+import { Badge, Button, Card, DatePicker, Field, Input, PageHeader, Table, ToastProvider, moduleIdentity, useToast } from '@/design-system'
 import { carbonService } from '../services/carbonService'
 import type { CarbonBlock, EmissionFactor } from '../types'
 
@@ -94,7 +94,7 @@ function CarbonConfigContent() {
               <Field label="Etiqueta visible"><Input value={factorForm.subtypeLabel} onChange={event => setFactorForm({ ...factorForm, subtypeLabel: event.target.value })} placeholder="ej. Electricidad (SIN Colombia)" /></Field>
               <Field label="Valor"><Input type="number" step="any" value={factorForm.value} onChange={event => setFactorForm({ ...factorForm, value: event.target.value })} /></Field>
               <Field label="Unidad"><Input value={factorForm.unit} onChange={event => setFactorForm({ ...factorForm, unit: event.target.value })} placeholder="kgCO2e/litro, gCO2/kWh..." /></Field>
-              <Field label="Vigente desde"><Input type="date" value={factorForm.validFrom} onChange={event => setFactorForm({ ...factorForm, validFrom: event.target.value })} /></Field>
+              <Field label="Vigente desde"><DatePicker value={factorForm.validFrom} onChange={value => setFactorForm({ ...factorForm, validFrom: value })} /></Field>
               <div className="sm:col-span-2"><Field label="Fuente metodológica"><Input value={factorForm.methodologySource} onChange={event => setFactorForm({ ...factorForm, methodologySource: event.target.value })} placeholder="ej. UPME/XM 2024" /></Field></div>
               <div className="sm:col-span-2"><Button identity={identity} onClick={createFactor}>Guardar factor</Button></div>
             </div>

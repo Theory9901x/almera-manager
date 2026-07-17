@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ClipboardList, Download, Lock, Plus, Save, Send, Unlock } from 'lucide-react'
-import { Badge, Button, Card, Field, Select, Table, moduleIdentity } from '@/design-system'
+import { Badge, Button, Card, DatePicker, Field, Select, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, CriterionResult, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score, ScopeResult } from '../types'
 import { ScoreSelector } from '../design/ScoreSelector'
@@ -351,8 +351,8 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           <p className="mt-1 text-xs text-[var(--muted)]">El profesional verá este plan en "Mi plan de trabajo" y podrá registrar seguimientos con evidencia.</p>
           <div className="dialog-form mt-4">
             <div className="full"><Field label="Descripción del plan"><textarea className="ds-input ds-textarea" rows={3} value={planForm.description} onChange={event => setPlanForm({ ...planForm, description: event.target.value })} placeholder="Qué debe hacer el profesional para mejorar" /></Field></div>
-            <Field label="Fecha inicio planeada"><input className="ds-input" type="date" value={planForm.plannedStartDate} onChange={event => setPlanForm({ ...planForm, plannedStartDate: event.target.value })} /></Field>
-            <Field label="Fecha fin planeada"><input className="ds-input" type="date" value={planForm.plannedEndDate} onChange={event => setPlanForm({ ...planForm, plannedEndDate: event.target.value })} /></Field>
+            <Field label="Fecha inicio planeada"><DatePicker value={planForm.plannedStartDate} onChange={value => setPlanForm({ ...planForm, plannedStartDate: value })} /></Field>
+            <Field label="Fecha fin planeada"><DatePicker value={planForm.plannedEndDate} onChange={value => setPlanForm({ ...planForm, plannedEndDate: value })} /></Field>
             <div className="full flex items-center gap-3">
               <GradientButton onClick={() => void savePlan()} disabled={busy}><Save size={16} />{improvementPlan ? 'Actualizar plan' : 'Crear plan'}</GradientButton>
               {improvementPlan && <span className="text-xs text-[var(--muted)]">Estado: {improvementPlan.status} · {improvementPlan.progress_percent}% de avance</span>}
@@ -423,7 +423,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             />
           </Field>
           <Field label="Mes reportado"><input className="ds-input" value={form.monthReported} onChange={event => setForm({ ...form, monthReported: event.target.value })} placeholder="Ej. Julio 2026" /></Field>
-          <Field label="Fecha de evaluación"><input className="ds-input" type="date" value={form.evaluationDate} onChange={event => setForm({ ...form, evaluationDate: event.target.value })} /></Field>
+          <Field label="Fecha de evaluación"><DatePicker value={form.evaluationDate} onChange={value => setForm({ ...form, evaluationDate: value })} /></Field>
           <Field label="Servicio"><input className="ds-input" value={form.service} onChange={event => setForm({ ...form, service: event.target.value })} /></Field>
           <Field label="Ciudad / sede"><input className="ds-input" value={form.citySite} onChange={event => setForm({ ...form, citySite: event.target.value })} /></Field>
           <Field label="Estado del profesional">

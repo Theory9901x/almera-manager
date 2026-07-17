@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { Badge, Button, Card, Field, PageHeader } from '@/shared/ui'
+import { DatePicker, Select } from '@/design-system'
 import { almeraService } from '../services/almeraService'
 import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AssistanceStatus } from '../types'
 
@@ -161,12 +162,12 @@ function FilterPanel({catalogs,filters,setFilters,pendingOnly=false}:{catalogs:A
       </div>
     </header>
     {filtersOpen&&<><div className="filter-primary">
-      <label className="filter-field"><span>Proceso</span><select value={filters.processId||''} onChange={event=>update('processId',event.target.value)}><option value="">Todos los procesos</option>{catalogs.processes.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <div className="filter-field"><span>Proceso</span><Select value={filters.processId||''} onChange={value=>update('processId',value)} placeholder="Todos los procesos" options={catalogs.processes.map(item=>({value:item.id,label:item.name}))}/></div>
       <fieldset className="filter-status"><legend>Estado</legend><div>{statuses.map(([value,label])=><button type="button" key={label} className={(filters.status||undefined)===value?'active':''} onClick={()=>update('status',value||'')}>{label}</button>)}</div></fieldset>
     </div>
     {showMore&&<div className="filter-advanced">
-      <label className="filter-field"><span>Módulo ALMERA</span><select value={filters.moduleId||''} onChange={event=>update('moduleId',event.target.value)}><option value="">Todos los módulos</option>{catalogs.modules.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <div className="filter-date-range"><span>Fecha de solicitud</span><div><label>Desde<input type="date" value={filters.dateFrom||''} onChange={event=>update('dateFrom',event.target.value)}/></label><label>Hasta<input type="date" value={filters.dateTo||''} onChange={event=>update('dateTo',event.target.value)}/></label></div></div>
+      <div className="filter-field"><span>Módulo ALMERA</span><Select value={filters.moduleId||''} onChange={value=>update('moduleId',value)} placeholder="Todos los módulos" options={catalogs.modules.map(item=>({value:item.id,label:item.name}))}/></div>
+      <div className="filter-date-range"><span>Fecha de solicitud</span><div><label>Desde<DatePicker value={filters.dateFrom||''} onChange={value=>update('dateFrom',value)}/></label><label>Hasta<DatePicker value={filters.dateTo||''} onChange={value=>update('dateTo',value)}/></label></div></div>
     </div>}</>}
   </Card>
 }

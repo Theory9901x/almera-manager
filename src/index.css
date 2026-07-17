@@ -1547,10 +1547,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-button:disabled { cursor: not-allowed; opacity: .55; transform: none; box-shadow: none; }
 .ds-button-primary { color: #fff; box-shadow: 0 8px 18px rgba(16,24,40,.16); background-size: 150% 150%; }
 .ds-button-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(16,24,40,.2); }
-.ds-button-secondary { background: #fff; color: var(--ink); border: 1px solid var(--border-hairline); }
-.ds-button-secondary:hover:not(:disabled) { border-color: #c3cad6; background: var(--color-surface-soft); }
+.ds-button-secondary { background: #fff; color: var(--ink); border: 1px solid var(--border-hairline); box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.ds-button-secondary:hover:not(:disabled) { border-color: var(--ds-accent, #c3cad6); background: var(--color-surface-soft); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(16,24,40,.08); }
+.ds-button-secondary:active:not(:disabled) { transform: translateY(0); }
 .ds-button-ghost { background: transparent; color: var(--ink-soft); }
-.ds-button-ghost:hover:not(:disabled) { background: var(--color-surface-soft); }
+.ds-button-ghost:hover:not(:disabled) { background: var(--color-surface-soft); color: var(--ink); }
 .ds-button-danger { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
 .ds-button-danger:hover:not(:disabled) { background: #FEE2E2; }
 
@@ -1566,23 +1567,77 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-badge-semaphore-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 999px; }
 .ds-badge-semaphore-empty { border-color: #E2E8F0; background: #F8FAFC; color: #94A3B8; }
 
+/* Componentes base de formulario — corregidos UNA VEZ aqui, no pantalla por pantalla: toda pantalla
+   nueva que use Field/Input/Select/DatePicker/Button del design-system nace ya con este estilo, sin
+   volver a pedirlo. El acento usa var(--ds-accent, ...) para heredar el color de marca del Card/
+   wrapper de modulo mas cercano (ej. .carbon-module), sin hardcodear un solo color para todo el
+   sistema — cada modulo mantiene su propia identidad automaticamente. */
 .ds-field { display: grid; gap: 6px; }
-.ds-field-label { font-size: 11px; font-weight: 800; color: var(--muted); }
-.ds-field-hint { font-size: 10px; color: var(--muted); }
-.ds-input, .ds-textarea { width: 100%; border: 1px solid var(--border-hairline); border-radius: 10px; background: #fff; padding: 10px 12px; font-size: 13px; color: var(--ink); outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
-.ds-input:focus, .ds-textarea:focus { border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+.ds-field-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.ds-field-hint { font-size: 12px; color: var(--ink-soft); font-weight: 400; }
+.ds-input, .ds-textarea {
+  width: 100%; border: 1.5px solid var(--border-hairline); border-radius: 12px; background: #fff;
+  padding: 12px 16px; font-size: 15px; color: var(--ink); outline: none; font-family: inherit;
+  box-shadow: 0 1px 2px rgba(21,34,56,.04); transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.ds-input:hover:not(:focus):not(:disabled), .ds-textarea:hover:not(:focus):not(:disabled) { border-color: color-mix(in srgb, var(--ds-accent, #4F46E5) 40%, var(--border-hairline)); }
+.ds-input:focus, .ds-textarea:focus { border-color: var(--ds-accent, #4F46E5); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-accent, #4F46E5) 14%, transparent); }
+.ds-input:disabled, .ds-textarea:disabled { opacity: .6; cursor: not-allowed; }
 .ds-textarea { resize: vertical; min-height: 80px; }
 
-.ds-search-box { display: flex; align-items: center; gap: 8px; height: 40px; border: 1px solid var(--border-hairline); border-radius: 10px; background: #fff; padding: 0 12px; color: var(--muted); transition: border-color 150ms ease, box-shadow 150ms ease; }
-.ds-search-box:focus-within { border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
-.ds-search-box input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 13px; color: var(--ink); }
+.ds-search-box { display: flex; align-items: center; gap: 8px; height: 44px; border: 1.5px solid var(--border-hairline); border-radius: 12px; background: #fff; padding: 0 14px; color: var(--muted); box-shadow: 0 1px 2px rgba(21,34,56,.04); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.ds-search-box:focus-within { border-color: var(--ds-accent, #4F46E5); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-accent, #4F46E5) 14%, transparent); }
+.ds-search-box input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 14px; color: var(--ink); }
 
-.ds-select-trigger { display: inline-flex; width: 100%; min-height: 40px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--border-hairline); border-radius: 10px; background: #fff; padding: 0 12px; font-size: 13px; font-weight: 650; color: var(--ink); cursor: pointer; outline: none; }
-.ds-select-trigger:focus-visible { border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
-.ds-select-content { z-index: 90; overflow: hidden; border: 1px solid var(--border-hairline); border-radius: 10px; background: #fff; box-shadow: var(--shadow-card-lg); padding: 4px; min-width: var(--radix-select-trigger-width); }
-.ds-select-item { display: flex; align-items: center; gap: 8px; border-radius: 7px; padding: 8px 10px; font-size: 13px; font-weight: 650; color: var(--ink); cursor: pointer; outline: none; }
-.ds-select-item[data-highlighted] { background: var(--color-surface-soft); }
-.ds-select-check { margin-left: auto; display: inline-flex; }
+.ds-select-trigger {
+  display: inline-flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1.5px solid var(--border-hairline); border-radius: 12px; background: #fff; padding: 0 14px; font-size: 14px; font-weight: 600;
+  color: var(--ink); cursor: pointer; outline: none; box-shadow: 0 1px 2px rgba(21,34,56,.04); transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.ds-select-trigger:hover { border-color: color-mix(in srgb, var(--ds-accent, #4F46E5) 40%, var(--border-hairline)); }
+.ds-select-trigger:focus-visible, .ds-select-trigger[data-state="open"] { border-color: var(--ds-accent, #4F46E5); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-accent, #4F46E5) 14%, transparent); }
+.ds-select-trigger svg { transition: transform 150ms ease; color: var(--muted); }
+.ds-select-trigger[data-state="open"] svg { transform: rotate(180deg); color: var(--ds-accent, #4F46E5); }
+.ds-select-content {
+  z-index: 90; overflow: hidden; border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
+  box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.12); padding: 5px; min-width: var(--radix-select-trigger-width);
+  animation: ds-popover-in 160ms ease;
+}
+.ds-select-item { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; outline: none; transition: background 120ms ease; }
+.ds-select-item[data-highlighted] { background: color-mix(in srgb, var(--ds-accent, #4F46E5) 10%, transparent); color: var(--ds-accent, #4F46E5); }
+.ds-select-check { margin-left: auto; display: inline-flex; color: var(--ds-accent, #4F46E5); }
+
+@keyframes ds-popover-in { from { opacity: 0; transform: scale(.96) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+/* DatePicker — reemplaza <input type="date"> nativo en todo el sistema */
+.ds-datepicker-trigger {
+  display: inline-flex; width: 100%; min-height: 44px; align-items: center; gap: 9px;
+  border: 1.5px solid var(--border-hairline); border-radius: 12px; background: #fff; padding: 0 14px; font-size: 14px; font-weight: 600;
+  color: var(--ink); cursor: pointer; outline: none; box-shadow: 0 1px 2px rgba(21,34,56,.04); transition: border-color 150ms ease, box-shadow 150ms ease;
+  font-family: inherit; text-align: left;
+}
+.ds-datepicker-trigger svg { color: var(--muted); flex: none; }
+.ds-datepicker-trigger:hover { border-color: color-mix(in srgb, var(--ds-accent, #4F46E5) 40%, var(--border-hairline)); }
+.ds-datepicker-trigger:focus-visible, .ds-datepicker-trigger[data-state="open"] { border-color: var(--ds-accent, #4F46E5); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-accent, #4F46E5) 14%, transparent); }
+.ds-datepicker-trigger:disabled { opacity: .6; cursor: not-allowed; }
+.ds-datepicker-placeholder { color: #9aa5b8; font-weight: 400; }
+.ds-datepicker-content {
+  z-index: 90; width: 272px; border: 1px solid var(--border-hairline); border-radius: 14px; background: #fff;
+  box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.14); padding: 12px; animation: ds-popover-in 160ms ease;
+}
+.ds-datepicker-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ds-datepicker-header strong { font-size: 13px; font-weight: 700; text-transform: capitalize; }
+.ds-datepicker-header button { display: grid; place-items: center; width: 26px; height: 26px; border: none; background: none; border-radius: 8px; color: var(--muted); cursor: pointer; }
+.ds-datepicker-header button:hover { background: var(--color-surface-soft); color: var(--ink); }
+.ds-datepicker-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
+.ds-datepicker-weekdays span { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.ds-datepicker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.ds-datepicker-day { display: grid; place-items: center; aspect-ratio: 1; border: none; background: none; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink); cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+.ds-datepicker-day:hover:not(:disabled) { background: color-mix(in srgb, var(--ds-accent, #4F46E5) 12%, transparent); }
+.ds-datepicker-day:disabled { color: #cbd5e1; cursor: not-allowed; }
+.ds-datepicker-day.is-today { color: var(--ds-accent, #4F46E5); font-weight: 800; }
+.ds-datepicker-day.is-selected { background: var(--ds-accent, #4F46E5); color: #fff; }
+.ds-datepicker-day.is-selected:hover { background: var(--ds-accent, #4F46E5); }
 
 .ds-table-wrap { overflow-x: auto; }
 .ds-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -1758,6 +1813,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-public-shell {
   position: relative; min-height: 100vh; font-family: var(--font-body, inherit);
   background: #f6f8fc;
+  /* Puente hacia --ds-accent: los controles compartidos (DatePicker, Select) leen esa variable,
+     no --survey-accent, para theming. Sin este puente heredarian el indigo generico en vez del
+     color de marca de la encuesta. */
+  --ds-accent: var(--survey-accent, #0F7A54);
 }
 
 /* Fondo vivo: formas grandes muy difuminadas que se desplazan despacio (18-26s), sin competir
@@ -2092,6 +2151,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   --carbon-brand: #0f5c3f;
   --carbon-brand-light: #0ca678;
   --carbon-brand-pale: #e6f9f3;
+  /* Puente hacia --ds-accent para que Select/DatePicker compartidos hereden el verde del modulo. */
+  --ds-accent: var(--carbon-brand-light);
   --scope-1: #2563eb;
   --scope-2: #d97706;
   --scope-3: #7c3aed;
@@ -2162,18 +2223,6 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .carbon-trend-badge--up { background: #fdeaea; color: var(--trend-bad); border: 1px solid color-mix(in srgb, var(--trend-bad) 30%, transparent); }
 .carbon-trend-badge--flat { background: #f1f5f9; color: var(--trend-neutral); border: 1px solid color-mix(in srgb, var(--trend-neutral) 25%, transparent); }
 @keyframes carbon-trend-pop { 0% { transform: scale(.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-
-/* Input de fecha nativo, pero con tratamiento visual completo (no el default del navegador):
-   mismo radio/sombra/foco que el resto del sistema — el icono del calendario se tiñe via filter
-   porque no existe una propiedad de color directa para ese pseudo-elemento en ningun navegador. */
-.carbon-module input[type="date"] {
-  padding: 10px 14px; border: 1.5px solid var(--border-subtle); border-radius: 12px; background: var(--surface-1);
-  box-shadow: 0 1px 2px rgba(15,92,63,.05); font-size: 13.5px; color: var(--ink); font-family: inherit;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.carbon-module input[type="date"]:hover { border-color: color-mix(in srgb, var(--carbon-brand-light) 50%, var(--border-subtle)); }
-.carbon-module input[type="date"]:focus { outline: none; border-color: var(--carbon-brand-light); box-shadow: 0 0 0 4px rgba(12,166,120,.14); }
-.carbon-module input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(36%) sepia(24%) saturate(1352%) hue-rotate(122deg) brightness(94%) contrast(94%); cursor: pointer; }
 
 .carbon-tooltip { background: var(--surface-1); border-radius: 12px; box-shadow: var(--shadow-stack); padding: 8px 12px; border-left: 3px solid var(--carbon-brand); }
 .carbon-tooltip-label { margin: 0 0 2px; font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; }
