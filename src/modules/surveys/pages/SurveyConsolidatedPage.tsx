@@ -67,12 +67,16 @@ function SurveyConsolidatedContent() {
         actions={<Button variant="secondary" onClick={() => navigate('/app/encuestas')}><ArrowLeft size={15} /> Encuestas</Button>}
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ClipboardList} label="Encuestas" value={<CountUpValue value={totals.totalSurveys} />} identity={identity} />
-        <StatCard icon={Radio} label="Publicadas" value={<CountUpValue value={totals.published} />} identity={identity} />
-        <StatCard icon={Users} label="Respuestas completadas" value={<CountUpValue value={totals.totalResponses} />} identity={identity} />
-        <StatCard icon={Percent} label="Tasa de finalización" value={<CountUpValue value={totals.completionRate} suffix="%" />} detail="Promedio de todas las encuestas" identity={identity} />
-      </section>
+      {/* Respuestas completadas es el volumen real de la entidad — dato protagonista (hero), no
+          una caja mas entre cuatro iguales. Encuestas/Publicadas/Tasa quedan secundarias. */}
+      <div className="ds-bento">
+        <div className="ds-bento-item ds-bento-hero">
+          <StatCard icon={Users} label="Respuestas completadas" value={<CountUpValue value={totals.totalResponses} />} identity={identity} />
+        </div>
+        <div className="ds-bento-item"><StatCard icon={ClipboardList} label="Encuestas" value={<CountUpValue value={totals.totalSurveys} />} identity={identity} /></div>
+        <div className="ds-bento-item"><StatCard icon={Radio} label="Publicadas" value={<CountUpValue value={totals.published} />} identity={identity} /></div>
+        <div className="ds-bento-item"><StatCard icon={Percent} label="Tasa de finalización" value={<CountUpValue value={totals.completionRate} suffix="%" />} detail="Promedio de todas las encuestas" identity={identity} /></div>
+      </div>
 
       {!surveys.length ? (
         <Card accent={identity.color}>

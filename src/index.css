@@ -1777,6 +1777,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-stat-card-icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 999px; color: #fff; }
 .ds-stat-card-value { display: block; font-size: 22px; font-weight: 800; }
 .ds-stat-card-detail { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+/* Dentro de un hero de bento, el StatCard protagonista escala su icono/numero — no es la misma
+   caja pequena que las secundarias, solo con mas aire alrededor. */
+.ds-bento-hero .ds-stat-card { border: 0; box-shadow: none; padding: 0; gap: var(--space-4); }
+.ds-bento-hero .ds-stat-card-icon { width: 60px; height: 60px; }
+.ds-bento-hero .ds-stat-card-value { font-size: 3rem; }
 
 .ds-page-header { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .ds-page-header h1 { margin: 0; font-size: var(--text-h1); font-weight: var(--weight-black); letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
