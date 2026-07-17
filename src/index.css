@@ -1665,6 +1665,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   padding: 20px 24px;
   color: rgba(255,255,255,.92);
 }
+/* El StatCard/Card que vive adentro trae su propio fondo blanco opaco (.ds-card) — hay que
+   despojarlo para que se vea el degradado oscuro del highlight-box, si no el contenido en blanco
+   (pensado para fondo oscuro) queda invisible sobre esa tarjeta blanca: un rectangulo en blanco. */
+.highlight-box .ds-card { background: transparent; border: none; box-shadow: none; padding: 0; }
 .highlight-box .ds-stat-card-icon { background: rgba(255,255,255,.12) !important; }
 .highlight-box .ds-eyebrow, .highlight-box .dashboard-card-category { color: rgba(255,255,255,.65); }
 .highlight-box .ds-stat-card-value { color: #fff; }
