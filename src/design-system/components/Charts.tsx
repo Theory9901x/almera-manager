@@ -5,7 +5,7 @@ import type { BarSeriesOption, GaugeSeriesOption, LineSeriesOption } from 'echar
 import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components'
 import type { GridComponentOption, TooltipComponentOption } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
-import ReactEChartsCore from 'echarts-for-react/lib/core'
+import ReactEChartsCore from 'echarts-for-react/esm/core'
 import { FONT_FAMILY } from '../tokens'
 
 type ECOption = ComposeOption<BarSeriesOption | LineSeriesOption | GaugeSeriesOption | GridComponentOption | TooltipComponentOption>
