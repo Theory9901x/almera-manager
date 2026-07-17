@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ArrowDown, ArrowUp, Leaf, Minus, Settings, Sparkles } from 'lucide-react'
+import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
 import { Button, Card, EmptyState, Field, Input, PageHeader, ProgressRing, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
+import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
+import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
 import type { CarbonStats } from '../types'
 
 const SCOPE_COLOR = { SCOPE_1: '#2563eb', SCOPE_2: '#d97706', SCOPE_3: '#7c3aed' }
@@ -32,10 +34,13 @@ export default function CarbonDashboardPage() {
 function CarbonDashboardContent() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { session } = useAuth()
   const [stats, setStats] = useState<CarbonStats | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [loading, setLoading] = useState(true)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -45,6 +50,13 @@ function CarbonDashboardContent() {
   }
 
   useEffect(() => { void load() }, [dateFrom, dateTo])
+
+  async function handleExportPdf() {
+    setExportingPdf(true)
+    try { await carbonService.exportPdf({ dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }) }
+    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar el informe') }
+    finally { setExportingPdf(false) }
+  }
 
   const scopeTotal = useMemo(() => stats ? stats.byScope.SCOPE_1 + stats.byScope.SCOPE_2 + stats.byScope.SCOPE_3 : 0, [stats])
   const scopePercent = (value: number) => scopeTotal ? Math.round((value / scopeTotal) * 100) : null
@@ -65,6 +77,8 @@ function CarbonDashboardContent() {
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/captura')}><Sparkles size={15} /> Registrar medición</Button>
+              <Button variant="secondary" onClick={() => setShowAnalysis(true)}><Telescope size={15} /> Análisis trimestral</Button>
+              <Button variant="secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileDown size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
               <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/configuracion')}><Settings size={15} /> Configuración</Button>
             </div>
           }
@@ -174,6 +188,8 @@ function CarbonDashboardContent() {
           )}
         </div>
       </div>
+
+      {showAnalysis && <QuarterlyAnalysisPanel canManage={Boolean(session?.permissions.includes('carbon.manage'))} onClose={() => setShowAnalysis(false)} />}
     </div>
   )
 }

@@ -75,6 +75,32 @@ export interface CarbonTargetProgress {
 export interface CarbonBlockTotal { blockKey: string; name: string; kgco2e: number }
 export interface CarbonTimelinePoint { period: string; kgco2e: number }
 
+export interface CarbonBenchmark {
+  id: string
+  source: string
+  metric_key: string
+  label: string
+  value: number | null
+  unit: string
+  note: string
+  methodology_source: string
+}
+
+export interface CarbonRecommendation { text: string; source: string }
+export interface CarbonBenchmarkComparison { benchmarks: CarbonBenchmark[]; caveat: string }
+
+export interface CarbonQuarterlyAnalysis {
+  id: string
+  year: number
+  quarter: number
+  total_kgco2e: number
+  trend_percent: number | null
+  top_block_key: string | null
+  benchmark_comparison: CarbonBenchmarkComparison
+  recommendations: CarbonRecommendation[]
+  created_at: string
+}
+
 export interface CarbonStats {
   total: number
   byScope: { SCOPE_1: number; SCOPE_2: number; SCOPE_3: number }

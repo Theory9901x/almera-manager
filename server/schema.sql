@@ -676,3 +676,77 @@ CREATE TABLE IF NOT EXISTS carbon_reduction_targets (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (organization_id, target_year)
 );
+
+-- Benchmarks cientificos de referencia (NHS Inglaterra — Lancet Planetary Health, HHS Health Sector
+-- Climate Pledge, Global Roadmap Salud sin Dano + Arup 2021) — datos globales, no por entidad,
+-- cargados una sola vez para trazabilidad y comparacion. Se usan como referencia de DIRECCION, no
+-- como meta exacta esperable en el contexto colombiano (salvedad que se muestra siempre junto al
+-- dato en el analisis trimestral).
+CREATE TABLE IF NOT EXISTS carbon_benchmarks (
+  id BIGSERIAL PRIMARY KEY,
+  source TEXT NOT NULL,
+  metric_key TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  value NUMERIC,
+  unit TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  methodology_source TEXT NOT NULL
+);
+INSERT INTO carbon_benchmarks (source, metric_key, label, value, unit, note, methodology_source) VALUES
+  ('NHS', 'nhs_acute_bed_day', 'Atención aguda hospitalaria', 125, 'kg CO2e/día-cama', '', 'NHS England — The Lancet Planetary Health'),
+  ('NHS', 'nhs_outpatient_visit', 'Consulta ambulatoria', 76, 'kg CO2e/cita', '', 'NHS England — The Lancet Planetary Health'),
+  ('NHS', 'nhs_gp_visit', 'Consulta de medicina general', 66, 'kg CO2e/visita', '', 'NHS England — The Lancet Planetary Health'),
+  ('NHS', 'nhs_ambulance_response', 'Respuesta de ambulancia de urgencia', 75, 'kg CO2e/respuesta', '', 'NHS England — The Lancet Planetary Health'),
+  ('NHS', 'nhs_elective_stay', 'Estancia hospitalaria electiva completa', 708, 'kg CO2e', '', 'NHS England — The Lancet Planetary Health'),
+  ('NHS', 'nhs_per_capita', 'Huella per cápita del sistema', 540, 'kg CO2e/persona/año', 'Referencia de un sistema de salud de altos ingresos — usar como dirección, no como meta exacta esperable en Colombia.', 'NHS England — The Lancet Planetary Health'),
+  ('NHS', 'nhs_target', 'Meta oficial NHS', 80, '% reducción vs. 1990 para 2032', 'Net zero (huella directa) para 2045.', 'NHS England Net Zero Plan'),
+  ('HHS', 'hhs_target', 'Meta HHS Health Sector Climate Pledge', 50, '% reducción para 2030', 'Cero emisiones netas para 2050, alineado con el Acuerdo de París — meta intermedia más conservadora que la del NHS.', 'HHS Health Sector Climate Pledge'),
+  ('GLOBAL_ROADMAP', 'roadmap_no_action', 'Proyección sin acción adicional', 3, 'x (podría triplicarse para 2050)', '7 acciones de mayor impacto: electrificación con energía 100% renovable, infraestructura de cero emisiones, transporte sanitario sostenible, entre otras.', 'Salud sin Daño + Arup, Hoja de Ruta Global para la Descarbonización de la Salud, 2021'),
+  ('CASE_STUDY', 'desflurane_equivalence', 'Equivalencia de impacto del desflurano', 886, 'kg CO2e por frasco de 240 ml', 'Equivale a quemar 440 kg de carbón. Un hospital NHS bajó su uso de desflurano de 20% a menos de 2% cambiando de agente anestésico.', 'Salud sin Daño')
+ON CONFLICT (metric_key) DO NOTHING;
+
+-- Banco de recomendaciones CURADO por variable/fuente de emision — nunca texto libre generado,
+-- siempre con su respaldo citado (clave para que el informe sea creible ante un ente acreditador).
+CREATE TABLE IF NOT EXISTS carbon_recommendations (
+  id BIGSERIAL PRIMARY KEY,
+  block_key TEXT NOT NULL REFERENCES carbon_blocks(key) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  source TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO carbon_recommendations (block_key, text, source, position)
+SELECT * FROM (VALUES
+  ('electricity', 'Realizar un inventario de equipos de alto consumo eléctrico para priorizar intervenciones.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 1),
+  ('electricity', 'Migrar la iluminación a tecnología LED en las áreas de mayor uso.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 2),
+  ('electricity', 'Instalar sensores de movimiento en zonas de tránsito y baja ocupación.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 3),
+  ('electricity', 'Establecer un programa de mantenimiento preventivo de sistemas HVAC.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 4),
+  ('electricity', 'Evaluar la viabilidad de energía renovable in situ (ej. paneles solares).', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 5),
+  ('waste', 'Fortalecer la segregación de residuos en la fuente para reducir el volumen que termina en incineración.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 1),
+  ('waste', 'Explorar alternativas a la incineración para el "mix clínico" (autoclave, microondas, tratamiento físico-químico).', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 2),
+  ('waste', 'Implementar o fortalecer programas de compostaje para residuos orgánicos.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 3),
+  ('stationary_combustion', 'Establecer mantenimiento preventivo periódico de calderas y generadores.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 1),
+  ('stationary_combustion', 'Evaluar combustibles alternativos de menor factor de emisión.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 2),
+  ('mobile_combustion', 'Establecer mantenimiento preventivo periódico de la flota vehicular.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 1),
+  ('mobile_combustion', 'Planificar la renovación gradual de la flota hacia vehículos híbridos o eléctricos.', 'Salud sin Daño — recomendaciones para el sector salud colombiano', 2),
+  ('anesthetic_gases', 'Evaluar la sustitución de óxido nitroso/desflurano por sevoflurano cuando sea médicamente viable — un solo frasco de 240 ml de desflurano equivale a quemar 440 kg de carbón (886 kg CO2e).', 'Salud sin Daño', 1),
+  ('anesthetic_gases', 'Implementar protocolos de anestesia de bajo flujo.', 'Salud sin Daño', 2)
+) AS seed(block_key, text, source, position)
+WHERE NOT EXISTS (SELECT 1 FROM carbon_recommendations LIMIT 1);
+
+-- Analisis trimestral: se GENERA y queda guardado como registro historico (nunca se regenera y
+-- pierde el anterior) — permite ver la evolucion del analisis y si las recomendaciones anteriores
+-- se implementaron.
+CREATE TABLE IF NOT EXISTS carbon_quarterly_analyses (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  quarter SMALLINT NOT NULL CHECK (quarter BETWEEN 1 AND 4),
+  total_kgco2e NUMERIC NOT NULL,
+  trend_percent NUMERIC,
+  top_block_key TEXT REFERENCES carbon_blocks(key),
+  benchmark_comparison JSONB NOT NULL DEFAULT '{}'::jsonb,
+  recommendations JSONB NOT NULL DEFAULT '[]'::jsonb,
+  generated_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, year, quarter)
+);

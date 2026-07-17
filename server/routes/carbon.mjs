@@ -6,6 +6,8 @@ import multer from 'multer'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { computeEmissions, lookupFactor, resolveScope } from '../carbonEngine.mjs'
+import { renderPdf } from '../pdf.mjs'
+import { renderCarbonReportHtml } from '../templates/carbonReport.mjs'
 
 export const carbonRouter = Router()
 
@@ -352,5 +354,130 @@ carbonRouter.get('/stats', carbonModule, view, async (request, response, next) =
       normalized: { perPatient: null, perBed: null, note: 'Este indicador requiere datos de pacientes atendidos/camas que aún no están disponibles en el sistema.' },
       target: targetProgress,
     })
+  } catch (error) { next(error) }
+})
+
+// ---- Benchmarks cientificos de referencia (NHS/HHS/Global Roadmap) ----
+
+carbonRouter.get('/benchmarks', carbonModule, view, async (request, response, next) => {
+  try {
+    const result = await query('SELECT * FROM carbon_benchmarks ORDER BY source, id')
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+// ---- Analisis trimestral automatico ----
+
+function quarterOf(date) { return Math.floor(date.getUTCMonth() / 3) + 1 }
+function quarterRange(year, quarter) {
+  const startMonth = (quarter - 1) * 3
+  const start = new Date(Date.UTC(year, startMonth, 1))
+  const end = new Date(Date.UTC(year, startMonth + 3, 0))
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
+}
+
+carbonRouter.get('/quarterly-analysis', carbonModule, view, async (request, response, next) => {
+  try {
+    const result = await query('SELECT * FROM carbon_quarterly_analyses WHERE organization_id = $1 ORDER BY year DESC, quarter DESC', [oid(request)])
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+// Genera el analisis de un trimestre y lo deja guardado como registro historico — si ya existe uno
+// para ese trimestre, NO se regenera/sobrescribe (se pierde la trazabilidad de que recomendaciones
+// se dieron entonces); hay que eliminarlo explicitamente primero si de verdad hace falta rehacerlo.
+carbonRouter.post('/quarterly-analysis/generate', carbonModule, manage, async (request, response, next) => {
+  try {
+    const body = request.body || {}
+    const now = new Date()
+    const year = Number(body.year) || now.getUTCFullYear()
+    const quarter = Number(body.quarter) || quarterOf(now)
+    const { start, end } = quarterRange(year, quarter)
+
+    const existing = await query('SELECT id FROM carbon_quarterly_analyses WHERE organization_id = $1 AND year = $2 AND quarter = $3', [oid(request), year, quarter])
+    if (existing.rows[0]) fail(409, `Ya existe un análisis para ${year} T${quarter}. Consulta el historial o elimínalo antes de regenerarlo.`)
+
+    const prevQuarter = quarter === 1 ? 4 : quarter - 1
+    const prevYear = quarter === 1 ? year - 1 : year
+    const previousRange = quarterRange(prevYear, prevQuarter)
+
+    const [currentResult, previousResult, benchmarksResult] = await Promise.all([
+      query('SELECT block_key, b.name, COALESCE(SUM(m.computed_kgco2e), 0) AS total FROM carbon_measurements m JOIN carbon_blocks b ON b.key = m.block_key WHERE m.organization_id = $1 AND m.record_date BETWEEN $2 AND $3 GROUP BY block_key, b.name', [oid(request), start, end]),
+      query('SELECT COALESCE(SUM(computed_kgco2e), 0) AS total FROM carbon_measurements WHERE organization_id = $1 AND record_date BETWEEN $2 AND $3', [oid(request), previousRange.start, previousRange.end]),
+      query('SELECT metric_key, label, value, unit, note FROM carbon_benchmarks'),
+    ])
+
+    const totalCurrent = currentResult.rows.reduce((sum, row) => sum + Number(row.total || 0), 0)
+    if (!totalCurrent) fail(422, `No hay mediciones registradas para ${year} T${quarter}`)
+
+    const previousTotal = Number(previousResult.rows[0].total)
+    const trendPercent = previousTotal ? Math.round(((totalCurrent - previousTotal) / previousTotal) * 1000) / 10 : null
+
+    const topBlock = currentResult.rows.slice().sort((a, b) => Number(b.total) - Number(a.total))[0]
+    const topBlockKey = topBlock?.block_key || null
+
+    let recommendations = []
+    if (topBlockKey) {
+      const recResult = await query('SELECT text, source FROM carbon_recommendations WHERE block_key = $1 ORDER BY position LIMIT 4', [topBlockKey])
+      recommendations = recResult.rows
+    }
+
+    const benchmarkComparison = {
+      benchmarks: benchmarksResult.rows,
+      caveat: 'Los benchmarks del NHS/HHS corresponden a sistemas de salud de altos ingresos; se muestran como referencia de dirección, no como meta exacta esperable en el contexto colombiano.',
+    }
+
+    const inserted = await query(
+      `INSERT INTO carbon_quarterly_analyses (organization_id, year, quarter, total_kgco2e, trend_percent, top_block_key, benchmark_comparison, recommendations, generated_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [oid(request), year, quarter, totalCurrent, trendPercent, topBlockKey, JSON.stringify(benchmarkComparison), JSON.stringify(recommendations), uid(request)],
+    )
+    response.status(201).json(inserted.rows[0])
+  } catch (error) { next(error) }
+})
+
+// ---- Informe PDF institucional ----
+
+carbonRouter.get('/report.pdf', carbonModule, exportPerm, async (request, response, next) => {
+  try {
+    const params = [oid(request)]
+    const where = ['m.organization_id = $1']
+    if (request.query.dateFrom) { params.push(request.query.dateFrom); where.push(`m.record_date >= $${params.length}`) }
+    if (request.query.dateTo) { params.push(request.query.dateTo); where.push(`m.record_date <= $${params.length}`) }
+
+    const measurementsResult = await query(
+      `SELECT m.*, b.name AS block_name, b.scope AS block_scope FROM carbon_measurements m JOIN carbon_blocks b ON b.key = m.block_key WHERE ${where.join(' AND ')} ORDER BY m.record_date`,
+      params,
+    )
+    const orgResult = await query('SELECT name FROM organizations WHERE id = $1', [oid(request)])
+
+    const byScope = { SCOPE_1: 0, SCOPE_2: 0, SCOPE_3: 0 }
+    const byBlockMap = new Map()
+    let total = 0
+    for (const row of measurementsResult.rows) {
+      const kgco2e = Number(row.computed_kgco2e) || 0
+      const scope = row.scope_override || row.block_scope
+      if (scope && byScope[scope] != null) byScope[scope] += kgco2e
+      total += kgco2e
+      const bucket = byBlockMap.get(row.block_key) || { name: row.block_name, kgco2e: 0, count: 0 }
+      bucket.kgco2e += kgco2e
+      bucket.count += 1
+      byBlockMap.set(row.block_key, bucket)
+    }
+
+    const html = renderCarbonReportHtml({
+      organizationName: orgResult.rows[0]?.name || '',
+      dateFrom: request.query.dateFrom || null,
+      dateTo: request.query.dateTo || null,
+      generatedAt: new Date().toISOString(),
+      total,
+      byScope,
+      byBlock: [...byBlockMap.entries()].map(([key, value]) => ({ blockKey: key, ...value })).sort((a, b) => b.kgco2e - a.kgco2e),
+      measurements: measurementsResult.rows,
+    })
+    const pdf = await renderPdf(html)
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', 'attachment; filename="informe-huella-carbono.pdf"')
+    response.send(pdf)
   } catch (error) { next(error) }
 })

@@ -1,5 +1,6 @@
 import type {
-  CarbonBlock, CarbonMeasurement, CarbonMeasurementDetail, CarbonMeasurementListResult, CarbonReductionTarget, CarbonStats, EmissionFactor,
+  CarbonBenchmark, CarbonBlock, CarbonMeasurement, CarbonMeasurementDetail, CarbonMeasurementListResult, CarbonQuarterlyAnalysis,
+  CarbonReductionTarget, CarbonStats, EmissionFactor,
 } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -55,4 +56,21 @@ export const carbonService = {
     call<CarbonReductionTarget>('/targets', { method: 'POST', body: JSON.stringify(data) }),
 
   stats: (filters: { dateFrom?: string; dateTo?: string } = {}) => call<CarbonStats>(`/stats${toQueryString(filters)}`),
+
+  benchmarks: () => call<CarbonBenchmark[]>('/benchmarks'),
+  quarterlyAnalyses: () => call<CarbonQuarterlyAnalysis[]>('/quarterly-analysis'),
+  generateQuarterlyAnalysis: (data: { year?: number; quarter?: number } = {}) =>
+    call<CarbonQuarterlyAnalysis>('/quarterly-analysis/generate', { method: 'POST', body: JSON.stringify(data) }),
+
+  exportPdf: async (filters: { dateFrom?: string; dateTo?: string } = {}) => {
+    const response = await fetch(`/api/carbon/report.pdf${toQueryString(filters)}`, { credentials: 'same-origin' })
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'informe-huella-carbono.pdf'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
 }

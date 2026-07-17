@@ -2159,6 +2159,33 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .carbon-skeleton-spinner { width: 32px; height: 32px; border-radius: 999px; border: 3px solid rgba(15,92,63,.2); border-top-color: var(--carbon-brand); animation: carbon-spin .8s linear infinite; }
 @keyframes carbon-spin { to { transform: rotate(360deg); } }
 
+/* Panel de analisis trimestral — glassmorphism 2.0: sutil, solo aqui (overlay), nunca en las
+   tarjetas KPI normales de la pantalla base. */
+.carbon-panel-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(15,34,28,.35); backdrop-filter: blur(2px); }
+.quarterly-analysis-panel {
+  position: relative; width: min(560px, 100%); max-height: 86vh; display: flex; flex-direction: column;
+  background: rgba(255,255,255,.85); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-radius: var(--radius-card); box-shadow: var(--shadow-stack);
+}
+.quarterly-analysis-panel::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  background: linear-gradient(135deg, rgba(12,166,120,.5), rgba(37,99,235,.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+}
+
+.recommendation-card {
+  border-radius: var(--radius-card); border-left: 4px solid var(--carbon-brand);
+  background: linear-gradient(135deg, var(--surface-1), var(--surface-2)); padding: 16px 20px;
+  box-shadow: var(--shadow-stack); transition: transform .15s var(--ease-standard), box-shadow .15s var(--ease-standard);
+}
+.recommendation-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-stack), 0 20px 40px rgba(15,92,63,.16); }
+.recommendation-source {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin: 10px 0 0;
+  display: flex; align-items: center; gap: 6px;
+}
+.recommendation-source::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--carbon-brand-light); }
+
 @media (prefers-reduced-motion: reduce) {
   .carbon-module * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
