@@ -74,8 +74,11 @@ export default function DashboardPage() {
 function DashboardSection({ label, color, children }: { label: string; color: string; children: React.ReactNode }) {
   return (
     <div className="dashboard-section">
-      <span className="pill-badge" style={{ ['--pill-color' as string]: color }}>{label}</span>
-      <div className="mt-3 flex flex-wrap gap-3">{children}</div>
+      <div className="dashboard-section-header">
+        <span className="dashboard-section-dot" style={{ ['--pill-color' as string]: color }} aria-hidden="true" />
+        <h2 className="dashboard-section-title">{label}</h2>
+      </div>
+      <div className="dashboard-section-grid">{children}</div>
     </div>
   )
 }
@@ -218,11 +221,13 @@ function AuditorHome({ membershipId }: { membershipId: string }) {
 
       {/* Cumplimiento promedio es la metrica que resume el desempeno del mes — protagonista en
           highlight-box, "evaluaciones cerradas" queda secundaria. */}
-      <div className="ds-bento">
+      <div className="ds-bento-split">
         <div className="ds-bento-item ds-bento-hero highlight-box" style={{ ['--highlight-accent' as string]: identity.color }}>
           <StatCard icon={ClipboardCheck} label="Cumplimiento promedio auditado" value={averageCompliance === null ? '—' : `${averageCompliance.toFixed(1)}%`} identity={identity} />
         </div>
-        <div className="ds-bento-item"><StatCard icon={Gauge} label="Evaluaciones cerradas este mes" value={closedThisMonth.length} identity={identity} /></div>
+        <div className="ds-bento-secondary-grid">
+          <StatCard icon={Gauge} label="Evaluaciones cerradas este mes" value={closedThisMonth.length} identity={identity} />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -256,14 +261,17 @@ function AdminHome() {
   return (
     <div className="space-y-4">
       {/* Pendientes por revisar es el numero que realmente pide accion hoy — dato protagonista en
-          highlight-box, no una caja mas entre 4 iguales. */}
-      <div className="ds-bento">
+          highlight-box, no una caja mas entre 4 iguales. Las 3 secundarias viven en su propia
+          grilla que envuelve independiente del hero, ninguna queda huerfana. */}
+      <div className="ds-bento-split">
         <div className="ds-bento-item ds-bento-hero highlight-box" style={{ ['--highlight-accent' as string]: almeraIdentity.color }}>
           <StatCard icon={ClipboardList} label="Pendientes por revisar" value={inReview} identity={almeraIdentity} />
         </div>
-        <div className="ds-bento-item"><StatCard icon={Users} label="Usuarios activos" value={userCount ?? '—'} identity={identity} /></div>
-        <div className="ds-bento-item"><StatCard icon={Headphones} label="Solicitudes ALMERA" value={total} identity={almeraIdentity} /></div>
-        <div className="ds-bento-item"><StatCard icon={CheckCircle2} label="Cerradas con trazabilidad" value={closed} identity={almeraIdentity} /></div>
+        <div className="ds-bento-secondary-grid">
+          <StatCard icon={Users} label="Usuarios activos" value={userCount ?? '—'} identity={identity} />
+          <StatCard icon={Headphones} label="Solicitudes ALMERA" value={total} identity={almeraIdentity} />
+          <StatCard icon={CheckCircle2} label="Cerradas con trazabilidad" value={closed} identity={almeraIdentity} />
+        </div>
       </div>
 
       <DashboardSection label="Gestión operativa" color={almeraIdentity.color}>

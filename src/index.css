@@ -31,7 +31,7 @@
   --color-navy-900: #101827;
   --color-navy-800: #1b2940;
   --color-navy-700: #2b3b56;
-  --color-surface-page: #f1f3ee;
+  --color-surface-page: #e7ebe0;
   --color-surface-card: #ffffff;
   --color-surface-soft: #f7f8f4;
   --color-border: #dde2d4;
@@ -63,10 +63,10 @@
   --shadow-md: 0 18px 42px rgba(20,27,45,.13);
   --shadow-brand: 0 12px 26px rgba(199,25,45,.24);
   /* Elevacion de superficies neutras (tarjetas SGIMR) */
-  --border-hairline: rgba(16,24,40,.07);
+  --border-hairline: rgba(16,24,40,.14);
   --radius-card: 16px;
   --radius-card-sm: 10px;
-  --shadow-card-sm: 0 1px 2px rgba(16,24,40,.045), 0 4px 10px rgba(16,24,40,.035);
+  --shadow-card-sm: 0 1px 3px rgba(16,24,40,.08), 0 6px 16px rgba(16,24,40,.08);
   --shadow-card-md: 0 2px 6px rgba(16,24,40,.055), 0 10px 26px rgba(16,24,40,.06);
   --shadow-card-lg: 0 10px 20px rgba(16,24,40,.09), 0 24px 48px rgba(16,24,40,.12);
   --font-sans: "Manrope Variable", "Manrope", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -144,15 +144,26 @@ p, .page-subtitle, .ds-page-header-description { text-wrap: pretty; }
    El dato protagonista (ds-bento-hero) ocupa 2x2, el resto (ds-bento-item a secas) 1x1 — nunca
    una fila de tarjetas todas iguales. Vocabulario compartido: cualquier dashboard del sistema lo
    usa, no solo Huella de Carbono (que ya lo probo con su propio carbon-bento-grid). */
-.ds-bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(150px, auto); gap: var(--space-4); }
+.ds-bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: auto; gap: var(--space-4); align-items: stretch; }
 .ds-bento-item { container-type: inline-size; min-width: 0; }
-.ds-bento-hero { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); }
+/* Hero: ancho protagonista (2 columnas), pero SOLO 1 fila — su alto lo da min-height/contenido
+   propio, nunca un grid-row:span forzado que deje relleno vacio gigante como paso antes. */
+.ds-bento-hero { grid-column: span 2; min-height: 160px; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); }
 .ds-bento-hero-content { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
 .ds-bento-hero-value { font-size: 2rem; }
 .ds-bento-wide { grid-column: span 2; }
+
+/* Hero + N secundarias sueltas (N variable: 1, 2, 3...) — la grilla plana de 4 columnas orfanaba
+   la ultima secundaria cuando N era impar (2+1+1 llena la fila, la 3ra secundaria queda sola en
+   la fila siguiente, sin relacion visual con nada). Aqui la secundaria vive en su PROPIA grilla
+   que envuelve independiente del hero, nunca queda huerfana sin importar cuantas sean. */
+.ds-bento-split { display: grid; grid-template-columns: minmax(240px, 1.4fr) minmax(220px, 1fr); gap: var(--space-4); align-items: stretch; }
+.ds-bento-split > .ds-bento-hero { grid-column: auto; }
+.ds-bento-secondary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4); }
 @media (max-width: 768px) {
   .ds-bento { grid-template-columns: 1fr 1fr; }
   .ds-bento-hero, .ds-bento-wide { grid-column: span 2; }
+  .ds-bento-split { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .ds-bento { grid-template-columns: 1fr; }
@@ -1630,9 +1641,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Agrupa accesos rapidos del dashboard por area — la separacion entre grupos es espacio (escala de
    8pt), no una linea divisoria delgada; cada grupo se identifica con una pildora de categoria. */
-.dashboard-section { padding-top: var(--space-6); }
+.dashboard-section { padding-top: var(--space-7); }
 .dashboard-section:first-of-type { padding-top: 0; }
-.dashboard-section-label { margin: 0 0 var(--space-3); }
+.dashboard-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-4); }
+.dashboard-section-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; background: var(--pill-color, var(--brand)); }
+.dashboard-section-title { font-size: var(--text-h3); font-weight: var(--weight-bold); color: var(--ink); margin: 0; }
+.dashboard-section-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
 
 /* Pildora de categoria — fondo solido de color, esquinas muy redondeadas. Para el nombre del
    modulo/area que antecede una tarjeta o agrupa accesos, nunca un color puesto al azar. */
