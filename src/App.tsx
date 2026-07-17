@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/platform/auth/AuthContext'
 import AppLayout from '@/platform/layout/AppLayout'
@@ -16,6 +17,9 @@ import SurveyResultsPage from '@/modules/surveys/pages/SurveyResultsPage'
 import SurveyResponsesPage from '@/modules/surveys/pages/SurveyResponsesPage'
 import SurveyConsolidatedPage from '@/modules/surveys/pages/SurveyConsolidatedPage'
 import PublicSurveyPage from '@/modules/surveys/pages/PublicSurveyPage'
+import CarbonDashboardPage from '@/modules/carbon/pages/CarbonDashboardPage'
+import CarbonCapturePage from '@/modules/carbon/pages/CarbonCapturePage'
+import CarbonConfigPage from '@/modules/carbon/pages/CarbonConfigPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -73,6 +77,18 @@ function SurveyResponsesRoute() {
   return <SurveyResponsesPage />
 }
 
+function CarbonRoute({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('carbon.view')) return <Navigate to="/app" replace />
+  return <>{children}</>
+}
+
+function CarbonConfigRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('carbon.manage')) return <Navigate to="/app/huella-carbono" replace />
+  return <CarbonConfigPage />
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -94,6 +110,9 @@ function AppRoutes() {
         <Route path="encuestas/:surveyId/constructor" element={<SurveyBuilderRoute />} />
         <Route path="encuestas/:surveyId/resultados" element={<SurveyResultsRoute />} />
         <Route path="encuestas/:surveyId/respuestas" element={<SurveyResponsesRoute />} />
+        <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />
+        <Route path="huella-carbono/captura" element={<CarbonRoute><CarbonCapturePage /></CarbonRoute>} />
+        <Route path="huella-carbono/configuracion" element={<CarbonConfigRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/app' : '/login'} replace />} />

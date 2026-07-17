@@ -518,3 +518,161 @@ CREATE TABLE IF NOT EXISTS survey_response_items (
   UNIQUE (response_id, question_id)
 );
 CREATE INDEX IF NOT EXISTS survey_response_items_question_idx ON survey_response_items(question_id);
+
+-- ============================================================================
+-- Huella de Carbono (Ambiental) — Herramienta de Monitoreo del Impacto
+-- Climatico (Salud sin Dano + MinSalud, 2023), estandar GHG Protocol (3
+-- alcances). Nucleo obligatorio (4 variables) + 8 variables activables por
+-- entidad sin necesitar despliegue de codigo nuevo (misma logica de 3
+-- condiciones ya usada en el resto de Almera: modulo activo + habilitado por
+-- la entidad + asignado — aqui a nivel de BLOQUE, no solo de modulo).
+-- ============================================================================
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('carbon-footprint', 'Huella de Carbono', 'Medicion de emisiones GEI (GHG Protocol), factores de emision configurables y analisis trimestral', '/app/huella-carbono', 'leaf', 15, TRUE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
+-- Backfill: las organizaciones ya existentes no reciben modulos nuevos automaticamente (el auto-
+-- enable solo corre al CREAR una organizacion, ver db.mjs bootstrap()) — se habilita aqui una sola
+-- vez para las que ya existen, igual que se hizo manualmente para modulos anteriores.
+INSERT INTO organization_modules (organization_id, module_id, enabled)
+SELECT o.id, m.id, TRUE FROM organizations o, modules m WHERE m.key = 'carbon-footprint'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO permissions (key, name, description) VALUES
+  ('carbon.view', 'Ver huella de carbono', 'Consultar mediciones, dashboard y analisis'),
+  ('carbon.capture', 'Capturar mediciones', 'Registrar mediciones de las variables habilitadas'),
+  ('carbon.manage', 'Gestionar huella de carbono', 'Configurar variables, factores de emision, responsables y metas'),
+  ('carbon.export', 'Exportar huella de carbono', 'Exportar informes PDF')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+-- Catalogo fijo de variables (4 nucleo + 8 activables) — mismo para todas las entidades, ya que la
+-- metodologia GHG Protocol/Salud sin Dano define las mismas categorias para cualquier IPS.
+CREATE TABLE IF NOT EXISTS carbon_blocks (
+  id BIGSERIAL PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('SCOPE_1', 'SCOPE_2', 'SCOPE_3', 'VARIABLE')),
+  is_core BOOLEAN NOT NULL DEFAULT FALSE,
+  description TEXT NOT NULL DEFAULT '',
+  position INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO carbon_blocks (key, name, scope, is_core, description, position) VALUES
+  ('stationary_combustion', 'Combustión estacionaria', 'SCOPE_1', TRUE, 'Combustible en calderas, plantas eléctricas de respaldo y generadores fijos', 1),
+  ('mobile_combustion', 'Combustión móvil', 'SCOPE_1', TRUE, 'Combustible de vehículos propios de la entidad (ambulancias, administrativos)', 2),
+  ('electricity', 'Energía eléctrica comprada', 'SCOPE_2', TRUE, 'Consumo de energía eléctrica en kWh', 3),
+  ('waste', 'Residuos', 'VARIABLE', TRUE, 'Disposición final, incineración y compostaje, por tipo de tratamiento', 4),
+  ('refrigerants', 'Gases refrigerantes y extintores', 'SCOPE_1', FALSE, 'Fugas de gases refrigerantes y agentes extintores', 5),
+  ('anesthetic_gases', 'Gases anestésicos y medicinales', 'SCOPE_1', FALSE, 'Óxido nitroso, desflurano y otros gases anestésicos (relevante con quirófanos)', 6),
+  ('purchased_heat', 'Calefacción/refrigeración/vapor comprado', 'SCOPE_2', FALSE, 'Poco común en Colombia, baja prioridad', 7),
+  ('business_travel', 'Viajes de trabajo del personal', 'SCOPE_3', FALSE, 'Desplazamientos laborales del personal', 8),
+  ('commuting', 'Traslados cotidianos del personal', 'SCOPE_3', FALSE, 'Casa-trabajo del personal', 9),
+  ('patient_travel', 'Desplazamiento de pacientes/visitantes', 'SCOPE_3', FALSE, 'Transporte de pacientes y visitantes hacia la entidad', 10),
+  ('inhalers', 'Inhaladores dispensados', 'SCOPE_3', FALSE, 'Inhaladores de dosis medida dispensados', 11),
+  ('supply_chain', 'Cadena de suministro', 'SCOPE_3', FALSE, 'Gasto en compras por categoría', 12)
+ON CONFLICT (key) DO NOTHING;
+
+-- Activacion por entidad: cada bloque se habilita/deshabilita independientemente (nucleo viene
+-- habilitado por defecto, activables vienen apagados), y opcionalmente se asigna una membresia
+-- responsable de capturarlo (ej. mantenimiento captura combustibles, administrativo captura
+-- electricidad, gestor ambiental captura residuos).
+CREATE TABLE IF NOT EXISTS carbon_organization_blocks (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  block_id BIGINT NOT NULL REFERENCES carbon_blocks(id) ON DELETE CASCADE,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  responsible_membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL,
+  UNIQUE (organization_id, block_id)
+);
+INSERT INTO carbon_organization_blocks (organization_id, block_id, enabled)
+SELECT o.id, b.id, b.is_core FROM organizations o, carbon_blocks b
+ON CONFLICT DO NOTHING;
+
+-- Factores de emision: dato de referencia GLOBAL (IDEAM/GHG Protocol/UPME-XM), no por entidad — la
+-- metodologia es la misma para cualquier IPS colombiana. Editable solo por superadmin. vigente por
+-- fecha: un mismo subtipo puede tener varios factores a lo largo del tiempo (ej. el factor electrico
+-- del SIN cambia cada año), y el calculo de cada medicion usa el vigente para SU fecha, nunca un
+-- valor fijo.
+CREATE TABLE IF NOT EXISTS carbon_emission_factors (
+  id BIGSERIAL PRIMARY KEY,
+  block_key TEXT NOT NULL REFERENCES carbon_blocks(key) ON DELETE CASCADE,
+  subtype TEXT NOT NULL,
+  subtype_label TEXT NOT NULL,
+  value NUMERIC NOT NULL,
+  unit TEXT NOT NULL,
+  valid_from DATE NOT NULL,
+  valid_to DATE,
+  methodology_source TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS carbon_emission_factors_lookup_idx ON carbon_emission_factors(block_key, subtype, valid_from);
+
+-- Valores de referencia iniciales (IDEAM/GHG Protocol/UPME-XM) — cargados una sola vez; superadmin
+-- puede editar/agregar desde el panel de configuracion sin tocar codigo.
+INSERT INTO carbon_emission_factors (block_key, subtype, subtype_label, value, unit, valid_from, methodology_source)
+SELECT * FROM (VALUES
+  ('stationary_combustion', 'diesel', 'Diésel', 2.68, 'kgCO2e/litro', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('stationary_combustion', 'gas_natural', 'Gas natural', 2.75, 'kgCO2e/m3', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('stationary_combustion', 'glp', 'GLP', 1.55, 'kgCO2e/litro', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('stationary_combustion', 'gasolina', 'Gasolina', 2.31, 'kgCO2e/litro', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('stationary_combustion', 'fuel_oil', 'Fuel oil', 3.15, 'kgCO2e/litro', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('mobile_combustion', 'diesel', 'Diésel', 2.68, 'kgCO2e/litro', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('mobile_combustion', 'gasolina', 'Gasolina', 2.31, 'kgCO2e/litro', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('mobile_combustion', 'gas_natural', 'Gas natural vehicular', 2.75, 'kgCO2e/m3', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('electricity', 'electricidad_sin', 'Electricidad (SIN Colombia)', 164.38, 'gCO2/kWh', '2020-01-01'::date, 'UPME/XM 2020'),
+  ('waste', 'relleno_sanitario', 'Disposición final en relleno sanitario', 0.58, 'kgCO2e/kg', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('waste', 'incineracion_ordinaria', 'Incineración — residuos ordinarios', 1.6, 'kgCO2e/kg', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('waste', 'incineracion_mix_clinico', 'Incineración — mix clínico (biosanitarios/cortopunzantes/anatomopatológicos/CRETIR no identificado)', 2.1, 'kgCO2e/kg', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('waste', 'incineracion_peligrosos', 'Incineración — peligrosos (químicos CRETIR conocidos)', 2.8, 'kgCO2e/kg', '2020-01-01'::date, 'GHG Protocol / IDEAM'),
+  ('waste', 'compostaje', 'Compostaje', 0.1, 'kgCO2e/kg', '2020-01-01'::date, 'GHG Protocol / IDEAM')
+) AS seed(block_key, subtype, subtype_label, value, unit, valid_from, methodology_source)
+WHERE NOT EXISTS (SELECT 1 FROM carbon_emission_factors LIMIT 1);
+
+-- Registro historico de mediciones por periodo — nunca se sobrescribe (permite ver evolucion).
+-- computed_kgco2e y factor_id quedan fijados al momento de guardar (trazabilidad: con que factor se
+-- calculo esa medicion especifica), aunque el factor de referencia cambie despues.
+CREATE TABLE IF NOT EXISTS carbon_measurements (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  block_key TEXT NOT NULL REFERENCES carbon_blocks(key),
+  period TEXT NOT NULL,
+  record_date DATE NOT NULL,
+  subtype TEXT,
+  quantity NUMERIC NOT NULL,
+  quantity_unit TEXT NOT NULL,
+  scope_override TEXT CHECK (scope_override IN ('SCOPE_1', 'SCOPE_3')),
+  in_situ BOOLEAN NOT NULL DEFAULT FALSE,
+  computed_kgco2e NUMERIC,
+  factor_id BIGINT REFERENCES carbon_emission_factors(id),
+  notes TEXT NOT NULL DEFAULT '',
+  recorded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS carbon_measurements_org_idx ON carbon_measurements(organization_id, block_key, period);
+
+CREATE TABLE IF NOT EXISTS carbon_measurement_evidence (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  measurement_id BIGINT NOT NULL REFERENCES carbon_measurements(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL,
+  uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS carbon_measurement_evidence_measurement_idx ON carbon_measurement_evidence(measurement_id);
+
+-- Metas de reduccion (opcional): año/valor base + año/porcentaje meta, para mostrar avance real vs.
+-- meta en el dashboard.
+CREATE TABLE IF NOT EXISTS carbon_reduction_targets (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  base_year INTEGER NOT NULL,
+  base_value_kgco2e NUMERIC NOT NULL,
+  target_year INTEGER NOT NULL,
+  target_reduction_percent NUMERIC NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, target_year)
+);

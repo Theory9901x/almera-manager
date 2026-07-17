@@ -16,6 +16,10 @@ const USUARIO_MODULE_PERMISSIONS = {
   // crear, editar, publicar y exportar, no solo ver resultados (a diferencia de otros modulos
   // operativos donde el USUARIO es de solo consulta salvo que el rol sea Admin/Superadmin).
   surveys: ['surveys.view', 'surveys.create', 'surveys.edit', 'surveys.delete', 'surveys.export'],
+  // carbon.manage (factores de emision, activar/desactivar variables, metas de reduccion) queda
+  // fuera de este mapa a proposito: solo admin-tier lo recibe (bypassa este mapa por completo),
+  // nunca un USUARIO comun aunque se le habilite el modulo.
+  'carbon-footprint': ['carbon.view', 'carbon.capture', 'carbon.export'],
 }
 
 // adherence-matrix es un caso especial: el permiso depende de la funcion elegida al habilitar
