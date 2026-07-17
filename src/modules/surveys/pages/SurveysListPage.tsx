@@ -196,7 +196,7 @@ function CreateSurveyModal({ close, onCreated }: { close(): void; onCreated(surv
     <div className="almera-modal" onClick={close}>
       <div className="ds-card almera-dialog" style={{ width: 'min(560px, 100%)' }} onClick={event => event.stopPropagation()}>
         <div className="dialog-head">
-          <div><p className="ds-eyebrow" style={{ color: identity.color }}>Nueva encuesta</p><h2>Crear encuesta</h2></div>
+          <div><p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Nueva encuesta</p><h2>Crear encuesta</h2></div>
           <button aria-label="Cerrar" onClick={close}><X /></button>
         </div>
         <form onSubmit={submit} className="dialog-form">
@@ -239,7 +239,7 @@ function UseTemplateModal({ template, close, onCreated }: { template: Survey; cl
     <div className="almera-modal" onClick={close}>
       <div className="ds-card almera-dialog" style={{ width: 'min(480px, 100%)' }} onClick={event => event.stopPropagation()}>
         <div className="dialog-head">
-          <div><p className="ds-eyebrow" style={{ color: identity.color }}>Desde plantilla</p><h2>Usar "{template.title}"</h2></div>
+          <div><p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Desde plantilla</p><h2>Usar "{template.title}"</h2></div>
           <button aria-label="Cerrar" onClick={close}><X /></button>
         </div>
         <form onSubmit={submit} className="dialog-form">
@@ -275,7 +275,7 @@ function LinkModal({ survey, close }: { survey: Survey; close(): void }) {
     <div className="almera-modal" onClick={close}>
       <div className="ds-card almera-dialog survey-link-dialog" onClick={event => event.stopPropagation()}>
         <div className="dialog-head">
-          <div><p className="ds-eyebrow" style={{ color: identity.color }}>Difusión</p><h2>Enlace público</h2></div>
+          <div><p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Difusión</p><h2>Enlace público</h2></div>
           <button aria-label="Cerrar" onClick={close}><X /></button>
         </div>
         {!link ? (

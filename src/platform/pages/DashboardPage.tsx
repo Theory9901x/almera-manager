@@ -83,7 +83,7 @@ function DashboardSection({ label, children }: { label: string; children: React.
 
 function QuickAccessCard({ to, icon: Icon, label, detail, identity }: { to: string; icon: typeof Headphones; label: string; detail: string; identity: ReturnType<typeof moduleIdentity> }) {
   return (
-    <Link to={to} className="ds-card flex items-center gap-3 transition hover:-translate-y-0.5" style={{ padding: '14px 16px' }}>
+    <Link to={to} viewTransition className="ds-card flex items-center gap-3 transition hover:-translate-y-0.5" style={{ padding: '14px 16px' }}>
       <span className="grid h-10 w-10 flex-none place-items-center rounded-xl text-white" style={{ backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})` }}><Icon size={18} /></span>
       <span className="min-w-0">
         <strong className="block text-sm">{label}</strong>
@@ -121,15 +121,15 @@ function ProfesionalHome() {
       <Card accent={identity.color}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="ds-eyebrow">Matrices de adherencia</p>
+            <p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Matrices de adherencia</p>
             <h2 className="mt-1 text-lg font-black">Mis planes de mejora</h2>
           </div>
-          <Link to="/app/adherencia/mis-planes" className="text-xs font-bold" style={{ color: identity.color }}>Ver todos →</Link>
+          <Link to="/app/adherencia/mis-planes" viewTransition className="text-xs font-bold" style={{ color: identity.color }}>Ver todos →</Link>
         </div>
         {activePlans.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {activePlans.map(plan => (
-              <Link key={plan.id} to="/app/adherencia/mis-planes" className="ds-card flex items-center gap-3" style={{ padding: '14px 16px' }}>
+              <Link key={plan.id} to="/app/adherencia/mis-planes" viewTransition className="ds-card flex items-center gap-3" style={{ padding: '14px 16px' }}>
                 <ProgressRing percent={plan.progress_percent} size={38} strokeWidth={4} />
                 <span className="min-w-0 flex-1">
                   <strong className="block truncate text-sm">{plan.area_name}</strong>
@@ -145,7 +145,7 @@ function ProfesionalHome() {
       </Card>
 
       <Card>
-        <p className="ds-eyebrow">Resultados</p>
+        <p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Resultados</p>
         <h2 className="mt-1 text-lg font-black">Mis resultados de auditoría</h2>
         {recentEvaluations.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -194,15 +194,15 @@ function AuditorHome({ membershipId }: { membershipId: string }) {
       <Card accent={identity.color}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="ds-eyebrow">Matrices de adherencia</p>
+            <p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Matrices de adherencia</p>
             <h2 className="mt-1 text-lg font-black">Mis evaluaciones en borrador</h2>
           </div>
-          <Link to="/app/adherencia/operacion" className="text-xs font-bold" style={{ color: identity.color }}>Ir a Operación →</Link>
+          <Link to="/app/adherencia/operacion" viewTransition className="text-xs font-bold" style={{ color: identity.color }}>Ir a Operación →</Link>
         </div>
         {drafts.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {drafts.map(evaluation => (
-              <Link key={evaluation.id} to="/app/adherencia/operacion" className="ds-card flex items-center justify-between gap-3" style={{ padding: '14px 16px' }}>
+              <Link key={evaluation.id} to="/app/adherencia/operacion" viewTransition className="ds-card flex items-center justify-between gap-3" style={{ padding: '14px 16px' }}>
                 <span className="min-w-0">
                   <strong className="block truncate text-sm">{evaluation.professional_name}</strong>
                   <span className="block truncate text-xs text-[var(--muted)]">{evaluation.area_name} · {evaluation.month_reported}</span>

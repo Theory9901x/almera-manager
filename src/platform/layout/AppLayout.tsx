@@ -87,6 +87,7 @@ export default function AppLayout() {
             return (
               <NavLink
                 to={operationalRoute}
+                viewTransition
                 onClick={() => setOpen(false)}
                 className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
                 style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
@@ -105,6 +106,7 @@ export default function AppLayout() {
                   <NavLink
                     key={link.to}
                     to={link.to}
+                    viewTransition
                     onClick={() => setOpen(false)}
                     className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
                     style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}
@@ -124,6 +126,7 @@ export default function AppLayout() {
                 key={module.id}
                 to={module.route}
                 end={['dashboard', 'admin'].includes(module.key)}
+                viewTransition
                 onClick={() => setOpen(false)}
                 className={({ isActive }) => `sidebar-link group ${isActive ? 'is-active' : ''}`}
                 style={({ isActive }) => isActive ? { backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})`, borderColor: identity.color } : undefined}

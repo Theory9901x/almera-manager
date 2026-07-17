@@ -204,7 +204,7 @@ function SurveyBuilderContent() {
 
   return (
     <div className="survey-builder mx-auto max-w-[1500px] space-y-2">
-      <header className="survey-builder-header" style={{ ['--ds-accent-from' as string]: identity.gradientFrom, ['--ds-accent-to' as string]: identity.gradientTo }}>
+      <header className="survey-builder-header">
         <div className="survey-builder-header-main">
           <div className={`survey-cover-picker ${survey.cover_image ? 'has-image' : ''}`}>
             {survey.cover_image && <img src={survey.cover_image} alt="" />}
@@ -218,7 +218,7 @@ function SurveyBuilderContent() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="ds-eyebrow" style={{ color: identity.color }}>Constructor</p>
+            <p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Constructor</p>
             <input
               className="survey-title-input"
               value={survey.title}

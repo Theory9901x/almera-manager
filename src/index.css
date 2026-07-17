@@ -9,34 +9,38 @@
 
 :root {
   color-scheme: light;
-  --canvas: #e9eef5;
-  --canvas-soft: #f1f4f8;
+  /* Superficies con temperatura calida sutil (antes gris-azulado frio generico) —
+     mismo nivel de luminosidad que antes, solo se retira el sesgo azul. */
+  --canvas: #eef1ea;
+  --canvas-soft: #f5f6f1;
   --surface: #ffffff;
-  --surface-soft: #f2f5f9;
+  --surface-soft: #f4f6f1;
   --surface-glass: rgba(255, 255, 255, 0.82);
   --ink: #161922;
   --ink-soft: #344054;
-  --muted: #526074;
-  --muted-light: #7d899a;
-  --line: #c8d1dd;
-  --line-strong: #aeb9c8;
+  --muted: #56624f;
+  --muted-light: #86917e;
+  --line: #d6dccd;
+  --line-strong: #bcc4b0;
   /* SGIMR COLOR CONTRACT — unica fuente de verdad para todos los modulos */
   --color-brand: #c7192d;
+  --color-brand-2: oklch(0.58 0.16 22);
   --color-critical: #c7192d;
   --color-warning: #c98212;
   --color-neutral: #667085;
   --color-navy-900: #101827;
   --color-navy-800: #1b2940;
   --color-navy-700: #2b3b56;
-  --color-surface-page: #edf1f5;
+  --color-surface-page: #f1f3ee;
   --color-surface-card: #ffffff;
-  --color-surface-soft: #f6f8fa;
-  --color-border: #d2d9e3;
+  --color-surface-soft: #f7f8f4;
+  --color-border: #dde2d4;
   --color-text: #172033;
-  --color-text-muted: #667085;
+  --color-text-muted: #6b7568;
   --color-surface-dark: var(--color-navy-900);
   --color-interactive: var(--color-navy-900);
   --brand: var(--color-brand);
+  --brand-2: var(--color-brand-2);
   --brand-deep: var(--color-brand);
   --brand-bright: var(--color-brand);
   --brand-soft: #fff0f2;
@@ -46,7 +50,7 @@
   --warning: var(--color-warning);
   --danger: var(--color-critical);
   --info: var(--color-neutral);
-  --gradient-brand: var(--color-brand);
+  --gradient-brand: linear-gradient(135deg in oklch, var(--brand), var(--brand-2));
   --gradient-dark: linear-gradient(145deg,var(--color-navy-800),var(--color-navy-900));
   --gradient-surface: linear-gradient(145deg, rgba(255,255,255,.98), rgba(248,250,252,.94));
   --radius-xs: 9px;
@@ -69,6 +73,21 @@
   --font-mono: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk Variable", "Space Grotesk", "Manrope Variable", sans-serif;
   --font-data: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  /* Escala tipografica centralizada — usar siempre estos tokens, nunca font-size sueltos */
+  --text-display: clamp(2.25rem, 4vw, 3.5rem);
+  --text-h1: clamp(1.625rem, 2.6vw, 2.125rem);
+  --text-h2: 1.3125rem;
+  --text-h3: 1.0625rem;
+  --text-body: 0.9375rem;
+  --text-caption: 0.8125rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-black: 800;
+  /* Escala de espaciado de 8pt — usar siempre estos tokens en componentes nuevos/tocados */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
   /* Aliases de compatibilidad; no definen colores nuevos */
   --mission-night: var(--color-navy-900);
   --mission-indigo: var(--color-navy-800);
@@ -77,6 +96,10 @@
   --mission-warning: var(--color-warning);
   --mission-safe: var(--color-neutral);
   --ease: 180ms cubic-bezier(.2,.8,.2,1);
+}
+
+@supports not (color: oklch(0 0 0)) {
+  :root { --gradient-brand: linear-gradient(135deg, var(--brand), #e0475d); }
 }
 
 * { box-sizing: border-box; }
@@ -99,12 +122,68 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .58; }
 ::selection { background: rgba(199,25,45,.16); color: var(--brand-deep); }
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #c5ccd7; background-clip: padding-box; }
+::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: var(--line-strong); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-light); background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 .font-black { font-weight: 760 !important; }
 .font-bold { font-weight: 680 !important; }
 .font-mono { font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; }
+
+/* Tipografia sin viudas — titulos balanceados, parrafos sin palabras sueltas al final */
+h1, h2, h3, .page-title, .ds-page-header h1 { text-wrap: balance; }
+p, .page-subtitle, .ds-page-header-description { text-wrap: pretty; }
+
+/* View Transitions entre navegaciones del router — activado via prop viewTransition en
+   Link/NavLink (react-router-dom 6.30+). Si el navegador no soporta la API, la navegacion
+   simplemente ocurre sin transicion, nada se rompe. */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root) { animation: ds-view-fade-out 160ms ease forwards; }
+  ::view-transition-new(root) { animation: ds-view-fade-in 260ms cubic-bezier(.22,1,.36,1) forwards; }
+}
+@keyframes ds-view-fade-out { to { opacity: 0; } }
+@keyframes ds-view-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Utilidades del sistema 2.0: adoptar por clase donde aplique, no retroactivo por defecto. */
+
+/* :has() — la tarjeta de formulario se resalta cuando un campo interno tiene foco, sin JS. */
+.ds-form-card:has(:focus-visible) { border-color: var(--ds-accent, var(--brand)); box-shadow: var(--shadow-card-md); }
+
+/* Bento grid — celdas con container query propia, se adaptan a SU tamano, no al viewport global.
+   El dato protagonista (ds-bento-hero) ocupa 2x2, el resto (ds-bento-item a secas) 1x1 — nunca
+   una fila de tarjetas todas iguales. Vocabulario compartido: cualquier dashboard del sistema lo
+   usa, no solo Huella de Carbono (que ya lo probo con su propio carbon-bento-grid). */
+.ds-bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(150px, auto); gap: var(--space-4); }
+.ds-bento-item { container-type: inline-size; min-width: 0; }
+.ds-bento-hero { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); }
+.ds-bento-hero-content { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+.ds-bento-hero-value { font-size: 2rem; }
+.ds-bento-wide { grid-column: span 2; }
+@media (max-width: 768px) {
+  .ds-bento { grid-template-columns: 1fr 1fr; }
+  .ds-bento-hero, .ds-bento-wide { grid-column: span 2; }
+}
+@media (max-width: 480px) {
+  .ds-bento { grid-template-columns: 1fr; }
+  .ds-bento-hero, .ds-bento-wide { grid-column: span 1; grid-row: span 1; }
+}
+@container (min-width: 320px) {
+  .ds-bento-hero .ds-bento-hero-content { display: flex; flex-direction: row; align-items: center; gap: var(--space-5); }
+  .ds-bento-hero .ds-bento-hero-value { font-size: 3rem; }
+}
+
+/* Entrada animada al hacer scroll — solo transform/opacity (compositado, 60fps). Sin JS. */
+@keyframes ds-reveal { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.ds-reveal { animation: ds-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
+@supports not (animation-timeline: view()) { .ds-reveal { animation: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ds-reveal { animation: none; opacity: 1; } }
+
+/* Esquinas continuas estilo squircle en tarjetas principales — mejora progresiva, cae a
+   border-radius normal si el navegador no soporta corner-shape. */
+@supports (corner-shape: squircle) {
+  .ds-card, .card-xl { corner-shape: squircle; }
+}
 
 /* Brand */
 .brand-symbol {
@@ -1534,7 +1613,17 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    + semaforo de cumplimiento son vocabularios distintos, nunca mezclados.
    ================================================================ */
 
+/* Caption interna generica (encima de una sub-seccion dentro de una tarjeta, ej. "Escala",
+   "Ambitos") — se mantiene sobria a proposito, NO es el badge de modulo (ver ds-module-badge). */
 .ds-eyebrow { margin: 0; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* Badge de modulo — reemplaza la rayita+etiqueta que iba antes del titulo de pagina. Se integra
+   junto al titulo, no le "abre espacio" de forma artificial como hacia el patron anterior. */
+.ds-module-badge {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 var(--space-3);
+  border-radius: var(--radius-xs); background: color-mix(in srgb, var(--ds-eyebrow-color, var(--brand)) 12%, transparent);
+  padding: 4px 10px; font-size: 12px; font-weight: var(--weight-semibold); color: var(--ds-eyebrow-color, var(--brand));
+}
 
 /* Agrupa accesos rapidos del dashboard por area, con una linea divisoria propia por grupo — evita
    que accesos de modulos distintos (operativo, calidad, administracion...) se vean como una sola
@@ -1672,11 +1761,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-stat-card-value { display: block; font-size: 22px; font-weight: 800; }
 .ds-stat-card-detail { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
 
-.ds-page-header { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; padding-top: 14px; }
-.ds-page-header::before { content: ""; position: absolute; top: 0; left: 0; width: 64px; height: 4px; border-radius: 999px; background-image: linear-gradient(90deg, var(--ds-accent-from), var(--ds-accent-to)); }
-.ds-page-header h1 { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
-.ds-page-header-description { margin: 4px 0 0; max-width: 640px; font-size: 12.5px; color: var(--muted); }
-.ds-page-header-actions { display: flex; align-items: center; gap: 10px; }
+.ds-page-header { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.ds-page-header h1 { margin: 0; font-size: var(--text-h1); font-weight: var(--weight-black); letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
+.ds-page-header-description { margin: var(--space-2) 0 0; max-width: 60ch; font-size: var(--text-body); font-weight: var(--weight-regular); color: var(--ink-soft); }
+.ds-page-header-actions { display: flex; align-items: center; gap: var(--space-3); }
 
 /* ================================================================
    MODULO ENCUESTAS — lista, constructor, resultados y pagina publica
@@ -2108,8 +2196,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 @media (prefers-reduced-motion: reduce) { .survey-live-dot { animation: none !important; } }
 
 /* ---- Constructor: encabezado con titulo editable e imagen de portada ---- */
-.survey-builder-header { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; padding-top: 14px; margin-bottom: 4px; }
-.survey-builder-header::before { content: ""; position: absolute; top: 0; left: 0; width: 64px; height: 4px; border-radius: 999px; background-image: linear-gradient(90deg, var(--ds-accent-from), var(--ds-accent-to)); }
+.survey-builder-header { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-1); }
 .survey-builder-header-main { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1 1 360px; }
 .survey-title-input {
   display: block; width: 100%; max-width: 520px; margin: 4px 0 2px; padding: 4px 8px; border: 1.5px solid transparent;

@@ -123,88 +123,98 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="surface-panel flex items-center gap-4">
+      {/* Bento: el cumplimiento promedio es el dato protagonista (hero 2x2) — evaluaciones y
+          distribucion por concepto son secundarios, ya no una fila de cajas identicas. */}
+      <div className="ds-bento">
+        <Card accent={identity.color} className="ds-bento-item ds-bento-hero p-6">
+          <p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Cumplimiento promedio</p>
+          <div className="ds-bento-hero-content">
+            <ComplianceRing percent={dashboard.averageCompliance} size={84} strokeWidth={8} />
+            <strong className="ds-bento-hero-value font-black leading-none">{formatPercent(dashboard.averageCompliance)}</strong>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {conceptOrder.map(concept => <ConceptBadge key={concept} concept={concept} size="sm" />)}
+          </div>
+        </Card>
+
+        <Card accent={identity.color} className="ds-bento-item flex flex-col justify-center gap-2 p-5">
           <span className="grid h-11 w-11 flex-none place-items-center rounded-full text-white" style={{ backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})` }}><ClipboardList size={20} /></span>
-          <div><p className="ds-eyebrow">Evaluaciones</p><strong className="text-2xl font-black">{dashboard.totalEvaluations}</strong></div>
-        </div>
-        <div className="surface-panel flex items-center gap-4">
-          <ComplianceRing percent={dashboard.averageCompliance} size={44} strokeWidth={5} />
-          <div><p className="ds-eyebrow">Cumplimiento promedio</p><strong className="text-2xl font-black">{formatPercent(dashboard.averageCompliance)}</strong></div>
-        </div>
-      </div>
+          <p className="ds-eyebrow">Evaluaciones</p>
+          <strong className="text-2xl font-black">{dashboard.totalEvaluations}</strong>
+        </Card>
 
-      <div className="flex flex-wrap gap-2">
-        {conceptOrder.map(concept => <ConceptBadge key={concept} concept={concept} size="sm" />)}
-      </div>
-
-      <Card accent={identity.color} className="p-5">
-        <p className="ds-eyebrow">Distribución</p>
-        <h2 className="mt-1 text-xl font-black">Distribución por concepto</h2>
-        <div style={{ width: '100%', height: chartHeight(conceptData.length) }} className="mt-3">
-          <ResponsiveContainer>
-            <BarChart data={conceptData} layout="vertical" margin={{ left: 8, right: 24 }}>
-              <ComplianceGradientDefs />
-              <CartesianGrid horizontal={false} stroke="#e5e9f0" />
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-              <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(value: unknown) => [`${value} evaluaciones`, '']} labelStyle={{ color: '#172033' }} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
-                {conceptData.map(item => <Cell key={item.concept} fill={`url(#${GRADIENT_IDS[item.concept]})`} />)}
-                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#344054' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      <Card accent={identity.color} className="p-5">
-        <p className="ds-eyebrow">Ámbitos</p>
-        <h2 className="mt-1 text-xl font-black">Cumplimiento por ámbito</h2>
-        {scopeData.length ? (
-          <div style={{ width: '100%', height: chartHeight(scopeData.length) }} className="mt-3">
+        <Card accent={identity.color} className="ds-bento-item ds-bento-wide p-5">
+          <p className="ds-eyebrow">Distribución</p>
+          <h2 className="mt-1 text-lg font-black">Distribución por concepto</h2>
+          <div style={{ width: '100%', height: chartHeight(conceptData.length) }} className="mt-3">
             <ResponsiveContainer>
-              <BarChart data={scopeData} layout="vertical" margin={{ left: 8, right: 24 }}>
+              <BarChart data={conceptData} layout="vertical" margin={{ left: 8, right: 24 }}>
                 <ComplianceGradientDefs />
                 <CartesianGrid horizontal={false} stroke="#e5e9f0" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: unknown) => [`${value}%`, 'Cumplimiento']} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}>
-                  {scopeData.map(item => <Cell key={item.name} fill={gradientFor(item.value, thresholds)} />)}
-                  <LabelList dataKey="value" position="right" formatter={(value: unknown) => `${value}%`} style={{ fontSize: 11, fill: '#344054' }} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
+                <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(value: unknown) => [`${value} evaluaciones`, '']} labelStyle={{ color: '#172033' }} />
+                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
+                  {conceptData.map(item => <Cell key={item.concept} fill={`url(#${GRADIENT_IDS[item.concept]})`} />)}
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#344054' }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
-      </Card>
+        </Card>
+      </div>
 
-      <Card accent={identity.color} className="p-5">
-        <p className="ds-eyebrow">Comparativo</p>
-        <h2 className="mt-1 text-xl font-black">Ranking de profesionales</h2>
-        {professionalData.length ? (
-          <div style={{ width: '100%', height: chartHeight(professionalData.length) }} className="mt-3">
-            <ResponsiveContainer>
-              <BarChart data={professionalData} layout="vertical" margin={{ left: 8, right: 24 }}>
-                <ComplianceGradientDefs />
-                <CartesianGrid horizontal={false} stroke="#e5e9f0" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: unknown) => [value === null || value === undefined ? 'N/A' : `${value}%`, 'Cumplimiento']} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}>
-                  {professionalData.map(item => <Cell key={item.name} fill={gradientFor(item.value, thresholds)} />)}
-                  <LabelList dataKey="value" position="right" formatter={(value: unknown) => value === null || value === undefined ? 'N/A' : `${value}%`} style={{ fontSize: 11, fill: '#344054' }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
-      </Card>
+      {/* Charts de volumen variable (crecen con la cantidad de ambitos/profesionales) — grid de
+          2 columnas en vez de una sola columna larga, sin forzar alturas iguales artificiales. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card accent={identity.color} className="p-5">
+          <p className="ds-eyebrow">Ámbitos</p>
+          <h2 className="mt-1 text-lg font-black">Cumplimiento por ámbito</h2>
+          {scopeData.length ? (
+            <div style={{ width: '100%', height: chartHeight(scopeData.length) }} className="mt-3">
+              <ResponsiveContainer>
+                <BarChart data={scopeData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                  <ComplianceGradientDefs />
+                  <CartesianGrid horizontal={false} stroke="#e5e9f0" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(value: unknown) => [`${value}%`, 'Cumplimiento']} />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}>
+                    {scopeData.map(item => <Cell key={item.name} fill={gradientFor(item.value, thresholds)} />)}
+                    <LabelList dataKey="value" position="right" formatter={(value: unknown) => `${value}%`} style={{ fontSize: 11, fill: '#344054' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
+        </Card>
+
+        <Card accent={identity.color} className="p-5">
+          <p className="ds-eyebrow">Comparativo</p>
+          <h2 className="mt-1 text-lg font-black">Ranking de profesionales</h2>
+          {professionalData.length ? (
+            <div style={{ width: '100%', height: chartHeight(professionalData.length) }} className="mt-3">
+              <ResponsiveContainer>
+                <BarChart data={professionalData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                  <ComplianceGradientDefs />
+                  <CartesianGrid horizontal={false} stroke="#e5e9f0" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(value: unknown) => [value === null || value === undefined ? 'N/A' : `${value}%`, 'Cumplimiento']} />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}>
+                    {professionalData.map(item => <Cell key={item.name} fill={gradientFor(item.value, thresholds)} />)}
+                    <LabelList dataKey="value" position="right" formatter={(value: unknown) => value === null || value === undefined ? 'N/A' : `${value}%`} style={{ fontSize: 11, fill: '#344054' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
+        </Card>
+      </div>
 
       <Card accent={identity.color} className="p-5">
         <p className="ds-eyebrow">Tendencia</p>
-        <h2 className="mt-1 text-xl font-black">Evolución por mes reportado</h2>
+        <h2 className="mt-1 text-lg font-black">Evolución por mes reportado</h2>
         {monthData.length ? (
           <div style={{ width: '100%', height: 260 }} className="mt-3">
             <ResponsiveContainer>
@@ -229,7 +239,7 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
 
       <Card accent={identity.color} className="p-5">
         <p className="ds-eyebrow">Escala</p>
-        <h2 className="mt-1 text-xl font-black">Umbrales de concepto</h2>
+        <h2 className="mt-1 text-lg font-black">Umbrales de concepto</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {thresholds.map(threshold => (
             <div key={threshold.concept} className="flex items-center gap-3">
