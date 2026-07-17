@@ -17,8 +17,15 @@ type ECOption = ComposeOption<BarSeriesOption | LineSeriesOption | GaugeSeriesOp
 // — evita empaquetar mapas, sankey, treemap, etc. que este sistema nunca renderiza.
 echarts.use([EChartsBarChart, EChartsLineChart, GaugeChart, GridComponent, TooltipComponent, MarkLineComponent, SVGRenderer])
 
-const AXIS_LABEL = { color: 'var(--ink-soft)', fontFamily: FONT_FAMILY, fontSize: 11 }
-const SPLIT_LINE = { lineStyle: { color: 'var(--border-subtle, var(--line))', type: 'dashed' as const } }
+// ECharts pinta estos colores directo en canvas/SVG via su propio parser interno de color, que
+// no entiende custom properties de CSS (var(--x)) — a diferencia del tooltip (un div real, ahi
+// si vale CSS). Por eso aqui van valores literales que reflejan los tokens de src/index.css.
+const AXIS_LABEL = { color: '#344054', fontFamily: FONT_FAMILY, fontSize: 11 }
+const SPLIT_LINE = { lineStyle: { color: '#d6dccd', type: 'dashed' as const } }
+const AXIS_LINE_COLOR = '#d6dccd'
+const TRACK_COLOR = '#f7f8f4'
+const REFERENCE_LINE_COLOR = '#86917e'
+const REFERENCE_LABEL_COLOR = '#56624f'
 
 function tooltipStyle() {
   return {
@@ -68,7 +75,7 @@ export function BarChart({
 }) {
   const format = valueFormatter || (value => `${value.toLocaleString('es-CO')}${valueSuffix}`)
   const isHorizontal = orientation === 'horizontal'
-  const categoryAxis = { type: 'category' as const, data: data.map(item => item.label), axisTick: { show: false }, axisLine: { lineStyle: { color: 'var(--border-subtle, var(--line))' } }, axisLabel: { ...AXIS_LABEL, interval: 0, rotate: !isHorizontal && data.length > 5 ? -20 : 0 } }
+  const categoryAxis = { type: 'category' as const, data: data.map(item => item.label), axisTick: { show: false }, axisLine: { lineStyle: { color: AXIS_LINE_COLOR } }, axisLabel: { ...AXIS_LABEL, interval: 0, rotate: !isHorizontal && data.length > 5 ? -20 : 0 } }
   const valueAxis = { type: 'value' as const, axisLabel: { ...AXIS_LABEL, formatter: (value: number) => format(value) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: SPLIT_LINE }
 
   const option: ECOption = {
@@ -123,7 +130,7 @@ export function LineChart({
         return `<strong>${item.name}</strong><br/>${format(item.value)}`
       },
     },
-    xAxis: { type: 'category', data: data.map(point => point.label), boundaryGap: false, axisTick: { show: false }, axisLine: { lineStyle: { color: 'var(--border-subtle, var(--line))' } }, axisLabel: AXIS_LABEL },
+    xAxis: { type: 'category', data: data.map(point => point.label), boundaryGap: false, axisTick: { show: false }, axisLine: { lineStyle: { color: AXIS_LINE_COLOR } }, axisLabel: AXIS_LABEL },
     yAxis: { type: 'value', axisLabel: { ...AXIS_LABEL, formatter: (value: number) => format(value) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: SPLIT_LINE },
     series: [{
       type: 'line',
@@ -137,8 +144,8 @@ export function LineChart({
       connectNulls: true,
       markLine: referenceLine ? {
         symbol: 'none',
-        lineStyle: { color: 'var(--muted-light, #94a3b8)', type: 'dashed' },
-        label: { formatter: referenceLine.label, color: 'var(--muted, #667085)', fontFamily: FONT_FAMILY, fontSize: 10, position: 'insideEndTop' },
+        lineStyle: { color: REFERENCE_LINE_COLOR, type: 'dashed' },
+        label: { formatter: referenceLine.label, color: REFERENCE_LABEL_COLOR, fontFamily: FONT_FAMILY, fontSize: 10, position: 'insideEndTop' },
         data: [{ yAxis: referenceLine.value }],
       } : undefined,
       animationDuration: 600,
@@ -160,7 +167,7 @@ export function RadialGauge({ percent, color = '#4F46E5', size = 96 }: { percent
       min: 0,
       max: 100,
       progress: { show: true, width: 10, itemStyle: { color, borderRadius: 10 } },
-      axisLine: { lineStyle: { width: 10, color: [[1, 'var(--color-surface-soft, #f1f5f9)']] } },
+      axisLine: { lineStyle: { width: 10, color: [[1, TRACK_COLOR]] } },
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: { show: false },
