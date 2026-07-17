@@ -5,7 +5,7 @@ import {
   Settings, Smartphone, Square, Trash2, X,
 } from 'lucide-react'
 import {
-  Badge, Button, Card, Field, Input, Select, Textarea, ToastProvider, moduleIdentity, useToast,
+  Badge, Button, Card, Field, Input, SaveStatusIndicator, Select, Textarea, ToastProvider, moduleIdentity, useToast,
 } from '@/design-system'
 import { surveysService } from '../services/surveysService'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -64,8 +64,18 @@ function SurveyBuilderContent() {
   const [deleteQuestion, setDeleteQuestion] = useState<SurveyQuestion | null>(null)
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('mobile')
   const [coverUploading, setCoverUploading] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const timers = useRef<Record<string, number>>({})
   const pendingMetaPatch = useRef<Record<string, unknown>>({})
+
+  // El guardado es automatico (debounced) en todo el constructor — titulo, portada, configuracion,
+  // paginas y preguntas — para no interrumpir con un boton por cada campo. Este indicador es lo que
+  // reemplaza a ese boton: siempre visible, dice si hay cambios pendientes, guardados o con error.
+  useEffect(() => {
+    if (saveState !== 'saved') return
+    const timeout = window.setTimeout(() => setSaveState('idle'), 2500)
+    return () => window.clearTimeout(timeout)
+  }, [saveState])
 
   async function load(preserveSelection = true) {
     if (!surveyId) return
@@ -86,6 +96,7 @@ function SurveyBuilderContent() {
 
   function debounced(key: string, fn: () => void, delay = 500) {
     if (timers.current[key]) window.clearTimeout(timers.current[key])
+    setSaveState('saving')
     timers.current[key] = window.setTimeout(fn, delay)
   }
 
@@ -110,8 +121,9 @@ function SurveyBuilderContent() {
       try {
         const updated = await surveysService.update(survey.id, toSend)
         setSurvey(current => current ? { ...current, ...updated } : current)
+        setSaveState('saved')
       }
-      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar') }
+      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar'); setSaveState('error') }
     })
   }
 
@@ -121,7 +133,7 @@ function SurveyBuilderContent() {
     try {
       const result = await surveysService.uploadMedia(survey.id, file)
       await saveMeta({ coverImage: result.url })
-    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible subir la imagen') }
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible subir la imagen'); setSaveState('error') }
     finally { setCoverUploading(false) }
   }
 
@@ -138,8 +150,8 @@ function SurveyBuilderContent() {
     if (!survey) return
     setSurvey({ ...survey, pages: survey.pages.map(item => item.id === page.id ? { ...item, ...patch } : item) })
     debounced(`page-${page.id}`, async () => {
-      try { await surveysService.updatePage(survey.id, page.id, patch) }
-      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar la página') }
+      try { await surveysService.updatePage(survey.id, page.id, patch); setSaveState('saved') }
+      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar la página'); setSaveState('error') }
     })
   }
 
@@ -181,8 +193,8 @@ function SurveyBuilderContent() {
       }),
     })
     debounced(`question-${question.id}`, async () => {
-      try { await surveysService.updateQuestion(survey.id, question.id, patch) }
-      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar la pregunta') }
+      try { await surveysService.updateQuestion(survey.id, question.id, patch); setSaveState('saved') }
+      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar la pregunta'); setSaveState('error') }
     })
   }
 
@@ -229,6 +241,7 @@ function SurveyBuilderContent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <SaveStatusIndicator state={saveState} />
           <Badge tone={survey.status === 'PUBLICADA' ? 'info' : 'neutral'}>{survey.status === 'BORRADOR' ? 'Borrador' : survey.status === 'PUBLICADA' ? 'Publicada' : 'Cerrada'}</Badge>
           <Button variant="secondary" onClick={() => navigate('/app/encuestas')}><ArrowLeft size={15} /> Encuestas</Button>
           <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/resultados`)}><BarChart3 size={15} /> Resultados</Button>

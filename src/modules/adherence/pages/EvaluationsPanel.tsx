@@ -169,6 +169,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     try {
       const record = await adherenceService.updateRecord(selectedId, recordId, { observations })
       setDetail(current => current ? { ...current, records: current.records.map(item => item.id === recordId ? record : item) } : current)
+      notify('Observación guardada')
     } catch (caught) { fail(caught, 'No fue posible guardar la observación') }
   }
 

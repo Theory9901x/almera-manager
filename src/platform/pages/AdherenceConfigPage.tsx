@@ -121,7 +121,7 @@ export default function AdherenceConfigPage() {
   }
 
   const toggleAreaActive = async (area: Area) => {
-    try { await adherenceService.updateArea(area.id, { active: !area.active }); await loadAreas() }
+    try { await adherenceService.updateArea(area.id, { active: !area.active }); await loadAreas(); notify(area.active ? 'Área desactivada' : 'Área activada') }
     catch (caught) { fail(caught, 'No fue posible actualizar el área') }
   }
 
@@ -133,7 +133,7 @@ export default function AdherenceConfigPage() {
   }
 
   const togglePositionActive = async (position: Position) => {
-    try { await adherenceService.updatePosition(position.id, { active: !position.active }); await loadPositions() }
+    try { await adherenceService.updatePosition(position.id, { active: !position.active }); await loadPositions(); notify(position.active ? 'Cargo desactivado' : 'Cargo activado') }
     catch (caught) { fail(caught, 'No fue posible actualizar el cargo') }
   }
 
