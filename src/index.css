@@ -1448,7 +1448,6 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .mission-module>.page-header .eyebrow::before { display:none; }
 .mission-module .page-header h1 { padding:0;color:var(--color-text);text-shadow:none; }
 .mission-module .page-header p:not(.eyebrow) { color:var(--color-text-muted); }
-.mission-module .page-actions .ui-button-primary { background:var(--color-brand); }
 .mission-module .page-actions .ui-button-secondary { background:var(--color-surface-card); }
 
 .assistance-nav.almera-nav { border-color:var(--color-border);background:var(--color-surface-card);box-shadow:0 4px 12px rgba(16,24,39,.06); }
@@ -1458,8 +1457,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 .mission-control {
   min-height:0;
-  grid-template-columns:minmax(260px,.7fr) minmax(520px,1.3fr);
-  gap:20px;
+  display: flex; flex-direction: column; gap: var(--space-5);
   border:1px solid var(--border-hairline);
   border-radius:var(--radius-card);
   background:var(--color-surface-card);
@@ -1471,29 +1469,20 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .mission-copy p { margin-bottom:5px;color:var(--color-text-muted);font-size:9px;letter-spacing:.11em; }
 .mission-copy h2 { color:var(--color-text);font-size:20px;font-weight:670;letter-spacing:-.025em; }
 .mission-copy>span { margin-top:5px;color:var(--color-text-muted);font-size:10px; }
-.mission-counts { border-color:var(--border-hairline);border-radius:var(--radius-card-sm);background:var(--color-surface-soft);backdrop-filter:none; }
-.mission-counts article { padding:12px 16px;color:var(--color-text-muted);transition:none; }
-.mission-counts article:hover { background:transparent;transform:none; }
-.mission-counts article+article { border-left-color:var(--color-border); }
-.mission-counts article svg,.mission-counts article strong,.mission-counts .is-overdue svg,.mission-counts .is-overdue strong,.mission-counts .is-due svg,.mission-counts .is-due strong,.mission-counts .is-course svg,.mission-counts .is-course strong { color:var(--color-text-muted); }
-.mission-counts article.has-value.is-overdue svg,.mission-counts article.has-value.is-overdue strong { color:var(--color-critical); }
-.mission-counts article.has-value.is-due svg,.mission-counts article.has-value.is-due strong { color:var(--color-warning); }
-.mission-counts article.has-value.is-course svg,.mission-counts article.has-value.is-course strong { color:var(--color-neutral); }
-.mission-counts strong { font-size:22px; }
-.mission-counts span { color:var(--color-text-muted);font-size:8px; }
 
-/* "Vencidas" es el dato protagonista del panel (columna ancha, numero grande) — "por vencer" y
-   "en curso" quedan secundarios, apilados en la columna angosta. Ya no 3 cajas identicas en fila. */
-.mission-counts { grid-template-columns: 1.3fr 1fr; }
-.mission-counts-hero.is-overdue { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:var(--space-2); padding:var(--space-5); }
-.mission-counts-hero strong { font-size:40px; }
-.mission-counts-secondary { display:grid; border-left:1px solid var(--border-hairline); }
-.mission-counts-secondary article { border-left:0; }
-.mission-counts-secondary article+article { border-left:0; border-top:1px solid var(--border-hairline); }
-.mission-counts-secondary strong { font-size:17px; }
-@media (max-width:560px) {
-  .mission-counts-secondary { border-left:0; border-top:1px solid var(--border-hairline); }
-}
+/* Fila limpia de mini-KPIs del mismo tamano — Vencidas/Por vencer/En curso/Sin iniciar, cada uno
+   con su color semantico. Reemplaza el patron anterior de "un 0 gigante en una caja + el resto
+   apretado al lado", que dejaba jerarquia confusa y espacio muerto. */
+.priority-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.priority-kpi { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border-radius: var(--radius-lg); background: var(--color-surface-card); border: 1px solid var(--border-hairline); box-shadow: var(--shadow-card-sm); }
+.priority-kpi-icon { display: inline-flex; }
+.priority-kpi-value { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.priority-kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); font-weight: 700; }
+.priority-kpi--danger .priority-kpi-value, .priority-kpi--danger .priority-kpi-icon { color: var(--color-critical); }
+.priority-kpi--warning .priority-kpi-value, .priority-kpi--warning .priority-kpi-icon { color: var(--color-warning); }
+.priority-kpi--info .priority-kpi-value, .priority-kpi--info .priority-kpi-icon { color: #2563eb; }
+.priority-kpi--neutral .priority-kpi-value, .priority-kpi--neutral .priority-kpi-icon { color: var(--ink-soft); }
+@media (max-width: 640px) { .priority-kpis { grid-template-columns: repeat(2,1fr); } }
 
 .mission-workspace .assistance-filter-panel,.mission-queue { border:1px solid var(--border-hairline);border-radius:var(--radius-card);background:var(--color-surface-card);box-shadow:var(--shadow-card-sm); }
 .mission-workspace .filter-heading>span { background:var(--color-surface-soft);color:var(--color-text-muted); }

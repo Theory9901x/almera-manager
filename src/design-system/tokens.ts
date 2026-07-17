@@ -41,8 +41,10 @@ export interface ModuleIdentity { key: string; color: string; gradientFrom: stri
 
 export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   dashboard: { key: 'dashboard', color: '#4263EB', gradientFrom: '#4263EB', gradientTo: '#748FFC' },
-  almera: { key: 'almera', color: '#3B5BDB', gradientFrom: '#3B5BDB', gradientTo: '#748FFC' },
-  'technical-assistances': { key: 'technical-assistances', color: '#3B5BDB', gradientFrom: '#3B5BDB', gradientTo: '#748FFC' },
+  // Rojo institucional (--color-brand): la pestaña activa y el botón "Nueva asistencia" ya usaban
+  // ese token directamente — este identity debe coincidir exactamente, no un rojo/azul distinto.
+  almera: { key: 'almera', color: '#c7192d', gradientFrom: '#c7192d', gradientTo: '#e0475d' },
+  'technical-assistances': { key: 'technical-assistances', color: '#c7192d', gradientFrom: '#c7192d', gradientTo: '#e0475d' },
   'internal-audits': { key: 'internal-audits', color: '#B08900', gradientFrom: '#B08900', gradientTo: '#E0B84D' },
   audits: { key: 'audits', color: '#B08900', gradientFrom: '#B08900', gradientTo: '#E0B84D' },
   'adherence-matrix': { key: 'adherence-matrix', color: '#4F46E5', gradientFrom: '#4F46E5', gradientTo: '#7C3AED' },

@@ -180,12 +180,11 @@ function PendingView({rows,search,setSearch,openDetail,filters}:{rows:Assistance
   return <div className="mission-workspace">
     <section className="mission-control" aria-labelledby="mission-title">
       <div className="mission-copy"><p>Estado actual</p><h2 id="mission-title">Resumen de prioridad</h2><span>{rows.length} solicitudes requieren seguimiento · {assigned} aún sin iniciar</span></div>
-      <div className="mission-counts" aria-label="Resumen urgente">
-        <article className={`mission-counts-hero is-overdue ${overdue>0?'has-value':''}`}><AlertTriangle size={24}/><strong>{overdue}</strong><span>vencidas</span></article>
-        <div className="mission-counts-secondary">
-          <article className={`is-due ${dueSoon>0?'has-value':''}`}><Timer size={16}/><strong>{dueSoon}</strong><span>por vencer en 48 h</span></article>
-          <article className={`is-course ${inProgress>0?'has-value':''}`}><ClipboardCheck size={16}/><strong>{inProgress}</strong><span>en curso</span></article>
-        </div>
+      <div className="priority-kpis" aria-label="Resumen urgente">
+        <article className="priority-kpi priority-kpi--danger"><AlertTriangle size={20} className="priority-kpi-icon"/><strong className="priority-kpi-value">{overdue}</strong><span className="priority-kpi-label">Vencidas</span></article>
+        <article className="priority-kpi priority-kpi--warning"><Timer size={20} className="priority-kpi-icon"/><strong className="priority-kpi-value">{dueSoon}</strong><span className="priority-kpi-label">Por vencer 48h</span></article>
+        <article className="priority-kpi priority-kpi--info"><ClipboardCheck size={20} className="priority-kpi-icon"/><strong className="priority-kpi-value">{inProgress}</strong><span className="priority-kpi-label">En curso</span></article>
+        <article className="priority-kpi priority-kpi--neutral"><ListTodo size={20} className="priority-kpi-icon"/><strong className="priority-kpi-value">{assigned}</strong><span className="priority-kpi-label">Sin iniciar</span></article>
       </div>
     </section>
 
