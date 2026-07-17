@@ -2137,7 +2137,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   font-variant-numeric: tabular-nums; font-weight: 800; font-size: clamp(2.2rem, 4vw, 3.5rem); line-height: 1.05;
   background: linear-gradient(135deg, var(--carbon-brand), var(--carbon-brand-light));
   -webkit-background-clip: text; background-clip: text; color: transparent; margin: 0;
+  /* Manrope Variable ya esta cargada como variable font: el peso puede interpolarse suavemente, un
+     detalle de pulido táctil casi imperceptible al pasar el mouse sobre el KPI principal. */
+  transition: font-weight .3s ease;
 }
+.bento-item--total:hover .carbon-metric-value { font-weight: 850; }
 .carbon-metric-unit { font-size: 14px; color: #64748b; font-weight: 600; margin-left: 6px; -webkit-text-fill-color: #64748b; }
 .carbon-scope-value { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 20px; margin: 0; line-height: 1.1; }
 
@@ -2155,6 +2159,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   border-radius: 12px; font-size: 13px; font-weight: 600; color: var(--carbon-brand); cursor: pointer; background: var(--surface-2);
 }
 .carbon-evidence-upload:hover { border-color: var(--carbon-brand-light); }
+
+/* Estado vacio con tinte sutil + borde punteado, nunca gris plano sin diseño. */
+.carbon-module .ds-empty-state { background: var(--surface-2); border: 1.5px dashed var(--border-subtle); border-radius: var(--radius-card); }
+.carbon-module .ds-empty-state svg { color: var(--carbon-brand-light); }
 
 .carbon-skeleton-spinner { width: 32px; height: 32px; border-radius: 999px; border: 3px solid rgba(15,92,63,.2); border-top-color: var(--carbon-brand); animation: carbon-spin .8s linear infinite; }
 @keyframes carbon-spin { to { transform: rotate(360deg); } }

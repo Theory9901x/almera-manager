@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Paperclip, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Paperclip, Save, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Table, ToastProvider, moduleIdentity, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
@@ -115,7 +115,7 @@ function CarbonCaptureContent() {
 
         {!enabledBlocks.length ? (
           <Card accent={identity.color}>
-            <EmptyState icon={Paperclip} title="No hay variables habilitadas" description="Pide a un administrador que habilite al menos una variable desde Configuración." />
+            <EmptyState icon={SlidersHorizontal} title="No hay variables habilitadas" description="Pide a un administrador que habilite al menos una variable desde Configuración." />
           </Card>
         ) : (
           <>
