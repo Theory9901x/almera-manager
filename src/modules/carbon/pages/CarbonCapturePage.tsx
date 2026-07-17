@@ -124,13 +124,20 @@ function CarbonCaptureContent() {
                 <Select value={selectedBlockKey} onChange={setSelectedBlockKey} options={enabledBlocks.map(block => ({ value: block.key, label: block.name }))} />
               </Field>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {/* La fecha va PRIMERO y sola en su fila: es el factor diferencial que permite agrupar
+                  cada medicion por mes/trimestre/semestre/año despues — sin esto no hay forma de
+                  medir periodicamente nada. */}
+              <div className="mt-4">
+                <Field label="Fecha del registro" hint="Determina a qué mes/trimestre/semestre/año pertenece esta medición">
+                  <Input type="date" value={recordDate} onChange={event => setRecordDate(event.target.value)} />
+                </Field>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {subtypeOptions.length > 0 && (
                   <Field label="Tipo / subtipo">
                     <Select value={subtype} onChange={pickSubtype} placeholder="Selecciona un tipo" options={subtypeOptions.map(item => ({ value: item.subtype, label: item.subtype_label }))} />
                   </Field>
                 )}
-                <Field label="Fecha del registro"><Input type="date" value={recordDate} onChange={event => setRecordDate(event.target.value)} /></Field>
                 <Field label="Cantidad"><Input type="number" min={0} step="any" value={quantity} onChange={event => setQuantity(event.target.value)} /></Field>
                 <Field label="Unidad"><Input value={quantityUnit} onChange={event => setQuantityUnit(event.target.value)} placeholder="litros, kWh, kg..." /></Field>
               </div>

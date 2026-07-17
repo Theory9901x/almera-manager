@@ -2116,21 +2116,29 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
 }
 
-.carbon-bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, auto); gap: 16px; }
+/* grid-auto-rows con un minimo explicito (no "auto" puro): asi la tarjeta total, que ocupa 2 filas,
+   queda visiblemente el doble de alta que una tarjeta de alcance de 1 fila, en vez de que ambas
+   terminen con la misma altura corta porque el contenido de las tarjetas de alcance es liviano. */
+.carbon-bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(160px, auto); gap: 16px; }
 .carbon-kpi-card {
   background: var(--surface-1); border-radius: var(--radius-card); padding: 24px 26px;
   box-shadow: var(--shadow-stack); border: 1px solid var(--border-subtle);
 }
-.bento-item--total { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
-.bento-item--scope { grid-column: span 1; grid-row: span 1; }
+.bento-item--total { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.bento-item--scope { grid-column: span 1; grid-row: span 1; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; gap: 4px; }
 @media (max-width: 768px) {
   .carbon-bento-grid { grid-template-columns: 1fr 1fr; }
   .bento-item--total { grid-column: span 2; }
 }
 @media (max-width: 480px) {
   .carbon-bento-grid { grid-template-columns: 1fr; }
-  .bento-item--total { grid-column: span 1; }
+  .bento-item--total { grid-column: span 1; grid-row: span 1; }
 }
+
+.carbon-radial-wrap { position: relative; width: 92px; height: 92px; margin: 4px auto; }
+.carbon-radial-center { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.carbon-radial-percent { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.carbon-nivo-chart { width: 100%; }
 
 .carbon-metric-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 700; margin: 0 0 6px; }
 .carbon-metric-value {
@@ -2145,10 +2153,27 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .carbon-metric-unit { font-size: 14px; color: #64748b; font-weight: 600; margin-left: 6px; -webkit-text-fill-color: #64748b; }
 .carbon-scope-value { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 20px; margin: 0; line-height: 1.1; }
 
-.carbon-trend-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; width: fit-content; }
-.carbon-trend-badge--down { background: var(--carbon-brand-pale); color: var(--trend-good); }
-.carbon-trend-badge--up { background: #fdeaea; color: var(--trend-bad); }
-.carbon-trend-badge--flat { background: #f1f5f9; color: var(--trend-neutral); }
+.carbon-trend-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 999px;
+  font-weight: 700; font-size: 12.5px; width: fit-content; box-shadow: 0 1px 2px rgba(15,92,63,.06);
+  animation: carbon-trend-pop .4s var(--ease-standard);
+}
+.carbon-trend-badge--down { background: var(--carbon-brand-pale); color: var(--trend-good); border: 1px solid color-mix(in srgb, var(--trend-good) 30%, transparent); }
+.carbon-trend-badge--up { background: #fdeaea; color: var(--trend-bad); border: 1px solid color-mix(in srgb, var(--trend-bad) 30%, transparent); }
+.carbon-trend-badge--flat { background: #f1f5f9; color: var(--trend-neutral); border: 1px solid color-mix(in srgb, var(--trend-neutral) 25%, transparent); }
+@keyframes carbon-trend-pop { 0% { transform: scale(.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* Input de fecha nativo, pero con tratamiento visual completo (no el default del navegador):
+   mismo radio/sombra/foco que el resto del sistema — el icono del calendario se tiñe via filter
+   porque no existe una propiedad de color directa para ese pseudo-elemento en ningun navegador. */
+.carbon-module input[type="date"] {
+  padding: 10px 14px; border: 1.5px solid var(--border-subtle); border-radius: 12px; background: var(--surface-1);
+  box-shadow: 0 1px 2px rgba(15,92,63,.05); font-size: 13.5px; color: var(--ink); font-family: inherit;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.carbon-module input[type="date"]:hover { border-color: color-mix(in srgb, var(--carbon-brand-light) 50%, var(--border-subtle)); }
+.carbon-module input[type="date"]:focus { outline: none; border-color: var(--carbon-brand-light); box-shadow: 0 0 0 4px rgba(12,166,120,.14); }
+.carbon-module input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(36%) sepia(24%) saturate(1352%) hue-rotate(122deg) brightness(94%) contrast(94%); cursor: pointer; }
 
 .carbon-tooltip { background: var(--surface-1); border-radius: 12px; box-shadow: var(--shadow-stack); padding: 8px 12px; border-left: 3px solid var(--carbon-brand); }
 .carbon-tooltip-label { margin: 0 0 2px; font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; }

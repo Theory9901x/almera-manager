@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ResponsiveBar } from '@nivo/bar'
+import { ResponsiveLine } from '@nivo/line'
+import { ResponsiveRadialBar } from '@nivo/radial-bar'
 import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
-import { Button, Card, EmptyState, Field, Input, PageHeader, ProgressRing, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
+import { Button, Card, EmptyState, Field, Input, PageHeader, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
 import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
@@ -12,18 +14,75 @@ import type { CarbonStats } from '../types'
 const SCOPE_COLOR = { SCOPE_1: '#2563eb', SCOPE_2: '#d97706', SCOPE_3: '#7c3aed' }
 const identity = moduleIdentity('carbon-footprint')
 
+const MONTH_OPTIONS = [
+  '01 · Enero', '02 · Febrero', '03 · Marzo', '04 · Abril', '05 · Mayo', '06 · Junio',
+  '07 · Julio', '08 · Agosto', '09 · Septiembre', '10 · Octubre', '11 · Noviembre', '12 · Diciembre',
+].map((label, index) => ({ value: String(index + 1), label }))
+const QUARTER_OPTIONS = [1, 2, 3, 4].map(n => ({ value: String(n), label: `Trimestre ${n}` }))
+const SEMESTER_OPTIONS = [1, 2].map(n => ({ value: String(n), label: `Semestre ${n}` }))
+
+type PeriodPreset = 'custom' | 'month' | 'quarter' | 'semester' | 'year'
+
+function pad(value: number) { return String(value).padStart(2, '0') }
+function lastDayOf(year: number, month: number) { return new Date(year, month, 0).getDate() }
+
+function presetRange(preset: PeriodPreset, year: number, index: number): { from: string; to: string } | null {
+  if (preset === 'month') return { from: `${year}-${pad(index)}-01`, to: `${year}-${pad(index)}-${pad(lastDayOf(year, index))}` }
+  if (preset === 'quarter') {
+    const startMonth = (index - 1) * 3 + 1
+    const endMonth = startMonth + 2
+    return { from: `${year}-${pad(startMonth)}-01`, to: `${year}-${pad(endMonth)}-${pad(lastDayOf(year, endMonth))}` }
+  }
+  if (preset === 'semester') {
+    const startMonth = (index - 1) * 6 + 1
+    const endMonth = startMonth + 5
+    return { from: `${year}-${pad(startMonth)}-01`, to: `${year}-${pad(endMonth)}-${pad(lastDayOf(year, endMonth))}` }
+  }
+  if (preset === 'year') return { from: `${year}-01-01`, to: `${year}-12-31` }
+  return null
+}
+
 function CountUpNumber({ value, decimals = 0 }: { value: number; decimals?: number }) {
   const animated = useCountUp(value, 1400)
   return <>{animated.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</>
 }
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; color?: string }[]; label?: string }) {
-  if (!active || !payload?.length) return null
+function NivoTooltip({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="carbon-tooltip">
       <p className="carbon-tooltip-label">{label}</p>
-      <p className="carbon-tooltip-value" style={{ color: payload[0].color }}>{Number(payload[0].value).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg CO2e</p>
+      <p className="carbon-tooltip-value" style={{ color }}>{value.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg CO2e</p>
     </div>
+  )
+}
+
+function ScopeRadialCard({ label, percent, kg, color }: { label: string; percent: number | null; kg: number; color: string }) {
+  return (
+    <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--scope">
+      <p className="carbon-metric-label">{label}</p>
+      <div className="carbon-radial-wrap">
+        <ResponsiveRadialBar
+          data={[{ id: label, data: [{ x: 'valor', y: percent ?? 0 }] }]}
+          maxValue={100}
+          startAngle={0}
+          endAngle={360}
+          innerRadius={0.7}
+          padding={0.1}
+          cornerRadius={8}
+          colors={[color]}
+          enableRadialGrid={false}
+          enableCircularGrid={false}
+          radialAxisStart={null}
+          circularAxisOuter={null}
+          isInteractive={false}
+          animate
+          motionConfig="gentle"
+          margin={{ top: 2, right: 2, bottom: 2, left: 2 }}
+        />
+        <div className="carbon-radial-center"><span className="carbon-radial-percent" style={{ color }}>{percent ?? 0}%</span></div>
+      </div>
+      <p className="carbon-scope-value" style={{ color }}><CountUpNumber value={kg} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
+    </motion.div>
   )
 }
 
@@ -36,11 +95,23 @@ function CarbonDashboardContent() {
   const toast = useToast()
   const { session } = useAuth()
   const [stats, setStats] = useState<CarbonStats | null>(null)
+  const [preset, setPreset] = useState<PeriodPreset>('custom')
+  const [presetYear, setPresetYear] = useState(new Date().getFullYear())
+  const [presetIndex, setPresetIndex] = useState(1)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [loading, setLoading] = useState(true)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
+
+  // El preset (mensual/trimestral/semestral/anual) calcula el rango automaticamente — la fecha de
+  // cada medicion es lo que permite agrupar por estos periodos, por eso es el primer dato que pide
+  // el formulario de captura.
+  useEffect(() => {
+    if (preset === 'custom') return
+    const range = presetRange(preset, presetYear, presetIndex)
+    if (range) { setDateFrom(range.from); setDateTo(range.to) }
+  }, [preset, presetYear, presetIndex])
 
   async function load() {
     setLoading(true)
@@ -76,17 +147,44 @@ function CarbonDashboardContent() {
           identity={identity}
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/captura')}><Sparkles size={15} /> Registrar medición</Button>
-              <Button variant="secondary" onClick={() => setShowAnalysis(true)}><Telescope size={15} /> Análisis trimestral</Button>
-              <Button variant="secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileDown size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
-              <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/configuracion')}><Settings size={15} /> Configuración</Button>
+              <Button identity={identity} onClick={() => navigate('/app/huella-carbono/captura')}><Sparkles size={15} /> Registrar medición</Button>
+              <Button identity={identity} onClick={() => setShowAnalysis(true)}><Telescope size={15} /> Análisis trimestral</Button>
+              <Button identity={identity} disabled={exportingPdf} onClick={handleExportPdf}><FileDown size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
+              <Button identity={identity} onClick={() => navigate('/app/huella-carbono/configuracion')}><Settings size={15} /> Configuración</Button>
             </div>
           }
         />
 
         <Card accent={identity.color} className="carbon-period-bar flex flex-wrap items-end gap-3 p-4">
-          <Field label="Desde"><Input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></Field>
-          <Field label="Hasta"><Input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></Field>
+          <Field label="Período">
+            <Select
+              value={preset}
+              onChange={value => { setPreset(value as PeriodPreset); setPresetIndex(1) }}
+              options={[
+                { value: 'custom', label: 'Personalizado' }, { value: 'month', label: 'Mensual' },
+                { value: 'quarter', label: 'Trimestral' }, { value: 'semester', label: 'Semestral' }, { value: 'year', label: 'Anual' },
+              ]}
+            />
+          </Field>
+          {preset !== 'custom' && (
+            <>
+              <Field label="Año"><Input type="number" value={presetYear} onChange={event => setPresetYear(Number(event.target.value))} /></Field>
+              {preset !== 'year' && (
+                <Field label={preset === 'month' ? 'Mes' : preset === 'quarter' ? 'Trimestre' : 'Semestre'}>
+                  <Select
+                    value={String(presetIndex)} onChange={value => setPresetIndex(Number(value))}
+                    options={preset === 'month' ? MONTH_OPTIONS : preset === 'quarter' ? QUARTER_OPTIONS : SEMESTER_OPTIONS}
+                  />
+                </Field>
+              )}
+            </>
+          )}
+          {preset === 'custom' && (
+            <>
+              <Field label="Desde"><Input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></Field>
+              <Field label="Hasta"><Input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></Field>
+            </>
+          )}
           {stats.lastUpdated && (
             <span className="carbon-period-badge">
               <Leaf size={13} /> Última actualización: {new Date(stats.lastUpdated).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -111,40 +209,38 @@ function CarbonDashboardContent() {
               </span>
             </motion.div>
 
-            {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map((scope, index) => (
-              <motion.div key={scope} variants={fadeSlideUp} className="carbon-kpi-card bento-item--scope">
-                <p className="carbon-metric-label">Alcance {index + 1}</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <ProgressRing percent={scopePercent(stats.byScope[scope])} color={SCOPE_COLOR[scope]} size={56} strokeWidth={7} />
-                  <div>
-                    <p className="carbon-scope-value" style={{ color: SCOPE_COLOR[scope] }}><CountUpNumber value={stats.byScope[scope]} decimals={1} /></p>
-                    <p className="carbon-metric-unit">kg CO2e</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+            <ScopeRadialCard label="Alcance 1" percent={scopePercent(stats.byScope.SCOPE_1)} kg={stats.byScope.SCOPE_1} color={SCOPE_COLOR.SCOPE_1} />
+            <ScopeRadialCard label="Alcance 2" percent={scopePercent(stats.byScope.SCOPE_2)} kg={stats.byScope.SCOPE_2} color={SCOPE_COLOR.SCOPE_2} />
+            <ScopeRadialCard label="Alcance 3" percent={scopePercent(stats.byScope.SCOPE_3)} kg={stats.byScope.SCOPE_3} color={SCOPE_COLOR.SCOPE_3} />
           </motion.div>
         )}
 
         {stats.byBlock.length > 0 && (
           <Card accent={identity.color} className="p-5">
             <h3 className="mb-3 text-base font-bold">Desglose por variable</h3>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.byBlock.map(item => ({ name: item.name, kgco2e: item.kgco2e }))} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                  <defs>
-                    <linearGradient id="carbon-bar-gradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={identity.gradientFrom} stopOpacity={0.95} />
-                      <stop offset="100%" stopColor={identity.gradientTo} stopOpacity={0.6} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.6} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} interval={0} angle={-18} textAnchor="end" height={60} />
-                  <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(15,92,63,.05)' }} />
-                  <Bar dataKey="kgco2e" fill="url(#carbon-bar-gradient)" radius={[8, 8, 0, 0]} isAnimationActive animationDuration={900} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="carbon-nivo-chart" style={{ height: 280 }}>
+              <ResponsiveBar
+                data={stats.byBlock.map(item => ({ variable: item.name, valor: item.kgco2e }))}
+                keys={['valor']}
+                indexBy="variable"
+                margin={{ top: 12, right: 16, bottom: 70, left: 60 }}
+                padding={0.4}
+                borderRadius={8}
+                colors={() => 'url(#carbon-bar-gradient)'}
+                defs={[{ id: 'carbon-bar-gradient', type: 'linearGradient', colors: [{ offset: 0, color: identity.gradientFrom }, { offset: 100, color: identity.gradientTo }] }]}
+                fill={[{ match: '*', id: 'carbon-bar-gradient' }]}
+                axisBottom={{ tickSize: 0, tickPadding: 12, tickRotation: -20 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8, format: (v: number) => v.toLocaleString('es-CO') }}
+                enableGridY
+                gridYValues={5}
+                theme={{
+                  grid: { line: { stroke: '#eef2f0', strokeDasharray: '3 3' } },
+                  axis: { ticks: { text: { fontSize: 11, fill: '#94a3b8' } } },
+                }}
+                animate
+                motionConfig="gentle"
+                tooltip={({ indexValue, value, color }) => <NivoTooltip label={String(indexValue)} value={Number(value)} color={color} />}
+              />
             </div>
           </Card>
         )}
@@ -152,16 +248,32 @@ function CarbonDashboardContent() {
         {stats.timeline.length > 1 && (
           <Card accent={identity.color} className="p-5">
             <h3 className="mb-3 text-base font-bold">Evolución en el tiempo</h3>
-            <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.timeline} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.6} />
-                  <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                  <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="kgco2e" stroke={identity.color} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive animationDuration={900} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="carbon-nivo-chart" style={{ height: 260 }}>
+              <ResponsiveLine
+                data={[{ id: 'huella', data: stats.timeline.map(point => ({ x: point.period, y: point.kgco2e })) }]}
+                margin={{ top: 12, right: 16, bottom: 50, left: 60 }}
+                colors={[identity.color]}
+                lineWidth={2.5}
+                pointSize={7}
+                pointColor="#fff"
+                pointBorderWidth={2}
+                pointBorderColor={identity.color}
+                enableArea
+                areaOpacity={0.12}
+                curve="monotoneX"
+                axisBottom={{ tickSize: 0, tickPadding: 12 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8, format: (v: number) => v.toLocaleString('es-CO') }}
+                enableGridX={false}
+                gridYValues={5}
+                theme={{
+                  grid: { line: { stroke: '#eef2f0', strokeDasharray: '3 3' } },
+                  axis: { ticks: { text: { fontSize: 11, fill: '#94a3b8' } } },
+                }}
+                animate
+                motionConfig="gentle"
+                useMesh
+                tooltip={({ point }) => <NivoTooltip label={String(point.data.x)} value={Number(point.data.y)} color={identity.color} />}
+              />
             </div>
           </Card>
         )}
