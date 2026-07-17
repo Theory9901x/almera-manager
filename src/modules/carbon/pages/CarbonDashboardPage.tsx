@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ResponsiveBar } from '@nivo/bar'
-import { ResponsiveLine } from '@nivo/line'
-import { ResponsiveRadialBar } from '@nivo/radial-bar'
 import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
-import { Button, Card, DatePicker, EmptyState, Field, Input, PageHeader, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
+import { BarChart, Button, Card, DatePicker, EmptyState, Field, Input, LineChart, PageHeader, RadialGauge, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
 import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
@@ -47,39 +44,12 @@ function CountUpNumber({ value, decimals = 0 }: { value: number; decimals?: numb
   return <>{animated.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</>
 }
 
-function NivoTooltip({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="carbon-tooltip">
-      <p className="carbon-tooltip-label">{label}</p>
-      <p className="carbon-tooltip-value" style={{ color }}>{value.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg CO2e</p>
-    </div>
-  )
-}
-
 function ScopeRadialCard({ label, percent, kg, color }: { label: string; percent: number | null; kg: number; color: string }) {
   return (
     <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--scope">
       <p className="carbon-metric-label">{label}</p>
       <div className="carbon-radial-wrap">
-        <ResponsiveRadialBar
-          data={[{ id: label, data: [{ x: 'valor', y: percent ?? 0 }] }]}
-          maxValue={100}
-          startAngle={0}
-          endAngle={360}
-          innerRadius={0.7}
-          padding={0.1}
-          cornerRadius={8}
-          colors={[color]}
-          enableRadialGrid={false}
-          enableCircularGrid={false}
-          radialAxisStart={null}
-          circularAxisOuter={null}
-          isInteractive={false}
-          animate
-          motionConfig="gentle"
-          margin={{ top: 2, right: 2, bottom: 2, left: 2 }}
-        />
-        <div className="carbon-radial-center"><span className="carbon-radial-percent" style={{ color }}>{percent ?? 0}%</span></div>
+        <RadialGauge percent={percent ?? 0} color={color} size={104} />
       </div>
       <p className="carbon-scope-value" style={{ color }}><CountUpNumber value={kg} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
     </motion.div>
@@ -218,63 +188,24 @@ function CarbonDashboardContent() {
         {stats.byBlock.length > 0 && (
           <Card accent={identity.color} className="p-5">
             <h3 className="mb-3 text-base font-bold">Desglose por variable</h3>
-            <div className="carbon-nivo-chart" style={{ height: 280 }}>
-              <ResponsiveBar
-                data={stats.byBlock.map(item => ({ variable: item.name, valor: item.kgco2e }))}
-                keys={['valor']}
-                indexBy="variable"
-                margin={{ top: 12, right: 16, bottom: 70, left: 60 }}
-                padding={0.4}
-                borderRadius={8}
-                colors={() => 'url(#carbon-bar-gradient)'}
-                defs={[{ id: 'carbon-bar-gradient', type: 'linearGradient', colors: [{ offset: 0, color: identity.gradientFrom }, { offset: 100, color: identity.gradientTo }] }]}
-                fill={[{ match: '*', id: 'carbon-bar-gradient' }]}
-                axisBottom={{ tickSize: 0, tickPadding: 12, tickRotation: -20 }}
-                axisLeft={{ tickSize: 0, tickPadding: 8, format: (v: number) => v.toLocaleString('es-CO') }}
-                enableGridY
-                gridYValues={5}
-                theme={{
-                  grid: { line: { stroke: '#eef2f0', strokeDasharray: '3 3' } },
-                  axis: { ticks: { text: { fontSize: 11, fill: '#94a3b8' } } },
-                }}
-                animate
-                motionConfig="gentle"
-                tooltip={({ indexValue, value, color }) => <NivoTooltip label={String(indexValue)} value={Number(value)} color={color} />}
-              />
-            </div>
+            <BarChart
+              height={280}
+              color={identity.color}
+              valueSuffix=" kg CO2e"
+              data={stats.byBlock.map(item => ({ label: item.name, value: item.kgco2e }))}
+            />
           </Card>
         )}
 
         {stats.timeline.length > 1 && (
           <Card accent={identity.color} className="p-5">
             <h3 className="mb-3 text-base font-bold">Evolución en el tiempo</h3>
-            <div className="carbon-nivo-chart" style={{ height: 260 }}>
-              <ResponsiveLine
-                data={[{ id: 'huella', data: stats.timeline.map(point => ({ x: point.period, y: point.kgco2e })) }]}
-                margin={{ top: 12, right: 16, bottom: 50, left: 60 }}
-                colors={[identity.color]}
-                lineWidth={2.5}
-                pointSize={7}
-                pointColor="#fff"
-                pointBorderWidth={2}
-                pointBorderColor={identity.color}
-                enableArea
-                areaOpacity={0.12}
-                curve="monotoneX"
-                axisBottom={{ tickSize: 0, tickPadding: 12 }}
-                axisLeft={{ tickSize: 0, tickPadding: 8, format: (v: number) => v.toLocaleString('es-CO') }}
-                enableGridX={false}
-                gridYValues={5}
-                theme={{
-                  grid: { line: { stroke: '#eef2f0', strokeDasharray: '3 3' } },
-                  axis: { ticks: { text: { fontSize: 11, fill: '#94a3b8' } } },
-                }}
-                animate
-                motionConfig="gentle"
-                useMesh
-                tooltip={({ point }) => <NivoTooltip label={String(point.data.x)} value={Number(point.data.y)} color={identity.color} />}
-              />
-            </div>
+            <LineChart
+              height={260}
+              color={identity.color}
+              valueSuffix=" kg CO2e"
+              data={stats.timeline.map(point => ({ label: point.period, value: point.kgco2e }))}
+            />
           </Card>
         )}
 

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Download, FileDown, FileText, ListChecks, Loader2, Pencil, Users } from 'lucide-react'
 import {
-  Badge, Button, Card, DatePicker, EmptyState, Field, PageHeader, ProgressBar, Select, SemaphoreBadge, StatCard, ToastProvider,
+  Badge, BarChart, Button, Card, DatePicker, EmptyState, Field, LineChart, PageHeader, ProgressBar, Select, SemaphoreBadge, StatCard, ToastProvider,
   moduleIdentity, semaphoreColor, semaphoreLevel, useCountUp, useToast,
 } from '@/design-system'
 import { surveysService } from '../services/surveysService'
@@ -191,17 +190,7 @@ function SurveyResultsContent() {
       {stats.timeline.length > 1 && (
         <Card accent={identity.color} className="p-5">
           <h3 className="mb-3 text-base font-bold">Evolución de respuestas</h3>
-          <div className="h-52 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={stats.timeline} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line, #e2e7f0)" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                <Tooltip labelStyle={{ fontWeight: 700 }} />
-                <Line type="monotone" dataKey="count" stroke={identity.color} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive animationDuration={600} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <LineChart height={208} color={identity.color} area={false} data={stats.timeline.map(point => ({ label: point.date, value: point.count }))} />
         </Card>
       )}
 
@@ -286,23 +275,7 @@ function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: stri
           {stat.accuracyPercent != null && (
             <Badge tone="info">Aciertos: {stat.accuracyPercent}%</Badge>
           )}
-          <div className="h-56 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stat.breakdown.map(item => ({ name: item.label ?? String(item.value), count: item.count, percent: item.percent }))} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-              <defs>
-                <linearGradient id={`survey-bar-${stat.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={identity.gradientFrom} stopOpacity={0.95} />
-                  <stop offset="100%" stopColor={identity.gradientTo} stopOpacity={0.65} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line, #e2e7f0)" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={stat.breakdown.length > 4 ? -18 : 0} textAnchor={stat.breakdown.length > 4 ? 'end' : 'middle'} height={stat.breakdown.length > 4 ? 50 : 30} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-              <Tooltip labelStyle={{ fontWeight: 700 }} />
-              <Bar dataKey="count" fill={`url(#survey-bar-${stat.id})`} radius={[8, 8, 0, 0]} isAnimationActive animationDuration={600} />
-            </BarChart>
-          </ResponsiveContainer>
-          </div>
+          <BarChart height={224} color={identity.color} data={stat.breakdown.map(item => ({ label: item.label ?? String(item.value), value: item.count }))} />
         </>
       )}
 

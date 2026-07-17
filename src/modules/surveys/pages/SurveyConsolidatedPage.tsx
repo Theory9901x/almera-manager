@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ArrowLeft, ClipboardList, Loader2, Percent, Radio, Users } from 'lucide-react'
 import {
-  Badge, Card, EmptyState, PageHeader, StatCard, Table, ToastProvider, moduleIdentity, useCountUp, useToast,
+  Badge, BarChart, Card, EmptyState, PageHeader, StatCard, Table, ToastProvider, moduleIdentity, useCountUp, useToast,
 } from '@/design-system'
 import { Button } from '@/design-system'
 import { surveysService } from '../services/surveysService'
@@ -86,23 +85,11 @@ function SurveyConsolidatedContent() {
         <>
           <Card accent={identity.color} className="p-5">
             <p className="ds-eyebrow mb-3">Respuestas completadas por encuesta</p>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topSurveys.map(survey => ({ name: survey.code, full: survey.title, count: survey.completed_count }))} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                  <defs>
-                    <linearGradient id="survey-consolidated-bar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={identity.gradientFrom} stopOpacity={0.95} />
-                      <stop offset="100%" stopColor={identity.gradientTo} stopOpacity={0.65} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line, #e2e7f0)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={50} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <Tooltip labelFormatter={(label, payload) => payload?.[0]?.payload?.full || label} />
-                  <Bar dataKey="count" name="Respuestas" fill="url(#survey-consolidated-bar)" radius={[8, 8, 0, 0]} isAnimationActive animationDuration={600} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <BarChart
+              height={288}
+              color={identity.color}
+              data={topSurveys.map(survey => ({ label: survey.code, tooltipLabel: survey.title, value: survey.completed_count }))}
+            />
           </Card>
 
           <Card accent={identity.color} className="overflow-hidden">

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardList, Download, Save } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Cell, Label, LabelList, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { BarChart, Button, Card, Field, LineChart, Select, moduleIdentity } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
-import { Button, Card, Field, Select, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, ConceptKey, Dashboard, Position, Professional, Threshold } from '../types'
 import { CONCEPT_COLORS, CONCEPT_LABELS } from '../design/scopeColors'
@@ -13,6 +12,7 @@ import { ToastStack } from '../design/Toast'
 
 const identity = moduleIdentity('adherence-matrix')
 const conceptOrder: ConceptKey[] = ['OPTIMO', 'ACEPTABLE', 'DEFICIENTE', 'MUY_DEFICIENTE']
+const NO_DATA_COLOR = '#94A3B8'
 
 function formatPercent(value: number | null) {
   return value === null ? 'N/A' : `${value.toFixed(1)}%`
@@ -20,30 +20,11 @@ function formatPercent(value: number | null) {
 
 const emptyDashboard: Dashboard = { totalEvaluations: 0, averageCompliance: null, byConcept: { OPTIMO: 0, ACEPTABLE: 0, DEFICIENTE: 0, MUY_DEFICIENTE: 0 }, byScope: [], byProfessional: [], byMonth: [] }
 
-const GRADIENT_IDS: Record<string, string> = { OPTIMO: 'gradOptimo', ACEPTABLE: 'gradAceptable', DEFICIENTE: 'gradDeficiente', MUY_DEFICIENTE: 'gradMuyDeficiente' }
-
-function ComplianceGradientDefs() {
-  return (
-    <defs>
-      {conceptOrder.map(concept => (
-        <linearGradient key={concept} id={GRADIENT_IDS[concept]} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor={CONCEPT_COLORS[concept]} stopOpacity={0.65} />
-          <stop offset="100%" stopColor={CONCEPT_COLORS[concept]} stopOpacity={1} />
-        </linearGradient>
-      ))}
-      <linearGradient id="gradNeutral" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stopColor="#94A3B8" stopOpacity={0.5} />
-        <stop offset="100%" stopColor="#94A3B8" stopOpacity={0.9} />
-      </linearGradient>
-    </defs>
-  )
-}
-
-function gradientFor(value: number | null, thresholds: Threshold[]) {
-  if (value === null) return 'url(#gradNeutral)'
+function colorFor(value: number | null, thresholds: Threshold[]) {
+  if (value === null) return NO_DATA_COLOR
   const sorted = [...thresholds].sort((left, right) => right.min_percent - left.min_percent)
   const match = sorted.find(threshold => value >= threshold.min_percent)
-  return match ? `url(#${GRADIENT_IDS[match.concept]})` : 'url(#gradNeutral)'
+  return match ? CONCEPT_COLORS[match.concept as ConceptKey] : NO_DATA_COLOR
 }
 
 export default function DashboardPanel({ areas, positions, professionals }: { areas: Area[]; positions: Position[]; professionals: Professional[] }) {
@@ -146,20 +127,13 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
         <Card accent={identity.color} className="ds-bento-item ds-bento-wide p-5">
           <p className="ds-eyebrow">Distribución</p>
           <h2 className="mt-1 text-lg font-black">Distribución por concepto</h2>
-          <div style={{ width: '100%', height: chartHeight(conceptData.length) }} className="mt-3">
-            <ResponsiveContainer>
-              <BarChart data={conceptData} layout="vertical" margin={{ left: 8, right: 24 }}>
-                <ComplianceGradientDefs />
-                <CartesianGrid horizontal={false} stroke="#e5e9f0" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-                <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: unknown) => [`${value} evaluaciones`, '']} labelStyle={{ color: '#172033' }} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
-                  {conceptData.map(item => <Cell key={item.concept} fill={`url(#${GRADIENT_IDS[item.concept]})`} />)}
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#344054' }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="mt-3">
+            <BarChart
+              orientation="horizontal"
+              height={chartHeight(conceptData.length)}
+              valueSuffix=" ev."
+              data={conceptData.map(item => ({ label: item.label, value: item.value, color: CONCEPT_COLORS[item.concept] }))}
+            />
           </div>
         </Card>
       </div>
@@ -171,20 +145,13 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
           <p className="ds-eyebrow">Ámbitos</p>
           <h2 className="mt-1 text-lg font-black">Cumplimiento por ámbito</h2>
           {scopeData.length ? (
-            <div style={{ width: '100%', height: chartHeight(scopeData.length) }} className="mt-3">
-              <ResponsiveContainer>
-                <BarChart data={scopeData} layout="vertical" margin={{ left: 8, right: 24 }}>
-                  <ComplianceGradientDefs />
-                  <CartesianGrid horizontal={false} stroke="#e5e9f0" />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-                  <YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value: unknown) => [`${value}%`, 'Cumplimiento']} />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}>
-                    {scopeData.map(item => <Cell key={item.name} fill={gradientFor(item.value, thresholds)} />)}
-                    <LabelList dataKey="value" position="right" formatter={(value: unknown) => `${value}%`} style={{ fontSize: 11, fill: '#344054' }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="mt-3">
+              <BarChart
+                orientation="horizontal"
+                height={chartHeight(scopeData.length)}
+                valueSuffix="%"
+                data={scopeData.map(item => ({ label: item.name, value: item.value, color: colorFor(item.value, thresholds) }))}
+              />
             </div>
           ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
         </Card>
@@ -193,20 +160,13 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
           <p className="ds-eyebrow">Comparativo</p>
           <h2 className="mt-1 text-lg font-black">Ranking de profesionales</h2>
           {professionalData.length ? (
-            <div style={{ width: '100%', height: chartHeight(professionalData.length) }} className="mt-3">
-              <ResponsiveContainer>
-                <BarChart data={professionalData} layout="vertical" margin={{ left: 8, right: 24 }}>
-                  <ComplianceGradientDefs />
-                  <CartesianGrid horizontal={false} stroke="#e5e9f0" />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-                  <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11, fill: '#344054' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value: unknown) => [value === null || value === undefined ? 'N/A' : `${value}%`, 'Cumplimiento']} />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}>
-                    {professionalData.map(item => <Cell key={item.name} fill={gradientFor(item.value, thresholds)} />)}
-                    <LabelList dataKey="value" position="right" formatter={(value: unknown) => value === null || value === undefined ? 'N/A' : `${value}%`} style={{ fontSize: 11, fill: '#344054' }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="mt-3">
+              <BarChart
+                orientation="horizontal"
+                height={chartHeight(professionalData.length)}
+                valueFormatter={value => `${value}%`}
+                data={professionalData.map(item => ({ label: item.name, value: item.value, color: colorFor(item.value, thresholds) }))}
+              />
             </div>
           ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
         </Card>
@@ -216,23 +176,14 @@ export default function DashboardPanel({ areas, positions, professionals }: { ar
         <p className="ds-eyebrow">Tendencia</p>
         <h2 className="mt-1 text-lg font-black">Evolución por mes reportado</h2>
         {monthData.length ? (
-          <div style={{ width: '100%', height: 260 }} className="mt-3">
-            <ResponsiveContainer>
-              <LineChart data={monthData} margin={{ left: 8, right: 24, top: 10 }}>
-                <defs>
-                  <linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="#4F46E5" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#e5e9f0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#667085' }} axisLine={{ stroke: '#e5e9f0' }} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#667085' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: unknown) => [value === null || value === undefined ? 'N/A' : `${value}%`, 'Cumplimiento']} />
-                <ReferenceLine y={80} stroke="#94a3b8" strokeDasharray="4 4"><Label value="Aceptable (80%)" position="insideTopRight" fill="#94a3b8" fontSize={10} /></ReferenceLine>
-                <Line type="monotone" dataKey="value" stroke="#4F46E5" strokeWidth={2.5} dot={{ r: 4, fill: '#4F46E5' }} connectNulls fill="url(#lineFill)" />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="mt-3">
+            <LineChart
+              height={260}
+              color="#4F46E5"
+              valueFormatter={value => `${value}%`}
+              referenceLine={{ value: 80, label: 'Aceptable (80%)' }}
+              data={monthData.map(item => ({ label: item.name, value: item.value }))}
+            />
           </div>
         ) : <div className="almera-empty mt-3"><p>Sin datos suficientes para este filtro.</p></div>}
       </Card>
