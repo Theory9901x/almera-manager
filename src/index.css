@@ -1536,6 +1536,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 .ds-eyebrow { margin: 0; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 
+/* Agrupa accesos rapidos del dashboard por area, con una linea divisoria propia por grupo — evita
+   que accesos de modulos distintos (operativo, calidad, administracion...) se vean como una sola
+   fila mezclada a medida que se agregan mas modulos. */
+.dashboard-section { padding-top: 14px; border-top: 1px solid var(--line); }
+.dashboard-section:first-of-type { padding-top: 0; border-top: none; }
+.dashboard-section-label { margin: 0 0 10px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
 .ds-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; border: 0; border-radius: 11px; padding: 0 16px; font-size: 12.5px; font-weight: 800; cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, color 150ms ease, border-color 150ms ease; }
 .ds-button:disabled { cursor: not-allowed; opacity: .55; transform: none; box-shadow: none; }
 .ds-button-primary { color: #fff; box-shadow: 0 8px 18px rgba(16,24,40,.16); background-size: 150% 150%; }

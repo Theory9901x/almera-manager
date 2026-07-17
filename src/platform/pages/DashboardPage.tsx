@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -65,6 +65,18 @@ export default function DashboardPage() {
           </motion.div>
         )}
       </motion.div>
+    </div>
+  )
+}
+
+// Agrupa accesos rapidos por area (operativa / calidad / administracion) con un titulo y una linea
+// divisoria — a medida que se agreguen mas modulos (ej. Huella de Carbono), cada uno entra en su
+// grupo correspondiente en vez de sumarse a una sola fila larga sin separacion visual.
+function DashboardSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="dashboard-section">
+      <p className="dashboard-section-label">{label}</p>
+      <div className="flex flex-wrap gap-3">{children}</div>
     </div>
   )
 }
@@ -244,11 +256,17 @@ function AdminHome() {
         <StatCard icon={CheckCircle2} label="Cerradas con trazabilidad" value={closed} identity={moduleIdentity('almera')} />
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <DashboardSection label="Gestión operativa">
         <QuickAccessCard to="/app/modulos/almera" icon={FilePlus2} label="Nuevo registro" detail="Gestión ALMERA" identity={moduleIdentity('almera')} />
-        <QuickAccessCard to="/app/administracion/users" icon={Users} label="Usuarios y roles" detail="Acceso y permisos" identity={identity} />
+      </DashboardSection>
+
+      <DashboardSection label="Calidad y auditoría">
         <QuickAccessCard to="/app/adherencia/configuracion" icon={Upload} label="Matrices de Adherencia" detail="Áreas, matrices, auditores" identity={moduleIdentity('adherence-matrix')} />
-      </div>
+      </DashboardSection>
+
+      <DashboardSection label="Administración">
+        <QuickAccessCard to="/app/administracion/users" icon={Users} label="Usuarios y roles" detail="Acceso y permisos" identity={identity} />
+      </DashboardSection>
     </div>
   )
 }
