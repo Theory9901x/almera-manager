@@ -1628,12 +1628,65 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   padding: 4px 10px; font-size: 12px; font-weight: var(--weight-semibold); color: var(--ds-eyebrow-color, var(--brand));
 }
 
-/* Agrupa accesos rapidos del dashboard por area, con una linea divisoria propia por grupo — evita
-   que accesos de modulos distintos (operativo, calidad, administracion...) se vean como una sola
-   fila mezclada a medida que se agregan mas modulos. */
-.dashboard-section { padding-top: 14px; border-top: 1px solid var(--line); }
-.dashboard-section:first-of-type { padding-top: 0; border-top: none; }
-.dashboard-section-label { margin: 0 0 10px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* Agrupa accesos rapidos del dashboard por area — la separacion entre grupos es espacio (escala de
+   8pt), no una linea divisoria delgada; cada grupo se identifica con una pildora de categoria. */
+.dashboard-section { padding-top: var(--space-6); }
+.dashboard-section:first-of-type { padding-top: 0; }
+.dashboard-section-label { margin: 0 0 var(--space-3); }
+
+/* Pildora de categoria — fondo solido de color, esquinas muy redondeadas. Para el nombre del
+   modulo/area que antecede una tarjeta o agrupa accesos, nunca un color puesto al azar. */
+.pill-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  background: var(--pill-color, var(--brand)); color: #fff;
+}
+
+/* Categoria pequena y coloreada encima de un titulo con peso real — jerarquia de tarjeta de
+   contenido (categoria -> titulo -> metadato secundario), nunca todo con el mismo peso visual. */
+.dashboard-card-category { display: block; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--card-category-color, var(--brand)); }
+
+/* Icono de acceso rapido — cuadrado con tinte suave del color de MODULO (nunca un color al azar
+   por tarjeta individual); si dos accesos son del mismo modulo, quedan identicos. */
+.action-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--module-color, var(--brand)) 14%, white);
+  color: var(--module-color, var(--brand));
+}
+
+/* Caja de highlight — para contenido/metricas destacadas, fondo oscuro con tinte del color de
+   marca y borde lateral de acento, en vez de una tarjeta blanca generica mas. */
+.highlight-box {
+  background: linear-gradient(135deg, #0f2a20, #143d2e);
+  border-left: 4px solid var(--highlight-accent, var(--brand-2));
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  color: rgba(255,255,255,.92);
+}
+.highlight-box .ds-stat-card-icon { background: rgba(255,255,255,.12) !important; }
+.highlight-box .ds-eyebrow, .highlight-box .dashboard-card-category { color: rgba(255,255,255,.65); }
+.highlight-box .ds-stat-card-value { color: #fff; }
+
+/* Header tipo "portada" del dashboard — seccion oscura como acento antes de las tarjetas claras de
+   contenido, en vez de un encabezado blanco plano igual al resto de pantallas del sistema. */
+.dashboard-hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, #0a1628 0%, #142238 60%, #1a2f4a 100%);
+  border-radius: var(--radius-xl);
+  padding: 40px 36px;
+  color: #fff;
+}
+.dashboard-hero::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--hero-accent, var(--brand-2)) 22%, transparent), transparent 55%);
+}
+.dashboard-hero > * { position: relative; z-index: 1; }
+.dashboard-hero .pill-badge { margin-bottom: var(--space-3); background: rgba(255,255,255,.14); }
+.dashboard-hero-greeting { font-size: var(--text-h1); font-weight: var(--weight-black); letter-spacing: -.02em; margin: 0; line-height: 1.1; }
+.dashboard-hero-sub { color: rgba(255,255,255,.65); font-size: var(--text-body); margin: var(--space-2) 0 0; }
+@media (max-width: 640px) { .dashboard-hero { padding: 28px 22px; } }
 
 .ds-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; border: 0; border-radius: 11px; padding: 0 16px; font-size: 12.5px; font-weight: 800; cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, color 150ms ease, border-color 150ms ease; }
 .ds-button:disabled { cursor: not-allowed; opacity: .55; transform: none; box-shadow: none; }

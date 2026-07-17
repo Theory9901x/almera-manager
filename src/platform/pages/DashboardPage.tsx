@@ -12,7 +12,7 @@ import { adherenceService } from '@/modules/adherence/services/adherenceService'
 import type { EvaluationSummary, ImprovementPlan } from '@/modules/adherence/types'
 import { PlanStatusBadge } from '@/modules/adherence/design/PlanStatusBadge'
 import {
-  Card, EmptyState, PageHeader, ProgressRing, SemaphoreBadge, StatCard,
+  Card, EmptyState, ProgressRing, SemaphoreBadge, StatCard,
   fadeSlideUp, moduleIdentity, semaphoreLevel, staggerContainer,
 } from '@/design-system'
 
@@ -39,12 +39,11 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader
-        eyebrow={session.organization.name}
-        title={greetingMessage(session.user.fullName)}
-        description={`${session.role.name}${session.position ? ` · ${session.position.name}` : ''} · ${dateLabel}`}
-        identity={identity}
-      />
+      <div className="dashboard-hero" style={{ ['--hero-accent' as string]: identity.color }}>
+        <span className="pill-badge">{session.organization.name}</span>
+        <h1 className="dashboard-hero-greeting">{greetingMessage(session.user.fullName)}</h1>
+        <p className="dashboard-hero-sub">{session.role.name}{session.position ? ` · ${session.position.name}` : ''} · {dateLabel}</p>
+      </div>
 
       <motion.div variants={staggerContainer()} initial="hidden" animate="visible" className="space-y-6">
         {isProfesional && <motion.div variants={fadeSlideUp}><ProfesionalHome /></motion.div>}
@@ -69,14 +68,14 @@ export default function DashboardPage() {
   )
 }
 
-// Agrupa accesos rapidos por area (operativa / calidad / administracion) con un titulo y una linea
-// divisoria — a medida que se agreguen mas modulos (ej. Huella de Carbono), cada uno entra en su
-// grupo correspondiente en vez de sumarse a una sola fila larga sin separacion visual.
-function DashboardSection({ label, children }: { label: string; children: React.ReactNode }) {
+// Agrupa accesos rapidos por area (operativa / calidad / administracion) — la separacion entre
+// grupos es espacio, no una linea divisoria; cada grupo lleva su propia pildora de categoria a
+// medida que se agreguen mas modulos (ej. Huella de Carbono), cada uno entra en su grupo.
+function DashboardSection({ label, color, children }: { label: string; color: string; children: React.ReactNode }) {
   return (
     <div className="dashboard-section">
-      <p className="dashboard-section-label">{label}</p>
-      <div className="flex flex-wrap gap-3">{children}</div>
+      <span className="pill-badge" style={{ ['--pill-color' as string]: color }}>{label}</span>
+      <div className="mt-3 flex flex-wrap gap-3">{children}</div>
     </div>
   )
 }
@@ -84,7 +83,7 @@ function DashboardSection({ label, children }: { label: string; children: React.
 function QuickAccessCard({ to, icon: Icon, label, detail, identity }: { to: string; icon: typeof Headphones; label: string; detail: string; identity: ReturnType<typeof moduleIdentity> }) {
   return (
     <Link to={to} className="ds-card flex items-center gap-3 transition hover:-translate-y-0.5" style={{ padding: '14px 16px' }}>
-      <span className="grid h-10 w-10 flex-none place-items-center rounded-xl text-white" style={{ backgroundImage: `linear-gradient(135deg, ${identity.gradientFrom}, ${identity.gradientTo})` }}><Icon size={18} /></span>
+      <span className="action-icon" style={{ ['--module-color' as string]: identity.color }}><Icon size={18} /></span>
       <span className="min-w-0">
         <strong className="block text-sm">{label}</strong>
         <span className="block text-xs text-[var(--muted)]">{detail}</span>
@@ -204,8 +203,9 @@ function AuditorHome({ membershipId }: { membershipId: string }) {
             {drafts.map(evaluation => (
               <Link key={evaluation.id} to="/app/adherencia/operacion" className="ds-card flex items-center justify-between gap-3" style={{ padding: '14px 16px' }}>
                 <span className="min-w-0">
+                  <span className="dashboard-card-category" style={{ ['--card-category-color' as string]: identity.color }}>{evaluation.area_name}</span>
                   <strong className="block truncate text-sm">{evaluation.professional_name}</strong>
-                  <span className="block truncate text-xs text-[var(--muted)]">{evaluation.area_name} · {evaluation.month_reported}</span>
+                  <span className="block truncate text-xs text-[var(--muted)]">{evaluation.month_reported}</span>
                 </span>
                 <ClipboardList size={16} style={{ color: identity.color }} />
               </Link>
@@ -216,9 +216,13 @@ function AuditorHome({ membershipId }: { membershipId: string }) {
         )}
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard icon={Gauge} label="Evaluaciones cerradas este mes" value={closedThisMonth.length} identity={identity} />
-        <StatCard icon={ClipboardCheck} label="Cumplimiento promedio auditado" value={averageCompliance === null ? '—' : `${averageCompliance.toFixed(1)}%`} identity={identity} />
+      {/* Cumplimiento promedio es la metrica que resume el desempeno del mes — protagonista en
+          highlight-box, "evaluaciones cerradas" queda secundaria. */}
+      <div className="ds-bento">
+        <div className="ds-bento-item ds-bento-hero highlight-box" style={{ ['--highlight-accent' as string]: identity.color }}>
+          <StatCard icon={ClipboardCheck} label="Cumplimiento promedio auditado" value={averageCompliance === null ? '—' : `${averageCompliance.toFixed(1)}%`} identity={identity} />
+        </div>
+        <div className="ds-bento-item"><StatCard icon={Gauge} label="Evaluaciones cerradas este mes" value={closedThisMonth.length} identity={identity} /></div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -247,24 +251,30 @@ function AdminHome() {
   const inReview = records?.filter(record => record.status === 'IN_REVIEW').length ?? 0
   const closed = records?.filter(record => record.status === 'CLOSED' || record.status === 'APPROVED').length ?? 0
 
+  const almeraIdentity = moduleIdentity('almera')
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Users} label="Usuarios activos" value={userCount ?? '—'} identity={identity} />
-        <StatCard icon={Headphones} label="Solicitudes ALMERA" value={total} identity={moduleIdentity('almera')} />
-        <StatCard icon={ClipboardList} label="Pendientes por revisar" value={inReview} identity={moduleIdentity('almera')} />
-        <StatCard icon={CheckCircle2} label="Cerradas con trazabilidad" value={closed} identity={moduleIdentity('almera')} />
+      {/* Pendientes por revisar es el numero que realmente pide accion hoy — dato protagonista en
+          highlight-box, no una caja mas entre 4 iguales. */}
+      <div className="ds-bento">
+        <div className="ds-bento-item ds-bento-hero highlight-box" style={{ ['--highlight-accent' as string]: almeraIdentity.color }}>
+          <StatCard icon={ClipboardList} label="Pendientes por revisar" value={inReview} identity={almeraIdentity} />
+        </div>
+        <div className="ds-bento-item"><StatCard icon={Users} label="Usuarios activos" value={userCount ?? '—'} identity={identity} /></div>
+        <div className="ds-bento-item"><StatCard icon={Headphones} label="Solicitudes ALMERA" value={total} identity={almeraIdentity} /></div>
+        <div className="ds-bento-item"><StatCard icon={CheckCircle2} label="Cerradas con trazabilidad" value={closed} identity={almeraIdentity} /></div>
       </div>
 
-      <DashboardSection label="Gestión operativa">
-        <QuickAccessCard to="/app/modulos/almera" icon={FilePlus2} label="Nuevo registro" detail="Gestión ALMERA" identity={moduleIdentity('almera')} />
+      <DashboardSection label="Gestión operativa" color={almeraIdentity.color}>
+        <QuickAccessCard to="/app/modulos/almera" icon={FilePlus2} label="Nuevo registro" detail="Gestión ALMERA" identity={almeraIdentity} />
       </DashboardSection>
 
-      <DashboardSection label="Calidad y auditoría">
+      <DashboardSection label="Calidad y auditoría" color={moduleIdentity('adherence-matrix').color}>
         <QuickAccessCard to="/app/adherencia/configuracion" icon={Upload} label="Matrices de Adherencia" detail="Áreas, matrices, auditores" identity={moduleIdentity('adherence-matrix')} />
       </DashboardSection>
 
-      <DashboardSection label="Administración">
+      <DashboardSection label="Administración" color={identity.color}>
         <QuickAccessCard to="/app/administracion/users" icon={Users} label="Usuarios y roles" detail="Acceso y permisos" identity={identity} />
       </DashboardSection>
     </div>
