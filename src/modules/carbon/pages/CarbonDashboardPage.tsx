@@ -2,16 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
-import { BarChart, Button, Card, DatePicker, EmptyState, Field, Input, LineChart, ModuleHero, RadialGauge, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
+import { Button, Card, DatePicker, DonutChart, EmptyState, Field, Input, LineChart, ModuleHero, Select, Table, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
 import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
-import type { CarbonStats } from '../types'
+import type { CarbonMeasurement, CarbonStats } from '../types'
 
 const SCOPE_COLOR = { SCOPE_1: '#2563eb', SCOPE_2: '#d97706', SCOPE_3: '#7c3aed' }
-const SCOPE_COLOR_LIGHT = { SCOPE_1: '#60a5fa', SCOPE_2: '#fbbf24', SCOPE_3: '#a78bfa' }
 const SCOPE_NAME = { SCOPE_1: 'Emisiones directas', SCOPE_2: 'Energía comprada', SCOPE_3: 'Cadena de valor' }
+const VARIABLE_PALETTE = ['#2563eb', '#0ca678', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#c026d3', '#65a30d']
 const identity = moduleIdentity('carbon-footprint')
+
+function ScopePill({ scope }: { scope: string | null | undefined }) {
+  const color = scope ? SCOPE_COLOR[scope as keyof typeof SCOPE_COLOR] : undefined
+  if (!scope || !color) return <span style={{ color: '#94a3b8' }}>—</span>
+  return <span className="carbon-scope-pill" style={{ background: `${color}18`, color, borderColor: `${color}40` }}>Alcance {scope.slice(-1)}</span>
+}
 
 const MONTH_OPTIONS = [
   '01 · Enero', '02 · Febrero', '03 · Marzo', '04 · Abril', '05 · Mayo', '06 · Junio',
@@ -46,19 +52,6 @@ function CountUpNumber({ value, decimals = 0 }: { value: number; decimals?: numb
   return <>{animated.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</>
 }
 
-function ScopeRadialCard({ label, name, percent, kg, color, colorLight }: { label: string; name: string; percent: number | null; kg: number; color: string; colorLight: string }) {
-  return (
-    <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--scope carbon-scope-card">
-      <p className="carbon-metric-label">{label}</p>
-      <div className="carbon-radial-wrap">
-        <RadialGauge percent={percent ?? 0} color={color} gradientTo={colorLight} size={104} />
-      </div>
-      <p className="carbon-scope-value" style={{ color }}><CountUpNumber value={kg} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
-      <p className="carbon-scope-name">{name}</p>
-    </motion.div>
-  )
-}
-
 export default function CarbonDashboardPage() {
   return <ToastProvider><CarbonDashboardContent /></ToastProvider>
 }
@@ -76,6 +69,7 @@ function CarbonDashboardContent() {
   const [loading, setLoading] = useState(true)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [recent, setRecent] = useState<CarbonMeasurement[]>([])
 
   // El preset (mensual/trimestral/semestral/anual) calcula el rango automaticamente — la fecha de
   // cada medicion es lo que permite agrupar por estos periodos, por eso es el primer dato que pide
@@ -94,6 +88,14 @@ function CarbonDashboardContent() {
   }
 
   useEffect(() => { void load() }, [dateFrom, dateTo])
+
+  // Mediciones recientes para la tabla de contexto — el mismo endpoint de captura, ya ordenado
+  // por fecha desc en el servidor, solo se limita a las ultimas 6 del periodo activo.
+  useEffect(() => {
+    carbonService.measurements({ dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, limit: '6' })
+      .then(result => setRecent(result.rows))
+      .catch(() => setRecent([]))
+  }, [dateFrom, dateTo])
 
   async function handleExportPdf() {
     setExportingPdf(true)
@@ -170,45 +172,46 @@ function CarbonDashboardContent() {
             <EmptyState icon={Leaf} title="Aún no hay mediciones registradas" description="Registra la primera medición de combustión, energía o residuos para ver el dashboard." />
           </Card>
         ) : (
-          <motion.div variants={staggerContainer(80)} initial="hidden" animate="visible" className="carbon-bento-grid">
-            <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--total">
-              <div>
-                <p className="carbon-metric-label">Huella total del período</p>
-                <p className="carbon-metric-value"><CountUpNumber value={stats.total} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
-              </div>
-              <div className="carbon-total-footer">
-                <div className="carbon-scope-breakdown">
-                  {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map(scope => (
-                    <span key={scope} className="carbon-scope-chip">
-                      <i style={{ background: SCOPE_COLOR[scope] }} />Alcance {scope.slice(-1)}: {scopePercent(stats.byScope[scope]) ?? 0}%
-                    </span>
-                  ))}
-                </div>
-                <span className={`carbon-trend-badge carbon-trend-badge--${trendTone}`}>
-                  {trendTone === 'down' && <ArrowDown size={14} />}
-                  {trendTone === 'up' && <ArrowUp size={14} />}
-                  {trendTone === 'flat' && <Minus size={14} />}
-                  {stats.trendPercent == null ? 'Sin período anterior para comparar' : `${Math.abs(stats.trendPercent)}% vs. período anterior`}
+          <>
+            <motion.div variants={staggerContainer(80)} initial="hidden" animate="visible" className="kpi-strip">
+              <motion.div variants={fadeSlideUp} className="kpi-tile kpi-tile--hero" style={{ ['--kpi-accent' as string]: identity.color }}>
+                <p className="kpi-tile-label">Huella total del período</p>
+                <p className="kpi-tile-value"><CountUpNumber value={stats.total} decimals={1} /><span className="kpi-tile-unit">kg CO2e</span></p>
+                <span className={`kpi-tile-delta kpi-tile-delta--${trendTone}`}>
+                  {trendTone === 'down' && <ArrowDown size={13} />}
+                  {trendTone === 'up' && <ArrowUp size={13} />}
+                  {trendTone === 'flat' && <Minus size={13} />}
+                  {stats.trendPercent == null ? 'Sin período anterior' : `${Math.abs(stats.trendPercent)}% vs. anterior`}
                 </span>
-              </div>
+              </motion.div>
+              {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map(scope => (
+                <motion.div key={scope} variants={fadeSlideUp} className="kpi-tile" style={{ ['--kpi-accent' as string]: SCOPE_COLOR[scope] }}>
+                  <p className="kpi-tile-label">{SCOPE_NAME[scope]}</p>
+                  <p className="kpi-tile-value"><CountUpNumber value={stats.byScope[scope]} decimals={1} /><span className="kpi-tile-unit">kg CO2e</span></p>
+                  <span className="kpi-tile-delta kpi-tile-delta--flat"><Minus size={13} />{scopePercent(stats.byScope[scope]) ?? 0}% del total</span>
+                </motion.div>
+              ))}
             </motion.div>
 
-            <ScopeRadialCard label="Alcance 1" name={SCOPE_NAME.SCOPE_1} percent={scopePercent(stats.byScope.SCOPE_1)} kg={stats.byScope.SCOPE_1} color={SCOPE_COLOR.SCOPE_1} colorLight={SCOPE_COLOR_LIGHT.SCOPE_1} />
-            <ScopeRadialCard label="Alcance 2" name={SCOPE_NAME.SCOPE_2} percent={scopePercent(stats.byScope.SCOPE_2)} kg={stats.byScope.SCOPE_2} color={SCOPE_COLOR.SCOPE_2} colorLight={SCOPE_COLOR_LIGHT.SCOPE_2} />
-            <ScopeRadialCard label="Alcance 3" name={SCOPE_NAME.SCOPE_3} percent={scopePercent(stats.byScope.SCOPE_3)} kg={stats.byScope.SCOPE_3} color={SCOPE_COLOR.SCOPE_3} colorLight={SCOPE_COLOR_LIGHT.SCOPE_3} />
-          </motion.div>
-        )}
-
-        {stats.byBlock.length > 0 && (
-          <Card accent={identity.color} className="p-5">
-            <h3 className="mb-3 text-base font-bold">Desglose por variable</h3>
-            <BarChart
-              height={280}
-              color={identity.color}
-              valueSuffix=" kg CO2e"
-              data={stats.byBlock.map(item => ({ label: item.name, value: item.kgco2e }))}
-            />
-          </Card>
+            <motion.div variants={staggerContainer(80)} initial="hidden" animate="visible" className="scope-wave-grid">
+              {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map((scope, index) => (
+                <motion.div key={scope} variants={fadeSlideUp} className="scope-wave-card" style={{ ['--scope-accent' as string]: SCOPE_COLOR[scope] }}>
+                  <div className="scope-wave-top">
+                    <span className="scope-wave-ghost">0{index + 1}</span>
+                    <div className="scope-wave-eyebrow">Alcance {index + 1}</div>
+                    <div className="scope-wave-title">{SCOPE_NAME[scope]}</div>
+                    <svg className="scope-wave-svg" viewBox="0 0 500 40" preserveAspectRatio="none">
+                      <path d="M0,20 C150,40 350,0 500,20 L500,40 L0,40 Z" style={{ fill: 'var(--surface-1)' }} />
+                    </svg>
+                  </div>
+                  <div className="scope-wave-body">
+                    <p className="scope-wave-pct">{scopePercent(stats.byScope[scope]) ?? 0}%</p>
+                    <p className="scope-wave-kg"><CountUpNumber value={stats.byScope[scope]} decimals={1} /> kg CO2e</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </>
         )}
 
         {stats.timeline.length > 1 && (
@@ -220,6 +223,62 @@ function CarbonDashboardContent() {
               valueSuffix=" kg CO2e"
               data={stats.timeline.map(point => ({ label: point.period, value: point.kgco2e }))}
             />
+          </Card>
+        )}
+
+        {stats.byBlock.length > 0 && (
+          <Card accent={identity.color} className="p-5">
+            <h3 className="mb-3 text-base font-bold">Desglose por variable</h3>
+            <div className="carbon-donut-row">
+              <div className="carbon-donut-chart">
+                <DonutChart
+                  height={220}
+                  centerLabel="kg CO2e total"
+                  data={stats.byBlock.map((item, i) => ({ label: item.name, value: item.kgco2e, color: VARIABLE_PALETTE[i % VARIABLE_PALETTE.length] }))}
+                />
+              </div>
+              <div className="carbon-donut-legend">
+                {stats.byBlock.map((item, i) => {
+                  const blockTotal = stats.byBlock.reduce((sum, block) => sum + block.kgco2e, 0)
+                  const pct = blockTotal ? Math.round((item.kgco2e / blockTotal) * 100) : 0
+                  return (
+                    <div key={item.blockKey} className="carbon-donut-legend-item">
+                      <i style={{ background: VARIABLE_PALETTE[i % VARIABLE_PALETTE.length] }} />
+                      <span className="carbon-donut-legend-name">{item.name}</span>
+                      <span className="carbon-donut-legend-value">{item.kgco2e.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span>
+                      <span className="carbon-donut-legend-pct">{pct}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {recent.length > 0 && (
+          <Card accent={identity.color} className="p-5">
+            <h3 className="mb-3 text-base font-bold">Mediciones recientes</h3>
+            <div className="carbon-recent-table">
+              <Table>
+                <thead>
+                  <tr><th>Fecha</th><th>Variable</th><th>Alcance</th><th>Cantidad</th><th>Emisión</th></tr>
+                </thead>
+                <tbody>
+                  {recent.map(row => {
+                    const scope = row.scope_override || row.block_scope || null
+                    return (
+                      <tr key={row.id}>
+                        <td>{new Date(row.record_date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                        <td>{row.block_name}</td>
+                        <td><ScopePill scope={scope} /></td>
+                        <td>{row.quantity.toLocaleString('es-CO')} {row.quantity_unit}</td>
+                        <td>{(row.computed_kgco2e ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </Table>
+            </div>
           </Card>
         )}
 

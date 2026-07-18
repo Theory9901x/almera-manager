@@ -1,21 +1,21 @@
 import * as echarts from 'echarts/core'
 import type { ComposeOption } from 'echarts/core'
-import { BarChart as EChartsBarChart, GaugeChart, LineChart as EChartsLineChart } from 'echarts/charts'
-import type { BarSeriesOption, GaugeSeriesOption, LineSeriesOption } from 'echarts/charts'
+import { BarChart as EChartsBarChart, GaugeChart, LineChart as EChartsLineChart, PieChart as EChartsPieChart } from 'echarts/charts'
+import type { BarSeriesOption, GaugeSeriesOption, LineSeriesOption, PieSeriesOption } from 'echarts/charts'
 import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components'
 import type { GridComponentOption, TooltipComponentOption } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import ReactEChartsCore from 'echarts-for-react/esm/core'
 import { FONT_FAMILY } from '../tokens'
 
-type ECOption = ComposeOption<BarSeriesOption | LineSeriesOption | GaugeSeriesOption | GridComponentOption | TooltipComponentOption>
+type ECOption = ComposeOption<BarSeriesOption | LineSeriesOption | GaugeSeriesOption | PieSeriesOption | GridComponentOption | TooltipComponentOption>
 
 // Motor unico de graficos para todo el sistema (reemplaza Recharts y Nivo, que convivian sin
 // necesidad). Estos wrappers cargan el tema SGIMR una sola vez — ningun modulo arma su propio
 // option de ECharts desde cero, todos consumen estos componentes con props simples.
 // Import modular (echarts/core + solo los charts/componentes usados) en vez de 'echarts' completo
 // — evita empaquetar mapas, sankey, treemap, etc. que este sistema nunca renderiza.
-echarts.use([EChartsBarChart, EChartsLineChart, GaugeChart, GridComponent, TooltipComponent, MarkLineComponent, SVGRenderer])
+echarts.use([EChartsBarChart, EChartsLineChart, EChartsPieChart, GaugeChart, GridComponent, TooltipComponent, MarkLineComponent, SVGRenderer])
 
 // ECharts pinta estos colores directo en canvas/SVG via su propio parser interno de color, que
 // no entiende custom properties de CSS (var(--x)) — a diferencia del tooltip (un div real, ahi
@@ -186,6 +186,47 @@ export function RadialGauge({ percent, color = '#4F46E5', gradientTo, size = 96 
       <ReactEChartsCore echarts={echarts} option={option} style={{ height: size, width: size }} opts={{ renderer: 'svg' }} />
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
         <span style={{ fontWeight: 800, fontSize: size * 0.22, color }}>{percent}%</span>
+      </div>
+    </div>
+  )
+}
+
+export interface DonutDatum { label: string; value: number; color: string }
+
+/** Donut con el total en numero grande al centro — la leyenda (color + nombre + % + valor) se
+ * arma en HTML real al lado, no como leyenda nativa de ECharts, para tener control total del
+ * estilo (tipografia tabular, wrap del nombre, etc). */
+export function DonutChart({ data, height = 220, centerLabel }: { data: DonutDatum[]; height?: number; centerLabel?: string }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const option: ECOption = {
+    tooltip: {
+      trigger: 'item', ...tooltipStyle(),
+      formatter: (params: unknown) => {
+        const item = params as { name: string; value: number; percent: number }
+        return `<strong>${item.name}</strong><br/>${item.value.toLocaleString('es-CO')} kg CO2e (${item.percent}%)`
+      },
+    },
+    series: [{
+      type: 'pie',
+      radius: ['62%', '88%'],
+      avoidLabelOverlap: false,
+      label: { show: false },
+      labelLine: { show: false },
+      itemStyle: { borderColor: '#fff', borderWidth: 3 },
+      data: data.map(item => ({ name: item.label, value: item.value, itemStyle: { color: item.color } })),
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+    }],
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <ReactEChartsCore echarts={echarts} option={option} style={{ height, width: '100%' }} opts={{ renderer: 'svg' }} />
+      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none', textAlign: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: '1.6rem', fontVariantNumeric: 'tabular-nums' }}>{total.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
+          {centerLabel && <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginTop: 2 }}>{centerLabel}</div>}
+        </div>
       </div>
     </div>
   )
