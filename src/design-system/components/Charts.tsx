@@ -157,8 +157,10 @@ export function LineChart({
 }
 
 /** Gauge radial compacto de un solo valor (0-100%) con etiqueta al centro — reemplaza Nivo
- * ResponsiveRadialBar en las tarjetas de alcance/porcentaje individuales. */
-export function RadialGauge({ percent, color = '#4F46E5', size = 96 }: { percent: number; color?: string; size?: number }) {
+ * ResponsiveRadialBar en las tarjetas de alcance/porcentaje individuales. Trazo con degradado
+ * (color -> gradientTo) si se da un segundo tono, en vez de un color plano sin vida. */
+export function RadialGauge({ percent, color = '#4F46E5', gradientTo, size = 96 }: { percent: number; color?: string; gradientTo?: string; size?: number }) {
+  const strokeColor = gradientTo ? new echarts.graphic.LinearGradient(0, 0, 1, 1, [{ offset: 0, color }, { offset: 1, color: gradientTo }]) : color
   const option: ECOption = {
     series: [{
       type: 'gauge',
@@ -166,7 +168,7 @@ export function RadialGauge({ percent, color = '#4F46E5', size = 96 }: { percent
       endAngle: -270,
       min: 0,
       max: 100,
-      progress: { show: true, width: 10, itemStyle: { color, borderRadius: 10 } },
+      progress: { show: true, width: 10, itemStyle: { color: strokeColor, borderRadius: 10 } },
       axisLine: { lineStyle: { width: 10, color: [[1, TRACK_COLOR]] } },
       axisTick: { show: false },
       splitLine: { show: false },

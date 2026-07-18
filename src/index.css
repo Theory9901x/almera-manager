@@ -2471,8 +2471,26 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   background: var(--surface-1); border-radius: var(--radius-card); padding: 24px 26px;
   box-shadow: var(--shadow-stack); border: 1px solid var(--border-subtle);
 }
-.bento-item--total { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
-.bento-item--scope { grid-column: span 1; grid-row: span 1; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; gap: 4px; }
+.bento-item--total { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; position: relative; overflow: hidden; }
+/* Anillo decorativo de fondo — le da vida a la tarjeta protagonista sin competir con el numero. */
+.bento-item--total::before { content: ''; position: absolute; top: -60px; right: -60px; width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--carbon-brand-light) 10%, transparent), transparent 70%); pointer-events: none; }
+.bento-item--total > * { position: relative; z-index: 1; }
+.bento-item--scope { grid-column: span 1; grid-row: span 1; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; gap: 4px; transition: transform 180ms var(--ease-standard, cubic-bezier(.22,1,.36,1)), box-shadow 180ms var(--ease-standard, cubic-bezier(.22,1,.36,1)); }
+.carbon-scope-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-stack), 0 12px 24px rgba(15,92,63,.1); }
+.carbon-scope-name { font-size: 11px; color: #94a3b8; font-weight: 600; margin: 2px 0 0; }
+
+/* Agrupa desglose + tendencia como un solo bloque al pie — asi space-between de bento-item--total
+   solo distribuye 2 grupos (valor arriba, contexto abajo), no 3 sueltos con huecos entre ellos. */
+.carbon-total-footer { display: flex; flex-direction: column; gap: 14px; }
+/* Desglose compacto por alcance en la tarjeta protagonista — contexto que antes faltaba. */
+.carbon-scope-breakdown { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.carbon-scope-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
+.carbon-scope-chip i { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+
+/* Botones secundarios sobre el hero oscuro — vidrio translucido, no blanco solido compitiendo con
+   4 acciones a la vez. */
+.btn-on-hero-secondary { background: rgba(255,255,255,.1) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.2) !important; backdrop-filter: blur(4px); }
+.btn-on-hero-secondary:hover:not(:disabled) { background: rgba(255,255,255,.16) !important; }
 @media (max-width: 768px) {
   .carbon-bento-grid { grid-template-columns: 1fr 1fr; }
   .bento-item--total { grid-column: span 2; }

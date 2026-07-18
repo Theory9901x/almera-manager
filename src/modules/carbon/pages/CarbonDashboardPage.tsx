@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
-import { BarChart, Button, Card, DatePicker, EmptyState, Field, Input, LineChart, PageHeader, RadialGauge, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
+import { BarChart, Button, Card, DatePicker, EmptyState, Field, Input, LineChart, ModuleHero, RadialGauge, Select, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { carbonService } from '../services/carbonService'
 import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
 import type { CarbonStats } from '../types'
 
 const SCOPE_COLOR = { SCOPE_1: '#2563eb', SCOPE_2: '#d97706', SCOPE_3: '#7c3aed' }
+const SCOPE_COLOR_LIGHT = { SCOPE_1: '#60a5fa', SCOPE_2: '#fbbf24', SCOPE_3: '#a78bfa' }
+const SCOPE_NAME = { SCOPE_1: 'Emisiones directas', SCOPE_2: 'Energía comprada', SCOPE_3: 'Cadena de valor' }
 const identity = moduleIdentity('carbon-footprint')
 
 const MONTH_OPTIONS = [
@@ -44,14 +46,15 @@ function CountUpNumber({ value, decimals = 0 }: { value: number; decimals?: numb
   return <>{animated.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</>
 }
 
-function ScopeRadialCard({ label, percent, kg, color }: { label: string; percent: number | null; kg: number; color: string }) {
+function ScopeRadialCard({ label, name, percent, kg, color, colorLight }: { label: string; name: string; percent: number | null; kg: number; color: string; colorLight: string }) {
   return (
-    <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--scope">
+    <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--scope carbon-scope-card">
       <p className="carbon-metric-label">{label}</p>
       <div className="carbon-radial-wrap">
-        <RadialGauge percent={percent ?? 0} color={color} size={104} />
+        <RadialGauge percent={percent ?? 0} color={color} gradientTo={colorLight} size={104} />
       </div>
       <p className="carbon-scope-value" style={{ color }}><CountUpNumber value={kg} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
+      <p className="carbon-scope-name">{name}</p>
     </motion.div>
   )
 }
@@ -110,17 +113,17 @@ function CarbonDashboardContent() {
   return (
     <div className="carbon-module">
       <div className="mx-auto max-w-7xl space-y-6">
-        <PageHeader
-          eyebrow="Ambiental"
+        <ModuleHero
+          badge="Ambiental"
           title="Huella de Carbono"
-          description="Medición de emisiones GEI según GHG Protocol — Herramienta de Monitoreo del Impacto Climático (Salud sin Daño / MinSalud, 2023)"
-          identity={identity}
+          subtitle="Medición de emisiones GEI según GHG Protocol — Herramienta de Monitoreo del Impacto Climático (Salud sin Daño / MinSalud, 2023)"
+          accent={identity.color}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Button identity={identity} onClick={() => navigate('/app/huella-carbono/captura')}><Sparkles size={15} /> Registrar medición</Button>
-              <Button identity={identity} onClick={() => setShowAnalysis(true)}><Telescope size={15} /> Análisis trimestral</Button>
-              <Button identity={identity} disabled={exportingPdf} onClick={handleExportPdf}><FileDown size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
-              <Button identity={identity} onClick={() => navigate('/app/huella-carbono/configuracion')}><Settings size={15} /> Configuración</Button>
+              <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => setShowAnalysis(true)}><Telescope size={15} /> Análisis trimestral</Button>
+              <Button variant="secondary" className="btn-on-hero-secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileDown size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
+              <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => navigate('/app/huella-carbono/configuracion')}><Settings size={15} /> Configuración</Button>
             </div>
           }
         />
@@ -169,19 +172,30 @@ function CarbonDashboardContent() {
         ) : (
           <motion.div variants={staggerContainer(80)} initial="hidden" animate="visible" className="carbon-bento-grid">
             <motion.div variants={fadeSlideUp} className="carbon-kpi-card bento-item--total">
-              <p className="carbon-metric-label">Huella total del período</p>
-              <p className="carbon-metric-value"><CountUpNumber value={stats.total} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
-              <span className={`carbon-trend-badge carbon-trend-badge--${trendTone}`}>
-                {trendTone === 'down' && <ArrowDown size={14} />}
-                {trendTone === 'up' && <ArrowUp size={14} />}
-                {trendTone === 'flat' && <Minus size={14} />}
-                {stats.trendPercent == null ? 'Sin período anterior para comparar' : `${Math.abs(stats.trendPercent)}% vs. período anterior`}
-              </span>
+              <div>
+                <p className="carbon-metric-label">Huella total del período</p>
+                <p className="carbon-metric-value"><CountUpNumber value={stats.total} decimals={1} /><span className="carbon-metric-unit">kg CO2e</span></p>
+              </div>
+              <div className="carbon-total-footer">
+                <div className="carbon-scope-breakdown">
+                  {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map(scope => (
+                    <span key={scope} className="carbon-scope-chip">
+                      <i style={{ background: SCOPE_COLOR[scope] }} />Alcance {scope.slice(-1)}: {scopePercent(stats.byScope[scope]) ?? 0}%
+                    </span>
+                  ))}
+                </div>
+                <span className={`carbon-trend-badge carbon-trend-badge--${trendTone}`}>
+                  {trendTone === 'down' && <ArrowDown size={14} />}
+                  {trendTone === 'up' && <ArrowUp size={14} />}
+                  {trendTone === 'flat' && <Minus size={14} />}
+                  {stats.trendPercent == null ? 'Sin período anterior para comparar' : `${Math.abs(stats.trendPercent)}% vs. período anterior`}
+                </span>
+              </div>
             </motion.div>
 
-            <ScopeRadialCard label="Alcance 1" percent={scopePercent(stats.byScope.SCOPE_1)} kg={stats.byScope.SCOPE_1} color={SCOPE_COLOR.SCOPE_1} />
-            <ScopeRadialCard label="Alcance 2" percent={scopePercent(stats.byScope.SCOPE_2)} kg={stats.byScope.SCOPE_2} color={SCOPE_COLOR.SCOPE_2} />
-            <ScopeRadialCard label="Alcance 3" percent={scopePercent(stats.byScope.SCOPE_3)} kg={stats.byScope.SCOPE_3} color={SCOPE_COLOR.SCOPE_3} />
+            <ScopeRadialCard label="Alcance 1" name={SCOPE_NAME.SCOPE_1} percent={scopePercent(stats.byScope.SCOPE_1)} kg={stats.byScope.SCOPE_1} color={SCOPE_COLOR.SCOPE_1} colorLight={SCOPE_COLOR_LIGHT.SCOPE_1} />
+            <ScopeRadialCard label="Alcance 2" name={SCOPE_NAME.SCOPE_2} percent={scopePercent(stats.byScope.SCOPE_2)} kg={stats.byScope.SCOPE_2} color={SCOPE_COLOR.SCOPE_2} colorLight={SCOPE_COLOR_LIGHT.SCOPE_2} />
+            <ScopeRadialCard label="Alcance 3" name={SCOPE_NAME.SCOPE_3} percent={scopePercent(stats.byScope.SCOPE_3)} kg={stats.byScope.SCOPE_3} color={SCOPE_COLOR.SCOPE_3} colorLight={SCOPE_COLOR_LIGHT.SCOPE_3} />
           </motion.div>
         )}
 
