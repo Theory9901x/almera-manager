@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Briefcase, CheckCircle2, Layers3, Link2, Pencil, Plus, Save, Trash2, Users, X } from 'lucide-react'
-import { Badge, Button, Card, Field, PageHeader, SearchBox, Select, Table, moduleIdentity } from '@/design-system'
+import { motion } from 'framer-motion'
+import { AlertTriangle, ArrowLeft, Briefcase, CheckCircle2, Layers3, Link2, ListChecks, Pencil, Plus, Save, Trash2, Users, X } from 'lucide-react'
+import { Badge, Button, Card, Field, ModuleHero, SearchBox, Select, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '@/modules/adherence/services/adherenceService'
 import type { Area, Auditor, Position, Professional, ProfessionalStatus } from '@/modules/adherence/types'
 import AuditorsPanel from '@/modules/adherence/pages/AuditorsPanel'
@@ -168,25 +169,35 @@ export default function AdherenceConfigPage() {
     } catch (caught) { fail(caught, 'No fue posible actualizar el profesional') } finally { setBusy(false) }
   }
 
-  return (
-    <div className="mx-auto max-w-[1500px] space-y-5">
-      <PageHeader
-        eyebrow="Matrices de adherencia"
-        title="Configuración"
-        description="Áreas, matrices y criterios ponderados, cargos, profesionales y auditores del módulo."
-        identity={identity}
-      />
+  const completeAreas = areas.filter(area => Number(area.weight_total) === 100).length
 
-      <div className="surface-panel is-header">
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-5 matrices-page-bg">
+      <ModuleHero
+        badge="Matrices de adherencia"
+        title="Configuración"
+        subtitle="Áreas, matrices y criterios ponderados, cargos, profesionales y auditores del módulo."
+        accent={identity.color}
+        className="matrices-hero"
+      >
+        <div className="hero-stat-inline">
+          <div><div className="num">{areas.length}</div><div className="lbl">Áreas</div></div>
+          <div><div className="num">{completeAreas}</div><div className="lbl">Completas (100%)</div></div>
+          <div><div className="num">{professionals.length}</div><div className="lbl">Profesionales</div></div>
+        </div>
+      </ModuleHero>
+
+      <div className="surface-panel is-header" style={{ ['--ds-accent' as string]: identity.color }}>
         <nav className="ds-tabs" aria-label="Secciones de configuración">
           {sections.map(([key, label]) => (
             <button
               key={key}
               className={`ds-tabs-item ${section === key ? 'is-active' : ''}`}
-              style={section === key ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+              style={section === key ? { color: identity.color } : undefined}
               onClick={() => { setSection(key); setSelectedAreaId(null) }}
             >
               {label}
+              {section === key && <motion.div layoutId="matrices-tab-indicator" className="ds-tabs-indicator" style={{ ['--tab-accent' as string]: identity.color }} />}
             </button>
           ))}
         </nav>
@@ -196,45 +207,58 @@ export default function AdherenceConfigPage() {
 
         {section === 'areas' && !selectedAreaId && (
           <div className="mt-5 space-y-5">
-            <Card accent={identity.color} className="p-5">
-              <p className="ds-eyebrow">Registro</p>
-              <h2 className="mt-1 text-xl font-black">Nueva área</h2>
-              <div className="mt-4 flex flex-wrap items-end gap-3">
-                <div className="min-w-[260px] flex-1"><Field label="Nombre del área"><input className="ds-input" value={newAreaName} onChange={event => setNewAreaName(event.target.value)} placeholder="Ej. Urgencias" /></Field></div>
-                <Button identity={identity} onClick={() => void createArea()} disabled={busy}><Plus size={16} />Crear área</Button>
-              </div>
-            </Card>
+            <div className="inline-action-bar">
+              <div className="min-w-[260px] flex-1"><Field label="Nueva área"><input className="ds-input" value={newAreaName} onChange={event => setNewAreaName(event.target.value)} placeholder="Ej. Urgencias" /></Field></div>
+              <Button identity={identity} onClick={() => void createArea()} disabled={busy}><Plus size={16} />Crear área</Button>
+            </div>
 
-            <Card accent={identity.color} className="overflow-hidden">
-              <div className="table-toolbar">
-                <div className="almera-panel-title"><span><Layers3 size={19} /></span><div><h2>Áreas</h2><p>{areas.length} áreas registradas</p></div></div>
-              </div>
-              <Table>
-                <thead><tr><th>Área</th><th>Versión</th><th>Ámbitos</th><th>Criterios</th><th>Peso total</th><th>Estado</th><th></th></tr></thead>
-                <tbody>
-                  {areas.map(area => {
-                    const validWeight = Number(area.weight_total) === 100
-                    return (
-                      <tr key={area.id}>
-                        <td><strong>{area.name}</strong></td>
-                        <td>v{area.version_number ?? 1}</td>
-                        <td>{area.scope_count}</td>
-                        <td>{area.criteria_count}</td>
-                        <td>{validWeight ? <Badge tone="info">{Number(area.weight_total).toFixed(0)} / 100</Badge> : <span className="inline-flex items-center gap-1 text-xs font-bold" style={{ color: '#B91C1C' }}><AlertTriangle size={12} />{Number(area.weight_total).toFixed(0)} / 100</span>}</td>
-                        <td><Badge tone={area.active ? 'info' : 'neutral'}>{area.active ? 'Activa' : 'Inactiva'}</Badge></td>
-                        <td>
-                          <div className="flex justify-end gap-3">
-                            <button className="row-action" style={{ color: identity.color }} onClick={() => void openArea(area.id)}><Pencil size={14} />Editar matriz</button>
-                            <button className="row-action" style={{ color: identity.color }} onClick={() => void toggleAreaActive(area)}>{area.active ? 'Desactivar' : 'Activar'}</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!areas.length && <tr><td colSpan={7}><div className="almera-empty"><Layers3 size={30} /><p>Aún no hay áreas registradas.</p></div></td></tr>}
-                </tbody>
-              </Table>
-            </Card>
+            {areas.length > 0 ? (
+              <motion.div
+                className="matrix-card-grid"
+                initial="hidden" animate="visible"
+                variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
+              >
+                {areas.map(area => {
+                  const validWeight = Number(area.weight_total) === 100
+                  const weightPercent = Math.min(100, Number(area.weight_total) || 0)
+                  return (
+                    <motion.div
+                      key={area.id}
+                      className="matrix-card"
+                      variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                    >
+                      <div className="matrix-card-head">
+                        <h3 className="matrix-card-name">{area.name}</h3>
+                        <span className="matrix-card-version">v{area.version_number ?? 1}</span>
+                      </div>
+
+                      <div className="matrix-card-stats">
+                        <span className="matrix-card-stat"><Layers3 size={14} />{area.scope_count} ámbito{area.scope_count === 1 ? '' : 's'}</span>
+                        <span className="matrix-card-stat"><ListChecks size={14} />{area.criteria_count} criterio{area.criteria_count === 1 ? '' : 's'}</span>
+                      </div>
+
+                      {!area.scope_count && <p className="matrix-card-empty-hint">Sin ámbitos configurados todavía — ábrela para agregar el primero.</p>}
+
+                      <div className="weight-bar-label">
+                        <span>Peso total</span>
+                        <span style={{ color: validWeight ? '#059669' : '#B45309' }}>{Number(area.weight_total).toFixed(0)} / 100</span>
+                      </div>
+                      <div className="weight-bar"><div className={`weight-bar-fill ${validWeight ? 'weight-bar-fill--complete' : 'weight-bar-fill--incomplete'}`} style={{ width: `${weightPercent}%` }} /></div>
+
+                      <div className="matrix-card-footer">
+                        <Badge tone={area.active ? 'info' : 'neutral'}>{area.active ? 'Activa' : 'Inactiva'}</Badge>
+                        <div className="flex gap-3">
+                          <button className="row-action" style={{ color: identity.color }} onClick={() => void openArea(area.id)}><Pencil size={14} />Editar matriz</button>
+                          <button className="row-action" style={{ color: 'var(--muted)' }} onClick={() => void toggleAreaActive(area)}>{area.active ? 'Desactivar' : 'Activar'}</button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
+            ) : (
+              <Card className="almera-empty"><Layers3 size={30} /><p>Aún no hay áreas registradas.</p></Card>
+            )}
           </div>
         )}
 
