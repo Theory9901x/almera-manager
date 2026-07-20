@@ -44,7 +44,7 @@ export default function AppLayout() {
   const operationalKeys = ['technical-assistances', 'internal-audits', 'audits', 'almera']
   const operationalModules = session.modules.filter(module => operationalKeys.includes(module.key))
   const adherenceModule = session.modules.find(module => module.key === 'adherence-matrix')
-  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key) && module.key !== 'adherence-matrix' && module.key !== 'admin')
+  const otherModules = session.modules.filter(module => !operationalKeys.includes(module.key) && module.key !== 'adherence-matrix' && module.key !== 'admin' && module.key !== 'dashboard')
   const adminModules = session.modules.filter(module => module.key === 'admin')
   const operationalRoute = operationalKeys.map(key => operationalModules.find(module => module.key === key)?.route).find(Boolean)
   const adherenceRoute = adherenceModule && (
