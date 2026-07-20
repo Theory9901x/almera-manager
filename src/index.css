@@ -598,8 +598,12 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .hc-grid thead th button{display:block;margin:2px auto 0;border:0;background:transparent;color:var(--muted)}
 .hc-grid td.hc-criterion,.hc-grid th.hc-criterion{position:sticky;left:0;z-index:1;background:#fff;text-align:left;min-width:230px;max-width:280px;white-space:normal;font-size:11px}
 .hc-grid thead th.hc-criterion{z-index:3;background:var(--color-surface-soft)}
-.hc-grid tr.hc-scope-row td{background:var(--color-surface-soft);font-weight:760;text-align:left}
-.hc-grid tr.hc-scope-row td.hc-summary{text-align:center}
+.hc-grid tr.hc-scope-row td{background:var(--m-matrices-soft);font-weight:700;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;color:var(--m-matrices);text-align:left}
+.hc-grid tr.hc-scope-row td.hc-summary{text-align:center;text-transform:none;letter-spacing:0}
+/* Hover de fila — solo en filas de criterio (dato), no en las de seccion — sigue la linea con la
+   vista sin animaciones pesadas: una sola transicion de background, nada por celda. */
+.hc-grid tbody tr.scope-criterion-row:hover td,
+.hc-grid tbody tr.scope-criterion-row:hover td.hc-criterion{background:color-mix(in srgb, var(--m-matrices) 6%, #fff)}
 .hc-score-select{min-width:64px;height:28px;border:1px solid var(--border-hairline);border-radius:6px;padding:0 4px;font-size:11px;font-weight:700;text-align:center;text-align-last:center;background:#fff;color:var(--muted);transition:background var(--ease),border-color var(--ease),color var(--ease)}
 .hc-score-2{background:#ecfdf5;border-color:#bce6d4;color:#087a54}
 .hc-score-1{background:#fffaeb;border-color:#f4d7a4;color:#a8640d}
@@ -619,9 +623,9 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .surface-section-nav button.active{color:var(--color-brand);border-bottom-color:var(--color-brand)}
 
 /* Matrices de Adherencia — sistema de diseno v2 (gradientes por ambito, Radix, Framer Motion) */
-.score-selector-trigger{display:inline-flex;min-width:44px;height:28px;align-items:center;justify-content:center;gap:3px;border:1.5px solid #CBD5E1;border-radius:8px;background:#E2E8F0;padding:0 8px;color:#64748B;font-size:11px;font-weight:800;cursor:pointer;transition:background 220ms ease,border-color 220ms ease,color 220ms ease,transform 150ms ease;outline:none}
+.score-selector-trigger{display:inline-flex;min-width:44px;height:28px;align-items:center;justify-content:center;gap:3px;border:1px dashed #d8dde5;border-radius:8px;background:transparent;padding:0 8px;color:#c3c9d0;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;transition:background 140ms ease,border-color 140ms ease,color 140ms ease,transform 150ms ease;outline:none}
 .score-selector-trigger:hover{transform:translateY(-1px)}
-.score-selector-trigger:focus-visible{outline:2px solid #4F46E5;outline-offset:2px}
+.score-selector-trigger:focus-visible{outline:2px solid var(--m-matrices, #8156c0);outline-offset:2px}
 .score-selector-trigger[data-disabled]{cursor:not-allowed;opacity:.6;transform:none}
 .score-selector-content{z-index:80;overflow:hidden;border:1px solid var(--border-hairline);border-radius:10px;background:#fff;box-shadow:var(--shadow-card-lg);padding:4px;min-width:88px}
 .score-selector-item{display:flex;align-items:center;gap:8px;border-radius:7px;padding:7px 9px;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer;outline:none}
@@ -649,7 +653,7 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .gradient-button-ghost{background:transparent;color:#8156c0;box-shadow:none;border:1px solid #E7DEF7}
 .gradient-button-ghost:hover{background:#F4EFFC;box-shadow:none}
 
-.scope-header-row{position:relative;border-left-width:4px;border-left-style:solid;padding:9px 12px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
+.scope-header-row{position:relative;border-left-width:3px;border-left-style:solid;border-left-color:var(--m-matrices);padding:9px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--m-matrices)}
 .scope-criterion-row{border-left:3px solid transparent}
 .matrix-toolbar-glass{display:grid;gap:10px;border:1px solid rgba(255,255,255,.6);border-radius:16px;background:rgba(255,255,255,.72);backdrop-filter:blur(14px);padding:16px 20px;box-shadow:0 8px 24px rgba(16,24,40,.08)}
 .matrix-toolbar-glass-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}

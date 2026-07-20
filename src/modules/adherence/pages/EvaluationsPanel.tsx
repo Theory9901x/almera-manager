@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ClipboardList, Download, Lock, Plus, Save, Send, Unlock } from 'lucide-react'
-import { Badge, Button, Card, DatePicker, Field, Select, Table, moduleIdentity } from '@/design-system'
+import { Badge, Button, Card, DatePicker, Field, ModuleHero, Select, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, CriterionResult, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score, ScopeResult } from '../types'
 import { ScoreSelector } from '../design/ScoreSelector'
@@ -10,7 +10,7 @@ import { ComplianceRing } from '../design/ComplianceRing'
 import { HcChip } from '../design/HcChip'
 import { GradientButton } from '../design/GradientButton'
 import { ToastStack } from '../design/Toast'
-import { scopeColor, type Concept } from '../design/scopeColors'
+import { colorForPercent, scopeColor, type Concept } from '../design/scopeColors'
 
 const identity = moduleIdentity('adherence-matrix')
 
@@ -232,24 +232,27 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       <div className="space-y-5">
         <ToastStack notice={notice} error={error} onDismissError={() => setError('')} />
 
-        <div className="matrix-toolbar-glass">
-          <div className="matrix-toolbar-glass-top">
-            <button className="row-action" onClick={backToList}><ArrowLeft size={15} />Volver a evaluaciones</button>
-            <div className="matrix-toolbar-glass-actions">
+        <button className="row-action" style={{ color: identity.color }} onClick={backToList}><ArrowLeft size={15} />Volver a evaluaciones</button>
+
+        <ModuleHero
+          badge="Evaluación de adherencia"
+          title={detail.evaluation.professional_name}
+          subtitle={`${detail.evaluation.area_name} · ${detail.evaluation.month_reported}`}
+          accent={identity.color}
+          className="matrices-hero"
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
               <Badge tone={isClosed ? 'info' : 'neutral'}>{isClosed ? 'Cerrada' : 'Borrador'}</Badge>
               <ConceptBadge concept={concept as Concept | null} />
-              <div className="matrix-compliance-pill">
-                <ComplianceRing percent={overallCompliance} size={34} strokeWidth={4} />
-                <span>Cumplimiento general</span>
-              </div>
-              <GradientButton variant="ghost" onClick={() => void downloadReport()} disabled={busy}><Download size={16} />Informe PDF</GradientButton>
+              <Button identity={identity} onClick={() => void downloadReport()} disabled={busy}><Download size={15} />Informe PDF</Button>
             </div>
+          }
+        >
+          <div className="hero-stat-inline">
+            <div><div className="num">{detail.records.length}</div><div className="lbl">HC evaluadas</div></div>
+            <div><div className="num" style={{ color: colorForPercent(overallCompliance) }}>{Math.round(overallCompliance)}%</div><div className="lbl">Cumplimiento general</div></div>
           </div>
-          <div className="grid gap-1 text-sm text-[var(--ink-soft)]">
-            <strong>{detail.evaluation.professional_name}</strong>
-            <span className="text-xs text-[var(--muted)]">{detail.evaluation.area_name} · {detail.evaluation.month_reported} · {detail.records.length} HC evaluadas</span>
-          </div>
-        </div>
+        </ModuleHero>
 
         <Card accent={identity.color} className="p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -294,9 +297,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                     return (
                       <Fragment key={scope.id}>
                         <tr className="hc-scope-row">
-                          <td className="scope-header-row" style={{ borderLeftColor: color.from, background: `linear-gradient(90deg, ${color.from}14, transparent 65%)` }}>{scope.name}</td>
+                          <td className="scope-header-row">{scope.name}</td>
                           <td className="hc-summary"><ComplianceRing percent={scopeCompliance(scope.id)} size={30} strokeWidth={3.5} /></td>
-                          {detail.records.map(record => <td key={record.id} style={{ background: `${color.from}08` }}></td>)}
+                          {detail.records.map(record => <td key={record.id} />)}
                         </tr>
                         {detail.criteria.filter(criterion => criterion.scope_id === scope.id).map(criterion => (
                           <tr key={criterion.id} className="scope-criterion-row" style={{ borderLeftColor: color.from }}>
