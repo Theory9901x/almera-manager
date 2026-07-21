@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BarChart3, Copy, GripVertical, ImagePlus, Loader2, Monitor, Plus, Rocket, RotateCcw,
-  Settings, Smartphone, Square, Trash2, X,
+  Save, Settings, Smartphone, Square, Trash2, X,
 } from 'lucide-react'
 import {
   Badge, Button, Card, Field, Input, SaveStatusIndicator, Select, Textarea, ToastProvider, moduleIdentity, useToast,
@@ -10,6 +10,7 @@ import {
 import { surveysService } from '../services/surveysService'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageAttachmentButton } from '../components/PageAttachmentButton'
+import { PresentationEmbed } from '../components/PresentationEmbed'
 import { QuestionConfigEditor } from '../components/QuestionConfigEditor'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { BUILDER_QUESTION_TYPES, QUESTION_TYPE_INFO } from '../components/questionTypeMeta'
@@ -66,17 +67,26 @@ function SurveyBuilderContent() {
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('mobile')
   const [coverUploading, setCoverUploading] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const timers = useRef<Record<string, number>>({})
-  const pendingMetaPatch = useRef<Record<string, unknown>>({})
+  const [dirty, setDirty] = useState(false)
+  // Cambios en espera de un clic en "Guardar" — nunca se envian solos. Se acumulan aqui (no se
+  // reemplazan) para que editar el titulo y luego, sin guardar, subir una presentacion, guarden
+  // ambos cambios juntos en vez de que el ultimo pise al anterior.
+  const pending = useRef<{ meta: Record<string, unknown>; pages: Record<string, Record<string, unknown>>; questions: Record<string, Record<string, unknown>> }>({ meta: {}, pages: {}, questions: {} })
 
-  // El guardado es automatico (debounced) en todo el constructor — titulo, portada, configuracion,
-  // paginas y preguntas — para no interrumpir con un boton por cada campo. Este indicador es lo que
-  // reemplaza a ese boton: siempre visible, dice si hay cambios pendientes, guardados o con error.
   useEffect(() => {
     if (saveState !== 'saved') return
     const timeout = window.setTimeout(() => setSaveState('idle'), 2500)
     return () => window.clearTimeout(timeout)
   }, [saveState])
+
+  // Aviso al cerrar/recargar la pestaña con cambios sin guardar — el constructor ya no guarda solo,
+  // asi que salir sin hacer clic en "Guardar" si perderia esos cambios.
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
 
   async function load(preserveSelection = true) {
     if (!surveyId) return
@@ -95,37 +105,22 @@ function SurveyBuilderContent() {
   const activePage = survey?.pages.find(page => page.id === activePageId) || null
   const activeQuestion = activePage?.questions.find(question => question.id === activeQuestionId) || null
 
-  function debounced(key: string, fn: () => void, delay = 500) {
-    if (timers.current[key]) window.clearTimeout(timers.current[key])
-    setSaveState('saving')
-    timers.current[key] = window.setTimeout(fn, delay)
-  }
-
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin" size={24} /></div>
   if (!survey) return null
 
-  async function saveMeta(patch: Record<string, unknown>) {
+  // Las tres funciones de abajo solo actualizan el estado local (optimista, para que se sienta
+  // instantaneo) y acumulan el cambio en `pending` — nunca llaman al servidor por si solas. Solo
+  // saveAll() (el boton "Guardar") persiste. Esto es intencional: antes el constructor guardaba
+  // automatico con debounce y no habia forma clara de saber si algo realmente quedo guardado.
+  function saveMeta(patch: Record<string, unknown>) {
     if (!survey) return
-    // Optimista solo para que escribir en el titulo/descripcion se sienta instantaneo: el patch
-    // usa claves camelCase (requireLogin, themeColor...) que NO coinciden con los campos
+    // El patch usa claves camelCase (requireLogin, themeColor...) que NO coinciden con los campos
     // snake_case del tipo SurveyDetail (require_login, theme_color...), asi que este spread por si
-    // solo NO actualiza esos campos — de ahi que un Select de configuracion pareciera "no cambiar".
-    // La correccion real llega abajo, al fusionar la respuesta del servidor tras guardar.
+    // solo no refleja esos campos en pantalla hasta guardar — aceptable, se confirma al guardar.
     setSurvey({ ...survey, ...patch as Partial<SurveyDetail> })
-    // Se acumulan los cambios pendientes en vez de reemplazarlos: si se edita el título y luego,
-    // dentro de la misma ventana de espera, se sube la portada (o viceversa), ambos cambios se
-    // guardan juntos en vez de que el ultimo cambio descarte al anterior.
-    pendingMetaPatch.current = { ...pendingMetaPatch.current, ...patch }
-    debounced('meta', async () => {
-      const toSend = pendingMetaPatch.current
-      pendingMetaPatch.current = {}
-      try {
-        const updated = await surveysService.update(survey.id, toSend)
-        setSurvey(current => current ? { ...current, ...updated } : current)
-        setSaveState('saved')
-      }
-      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar'); setSaveState('error') }
-    })
+    pending.current.meta = { ...pending.current.meta, ...patch }
+    setDirty(true)
+    setSaveState('idle')
   }
 
   async function uploadCoverImage(file: File | undefined) {
@@ -133,14 +128,43 @@ function SurveyBuilderContent() {
     setCoverUploading(true)
     try {
       const result = await surveysService.uploadMedia(survey.id, file)
-      await saveMeta({ coverImage: result.url })
-    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible subir la imagen'); setSaveState('error') }
+      saveMeta({ coverImage: result.url })
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible subir la imagen') }
     finally { setCoverUploading(false) }
+  }
+
+  async function saveAll() {
+    if (!survey || !dirty) return
+    setSaveState('saving')
+    const toSend = pending.current
+    try {
+      const tasks: Promise<unknown>[] = []
+      if (Object.keys(toSend.meta).length) tasks.push(surveysService.update(survey.id, toSend.meta))
+      for (const [pageId, patch] of Object.entries(toSend.pages)) if (Object.keys(patch).length) tasks.push(surveysService.updatePage(survey.id, pageId, patch))
+      for (const [questionId, patch] of Object.entries(toSend.questions)) if (Object.keys(patch).length) tasks.push(surveysService.updateQuestion(survey.id, questionId, patch))
+      await Promise.all(tasks)
+      pending.current = { meta: {}, pages: {}, questions: {} }
+      setDirty(false)
+      setSaveState('saved')
+      await load()
+      toast.push('success', 'Cambios guardados')
+    } catch (cause) {
+      toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar. Tus cambios siguen aquí, intenta de nuevo.')
+      setSaveState('error')
+    }
+  }
+
+  // Varias acciones estructurales (agregar/eliminar pagina o pregunta, duplicar) terminan en
+  // load(), que reemplaza el estado local con lo que hay en el servidor — si hubiera cambios sin
+  // guardar en ese momento, se perderian en silencio. Por eso primero se guardan.
+  async function flushPending() {
+    if (dirty) await saveAll()
   }
 
   async function addPage() {
     if (!survey) return
     try {
+      await flushPending()
       await surveysService.createPage(survey.id, { title: `Página ${survey.pages.length + 1}` })
       await load()
       toast.push('success', 'Página agregada')
@@ -150,10 +174,9 @@ function SurveyBuilderContent() {
   function updatePageField(page: SurveyPage, patch: { title?: string; description?: string; attachmentUrl?: string | null; attachmentName?: string | null }) {
     if (!survey) return
     setSurvey({ ...survey, pages: survey.pages.map(item => item.id === page.id ? { ...item, ...patch } : item) })
-    debounced(`page-${page.id}`, async () => {
-      try { await surveysService.updatePage(survey.id, page.id, patch); setSaveState('saved') }
-      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar la página'); setSaveState('error') }
-    })
+    pending.current.pages[page.id] = { ...pending.current.pages[page.id], ...patch }
+    setDirty(true)
+    setSaveState('idle')
   }
 
   async function reorderPages(from: number, to: number) {
@@ -176,6 +199,7 @@ function SurveyBuilderContent() {
     if (!survey || !activePage) return
     setShowTypePicker(false)
     try {
+      await flushPending()
       const created = await surveysService.createQuestion(survey.id, activePage.id, {
         type, prompt: `${QUESTION_TYPE_INFO[type].label}`, required: false, config: defaultConfigFor(type),
       }) as SurveyQuestion
@@ -193,21 +217,25 @@ function SurveyBuilderContent() {
         questions: page.questions.map(item => item.id === question.id ? { ...item, ...patch } : item),
       }),
     })
-    debounced(`question-${question.id}`, async () => {
-      try { await surveysService.updateQuestion(survey.id, question.id, patch); setSaveState('saved') }
-      catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar la pregunta'); setSaveState('error') }
-    })
+    pending.current.questions[question.id] = { ...pending.current.questions[question.id], ...patch }
+    setDirty(true)
+    setSaveState('idle')
   }
 
   async function duplicateQuestion(question: SurveyQuestion) {
     if (!survey) return
-    try { await surveysService.duplicateQuestion(survey.id, question.id); await load(); toast.push('success', 'Pregunta duplicada') }
-    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible duplicar') }
+    try {
+      await flushPending()
+      await surveysService.duplicateQuestion(survey.id, question.id)
+      await load()
+      toast.push('success', 'Pregunta duplicada')
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible duplicar') }
   }
 
   async function publishToggle() {
     if (!survey) return
     try {
+      await flushPending()
       if (survey.status === 'BORRADOR') { await surveysService.publish(survey.id); toast.push('success', 'Encuesta publicada') }
       else if (survey.status === 'PUBLICADA') { await surveysService.close(survey.id); toast.push('success', 'Encuesta cerrada') }
       else { await surveysService.reopen(survey.id); toast.push('success', 'Encuesta reabierta') }
@@ -242,11 +270,13 @@ function SurveyBuilderContent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {dirty && <span className="survey-unsaved-dot">Cambios sin guardar</span>}
           <SaveStatusIndicator state={saveState} />
           <Badge tone={survey.status === 'PUBLICADA' ? 'info' : 'neutral'}>{survey.status === 'BORRADOR' ? 'Borrador' : survey.status === 'PUBLICADA' ? 'Publicada' : 'Cerrada'}</Badge>
           <Button variant="secondary" onClick={() => navigate('/app/encuestas')}><ArrowLeft size={15} /> Encuestas</Button>
           <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/resultados`)}><BarChart3 size={15} /> Resultados</Button>
           <Button variant="secondary" onClick={() => setShowSettings(true)}><Settings size={15} /> Configuración</Button>
+          <Button identity={identity} onClick={saveAll} disabled={!dirty || saveState === 'saving'}><Save size={15} /> Guardar</Button>
           <Button identity={identity} onClick={publishToggle}>
             {survey.status === 'BORRADOR' && <><Rocket size={15} /> Publicar</>}
             {survey.status === 'PUBLICADA' && <><Square size={15} /> Cerrar</>}
@@ -369,6 +399,26 @@ function SurveyBuilderContent() {
                 {activeQuestion.description && <p className="survey-question-hint">{activeQuestion.description}</p>}
                 <QuestionRenderer question={activeQuestion} value={undefined} onChange={() => {}} color={survey.theme_color} />
               </div>
+            ) : activePage ? (
+              <div className="survey-step-card" style={{ ['--survey-accent' as string]: survey.theme_color }}>
+                {(activePage.title || activePage.description) && (
+                  <div className="survey-step-card-head">
+                    {activePage.title && (
+                      <p className="survey-section-eyebrow" style={{ color: survey.theme_color }}>
+                        <span className="survey-section-eyebrow-dash" style={{ background: survey.theme_color }} />
+                        {activePage.title}
+                      </p>
+                    )}
+                    {activePage.title && <h2>{activePage.title}</h2>}
+                    {activePage.description && <p>{activePage.description}</p>}
+                  </div>
+                )}
+                {activePage.attachment_url ? (
+                  <PresentationEmbed url={activePage.attachment_url} name={activePage.attachment_name} />
+                ) : (
+                  <p className="survey-config-empty">Agrega un título, descripción o presentación de apoyo para verlos aquí, o selecciona una pregunta.</p>
+                )}
+              </div>
             ) : (
               <p className="survey-config-empty" style={{ padding: 24 }}>Selecciona una pregunta para verla aquí.</p>
             )}
@@ -386,14 +436,14 @@ function SurveyBuilderContent() {
         <ConfirmDialog
           title="Eliminar página" message={`¿Eliminar "${deletePage.title}" y todas sus preguntas?`} confirmLabel="Eliminar"
           onCancel={() => setDeletePage(null)}
-          onConfirm={async () => { await surveysService.removePage(survey.id, deletePage.id); setDeletePage(null); await load(false) }}
+          onConfirm={async () => { await flushPending(); await surveysService.removePage(survey.id, deletePage.id); setDeletePage(null); await load(false) }}
         />
       )}
       {deleteQuestion && (
         <ConfirmDialog
           title="Eliminar pregunta" message={`¿Eliminar "${deleteQuestion.prompt}"?`} confirmLabel="Eliminar"
           onCancel={() => setDeleteQuestion(null)}
-          onConfirm={async () => { await surveysService.removeQuestion(survey.id, deleteQuestion.id); setActiveQuestionId(null); setDeleteQuestion(null); await load() }}
+          onConfirm={async () => { await flushPending(); await surveysService.removeQuestion(survey.id, deleteQuestion.id); setActiveQuestionId(null); setDeleteQuestion(null); await load() }}
         />
       )}
     </div>
