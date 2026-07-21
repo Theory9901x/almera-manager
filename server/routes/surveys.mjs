@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdir, unlink } from 'node:fs/promises'
-import { extname, resolve } from 'node:path'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, extname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { Router } from 'express'
 import multer from 'multer'
@@ -28,6 +29,67 @@ const allowedMediaTypes = new Set([
 ])
 const PRESENTATION_MIMES = new Set(['application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'])
 
+async function findFilesRecursive(dir, predicate) {
+  const entries = await readdir(dir, { withFileTypes: true })
+  const results = []
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) results.push(...await findFilesRecursive(full, predicate))
+    else if (predicate(entry.name)) results.push(full)
+  }
+  return results
+}
+
+// Algunas presentaciones (con iconos vectoriales con mask+filter complejos, tipicos de plantillas
+// de Canva) hacen que el filtro de importacion de SVG de LibreOffice se cuelgue INDEFINIDAMENTE al
+// exportar a PDF — confirmado con archivos reales de un cliente que nunca terminaron ni pasados 10
+// minutos. rsvg-convert rasteriza esos mismos SVG en milisegundos, asi que se reemplazan por PNG
+// dentro del pptx ANTES de pasarselo a soffice. Devuelve false sin tocar nada si el pptx no tiene
+// SVG (la mayoria) o si faltan las herramientas (unzip/rsvg-convert/zip — ej. en desarrollo local).
+async function rasterizeEmbeddedSvgs(pptxPath) {
+  const workDir = await mkdtemp(join(tmpdir(), 'lo-desvg-'))
+  try {
+    await execFileAsync('unzip', ['-q', pptxPath, '-d', workDir])
+    const svgFiles = await findFilesRecursive(workDir, name => name.toLowerCase().endsWith('.svg'))
+    if (!svgFiles.length) return false
+
+    const convertedNames = []
+    for (const svgPath of svgFiles) {
+      try {
+        await execFileAsync('rsvg-convert', ['--zoom', '2', '-o', svgPath.replace(/\.svg$/i, '.png'), svgPath], { timeout: 15_000 })
+        await unlink(svgPath)
+        convertedNames.push(basename(svgPath))
+      } catch { /* esta imagen en particular no se pudo rasterizar: se deja como svg */ }
+    }
+    if (!convertedNames.length) return false
+
+    const relsFiles = await findFilesRecursive(workDir, name => name.toLowerCase().endsWith('.rels'))
+    for (const relsPath of relsFiles) {
+      let content = await readFile(relsPath, 'utf8')
+      let changed = false
+      for (const svgName of convertedNames) {
+        if (content.includes(`${svgName}"`)) { content = content.split(`${svgName}"`).join(`${svgName.replace(/\.svg$/i, '.png')}"`); changed = true }
+      }
+      if (changed) await writeFile(relsPath, content)
+    }
+
+    // Asegura que el pptx declare el tipo png (ya presente si el archivo original ya traia alguna
+    // imagen png propia, pero no todos la traen).
+    const contentTypesPath = join(workDir, '[Content_Types].xml')
+    const contentTypes = await readFile(contentTypesPath, 'utf8')
+    if (!/Extension="png"/i.test(contentTypes)) {
+      await writeFile(contentTypesPath, contentTypes.replace('</Types>', '<Default Extension="png" ContentType="image/png"/></Types>'))
+    }
+
+    const rebuiltPath = `${pptxPath}.rebuilt`
+    await execFileAsync('zip', ['-q', '-r', rebuiltPath, '.'], { cwd: workDir })
+    await rename(rebuiltPath, pptxPath)
+    return true
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
 // Un PPT/PPTX embebido via Office Online Viewer es lento: Microsoft tiene que bajar el archivo
 // desde nuestro servidor y renderizarlo en sus propios servidores antes de mostrar nada. Para que
 // quien RESPONDE la encuesta (muchas personas) no pague ese costo cada vez, se convierte a PDF UNA
@@ -38,6 +100,7 @@ const PRESENTATION_MIMES = new Set(['application/vnd.ms-powerpoint', 'applicatio
 // lento via Office Online Viewer, pero funciona igual.
 async function convertPresentationToPdf(filename) {
   const inputPath = resolve(mediaRoot, filename)
+  await rasterizeEmbeddedSvgs(inputPath).catch(() => {})
   const profileDir = `/tmp/lo-profile-${randomUUID()}`
   await execFileAsync('soffice', [
     '--headless', '--norestore', `-env:UserInstallation=file://${profileDir}`,
