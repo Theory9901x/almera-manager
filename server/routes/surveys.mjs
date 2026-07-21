@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, unlink } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
+import { promisify } from 'node:util'
 import { Router } from 'express'
 import multer from 'multer'
 import QRCode from 'qrcode'
@@ -12,17 +14,39 @@ import { aggregateScores, computeResponseScore, hasScoredQuestions } from '../su
 
 export const surveysRouter = Router()
 
+const execFileAsync = promisify(execFile)
+
 // Imagenes de opciones (seleccion con imagenes, emparejamiento) y presentaciones de apoyo
 // (PPT/PDF de guias clinicas): se sirven publicas y sin auth desde /uploads/surveys (montado en
 // server/index.mjs), a diferencia de las evidencias de otros modulos que solo se descargan
-// autenticadas. Son contenido pensado para verse en el enlace publico o embeberse via Office
-// Online Viewer, que necesita poder alcanzar la URL desde internet.
+// autenticadas. Son contenido pensado para verse en el enlace publico.
 const mediaRoot = resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys')
 await mkdir(mediaRoot, { recursive: true })
 const allowedMediaTypes = new Set([
   'image/png', 'image/jpeg', 'image/webp', 'image/gif',
   'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/pdf',
 ])
+const PRESENTATION_MIMES = new Set(['application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'])
+
+// Un PPT/PPTX embebido via Office Online Viewer es lento: Microsoft tiene que bajar el archivo
+// desde nuestro servidor y renderizarlo en sus propios servidores antes de mostrar nada. Para que
+// quien RESPONDE la encuesta (muchas personas) no pague ese costo cada vez, se convierte a PDF UNA
+// sola vez aqui, al momento de subir (lo paga solo quien arma la encuesta) — un PDF lo renderiza
+// el navegador de forma nativa e instantanea, sin depender de un servicio externo.
+// Requiere LibreOffice instalado en el servidor (soffice). Si la conversion falla (no instalado,
+// archivo corrupto, timeout) se sigue sirviendo el PPT/PPTX original sin romper la subida — mas
+// lento via Office Online Viewer, pero funciona igual.
+async function convertPresentationToPdf(filename) {
+  const inputPath = resolve(mediaRoot, filename)
+  const profileDir = `/tmp/lo-profile-${randomUUID()}`
+  await execFileAsync('soffice', [
+    '--headless', '--norestore', `-env:UserInstallation=file://${profileDir}`,
+    '--convert-to', 'pdf', '--outdir', mediaRoot, inputPath,
+  ], { timeout: 90_000 })
+  const pdfFilename = filename.replace(/\.[^.]+$/, '.pdf')
+  await unlink(inputPath).catch(() => {})
+  return pdfFilename
+}
 const mediaUpload = multer({
   storage: multer.diskStorage({
     destination: mediaRoot,
@@ -444,7 +468,15 @@ surveysRouter.post('/:id/media', surveysModule, edit, mediaUpload.single('file')
   try {
     await assertSurvey(request)
     if (!request.file) fail(400, 'Adjunta un archivo')
-    response.status(201).json({ url: `/uploads/surveys/${request.file.filename}`, originalName: request.file.originalname })
+    let filename = request.file.filename
+    let originalName = request.file.originalname
+    if (PRESENTATION_MIMES.has(request.file.mimetype)) {
+      try {
+        filename = await convertPresentationToPdf(filename)
+        originalName = originalName.replace(/\.[^.]+$/, '.pdf')
+      } catch (conversionError) { /* sin LibreOffice o conversion fallida: se sirve el original */ }
+    }
+    response.status(201).json({ url: `/uploads/surveys/${filename}`, originalName })
   } catch (error) { next(error) }
 })
 
