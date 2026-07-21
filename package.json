@@ -22,7 +22,7 @@
     "echarts-for-react": "^3.0.6",
     "express": "^5.2.1",
     "framer-motion": "^12.42.2",
-    "lucide-react": "^0.379.0",
+    "lucide-react": "^1.25.0",
     "multer": "^2.2.0",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.16.3",
