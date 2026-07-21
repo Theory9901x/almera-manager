@@ -33,7 +33,7 @@ async function loadPublicSurvey(slug) {
   )
   const survey = surveyResult.rows[0]
   if (!survey) return null
-  const pagesResult = await query('SELECT id, order_index, title, description FROM survey_pages WHERE survey_id = $1 ORDER BY order_index, id', [survey.id])
+  const pagesResult = await query('SELECT id, order_index, title, description, attachment_url, attachment_name FROM survey_pages WHERE survey_id = $1 ORDER BY order_index, id', [survey.id])
   const questionsResult = await query(
     `SELECT q.id, q.page_id, q.order_index, q.type, q.prompt, q.description, q.image_url, q.required, q.config
      FROM survey_questions q JOIN survey_pages p ON p.id = q.page_id

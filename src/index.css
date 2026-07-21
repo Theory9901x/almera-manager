@@ -2211,6 +2211,16 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-required-mark { color: #DC2626; margin-left: 3px; }
 .survey-question-hint { margin: -4px 0 12px; font-size: 12.5px; color: var(--muted); }
 
+/* Presentacion de apoyo embebida (guias clinicas) — se ve antes de las preguntas de la pagina. */
+.survey-presentation-embed { margin: 4px 0 22px; border: 1px solid #eef1f6; border-radius: 16px; overflow: hidden; background: #f7f8fa; }
+.survey-presentation-embed-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 12.5px; font-weight: 700; color: var(--ink-soft, #344054); border-bottom: 1px solid #eef1f6; }
+.survey-presentation-embed-bar > span { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.survey-presentation-embed-bar a { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-weight: 700; }
+.survey-presentation-embed-bar a:hover { color: #0F7A54; }
+.survey-presentation-embed-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #fff; }
+.survey-presentation-embed-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+@media (max-width: 640px) { .survey-presentation-embed-frame { aspect-ratio: 4 / 5; } }
+
 /* Estilo "RedSalud": eyebrow (guion de color + texto) antes del titulo de un bloque de preguntas */
 .survey-section-eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .survey-section-eyebrow-dash { display: inline-block; width: 18px; height: 2px; border-radius: 999px; flex: none; }
@@ -2252,6 +2262,16 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .survey-image-thumb { position: relative; display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; overflow: hidden; border: 1.5px solid var(--line); }
 .survey-image-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .survey-image-thumb button { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 999px; border: none; background: #DC2626; color: #fff; cursor: pointer; }
+
+/* Presentacion de apoyo por pagina (guias clinicas) */
+.survey-config-hint { font-size: 11.5px; color: var(--muted); margin: -8px 0 4px; line-height: 1.5; }
+.survey-attachment-upload { position: relative; display: inline-flex; align-items: center; gap: 8px; width: 100%; border: 1.5px dashed var(--line); border-radius: 10px; background: var(--surface-soft, #f2f5f9); padding: 10px 14px; color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: border-color 150ms ease, color 150ms ease; }
+.survey-attachment-upload:hover { border-color: #0F7A54; color: #0F7A54; }
+.survey-attachment-chip { display: flex; align-items: center; gap: 8px; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 9px 12px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.survey-attachment-chip a { display: grid; place-items: center; color: var(--muted); }
+.survey-attachment-chip a:hover { color: #0F7A54; }
+.survey-attachment-chip button { display: grid; place-items: center; border: none; background: transparent; color: #94A3B8; cursor: pointer; }
+.survey-attachment-chip button:hover { color: #DC2626; }
 
 /* Seleccion con imagenes */
 .survey-image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }

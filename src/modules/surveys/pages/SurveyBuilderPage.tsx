@@ -9,6 +9,7 @@ import {
 } from '@/design-system'
 import { surveysService } from '../services/surveysService'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PageAttachmentButton } from '../components/PageAttachmentButton'
 import { QuestionConfigEditor } from '../components/QuestionConfigEditor'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { BUILDER_QUESTION_TYPES, QUESTION_TYPE_INFO } from '../components/questionTypeMeta'
@@ -146,7 +147,7 @@ function SurveyBuilderContent() {
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible agregar la página') }
   }
 
-  function updatePageField(page: SurveyPage, patch: { title?: string; description?: string }) {
+  function updatePageField(page: SurveyPage, patch: { title?: string; description?: string; attachmentUrl?: string | null; attachmentName?: string | null }) {
     if (!survey) return
     setSurvey({ ...survey, pages: survey.pages.map(item => item.id === page.id ? { ...item, ...patch } : item) })
     debounced(`page-${page.id}`, async () => {
@@ -320,6 +321,15 @@ function SurveyBuilderContent() {
               <div className="survey-builder-page-meta">
                 <Field label="Título de la página"><Input value={activePage.title} onChange={event => updatePageField(activePage, { title: event.target.value })} /></Field>
                 <Field label="Descripción de la página"><Textarea value={activePage.description} onChange={event => updatePageField(activePage, { description: event.target.value })} /></Field>
+                <Field label="Presentación de apoyo (opcional)">
+                  <PageAttachmentButton
+                    surveyId={survey.id}
+                    url={activePage.attachment_url}
+                    name={activePage.attachment_name}
+                    onChange={attachment => updatePageField(activePage, { attachmentUrl: attachment.url, attachmentName: attachment.name })}
+                  />
+                </Field>
+                <p className="survey-config-hint">Se muestra embebida arriba de las preguntas de esta página, antes de responder — ideal para evaluaciones de guías clínicas.</p>
                 <p className="survey-config-empty">Selecciona una pregunta para editarla o crea una nueva.</p>
               </div>
             )

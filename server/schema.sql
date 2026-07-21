@@ -470,6 +470,11 @@ CREATE TABLE IF NOT EXISTS survey_pages (
 );
 CREATE INDEX IF NOT EXISTS survey_pages_survey_idx ON survey_pages(survey_id, order_index);
 
+-- Presentacion de apoyo (PPT/PDF) que se ve embebida antes de responder las preguntas de la
+-- pagina — pensada para encuestas de evaluacion de guias clinicas. Opcional, una por pagina.
+ALTER TABLE survey_pages ADD COLUMN IF NOT EXISTS attachment_url TEXT;
+ALTER TABLE survey_pages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
+
 -- El enum de tipos ya incluye los tipos avanzados de fase 2 (matching, ranking, imagenes, NPS, estrellas,
 -- archivo) para no rehacer el modelo de datos; el constructor de la fase 1 solo ofrece los tipos basicos.
 CREATE TABLE IF NOT EXISTS survey_questions (

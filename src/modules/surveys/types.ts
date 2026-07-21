@@ -79,6 +79,8 @@ export interface SurveyPage {
   order_index: number
   title: string
   description: string
+  attachment_url: string | null
+  attachment_name: string | null
   questions: SurveyQuestion[]
 }
 
@@ -207,6 +209,8 @@ export interface PublicSurveyPage {
   order_index: number
   title: string
   description: string
+  attachment_url: string | null
+  attachment_name: string | null
   questions: PublicSurveyQuestion[]
 }
 

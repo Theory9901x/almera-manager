@@ -62,7 +62,7 @@ export const surveysService = {
   link: (id: string) => call<SurveyLink>(`/${id}/link`),
 
   createPage: (surveyId: string, data: { title?: string; description?: string }) => call(`/${surveyId}/pages`, { method: 'POST', body: JSON.stringify(data) }),
-  updatePage: (surveyId: string, pageId: string, data: { title?: string; description?: string }) => call(`/${surveyId}/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updatePage: (surveyId: string, pageId: string, data: { title?: string; description?: string; attachmentUrl?: string | null; attachmentName?: string | null }) => call(`/${surveyId}/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   removePage: (surveyId: string, pageId: string) => call(`/${surveyId}/pages/${pageId}`, { method: 'DELETE' }),
   reorderPages: (surveyId: string, order: string[]) => call<{ ok: true }>(`/${surveyId}/pages/reorder`, { method: 'PUT', body: JSON.stringify({ order }) }),
 
@@ -77,8 +77,8 @@ export const surveysService = {
     body.append('file', file)
     const response = await fetch(`/api/surveys/${surveyId}/media`, { method: 'POST', credentials: 'same-origin', body })
     const data = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(data.error || 'No fue posible subir la imagen')
-    return data as { url: string }
+    if (!response.ok) throw new Error(data.error || 'No fue posible subir el archivo')
+    return data as { url: string; originalName: string }
   },
 
   responses: (surveyId: string, filters: ResponseFilters = {}) => call<SurveyResponseListResult>(`/${surveyId}/responses${toQueryString(filters)}`),

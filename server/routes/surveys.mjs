@@ -12,21 +12,26 @@ import { aggregateScores, computeResponseScore, hasScoredQuestions } from '../su
 
 export const surveysRouter = Router()
 
-// Imagenes de opciones (seleccion con imagenes, emparejamiento): se sirven publicas y sin auth
-// desde /uploads/surveys (montado en server/index.mjs), a diferencia de las evidencias de otros
-// modulos que solo se descargan autenticadas. Son contenido pensado para verse en el enlace publico.
+// Imagenes de opciones (seleccion con imagenes, emparejamiento) y presentaciones de apoyo
+// (PPT/PDF de guias clinicas): se sirven publicas y sin auth desde /uploads/surveys (montado en
+// server/index.mjs), a diferencia de las evidencias de otros modulos que solo se descargan
+// autenticadas. Son contenido pensado para verse en el enlace publico o embeberse via Office
+// Online Viewer, que necesita poder alcanzar la URL desde internet.
 const mediaRoot = resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys')
 await mkdir(mediaRoot, { recursive: true })
-const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const allowedMediaTypes = new Set([
+  'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/pdf',
+])
 const mediaUpload = multer({
   storage: multer.diskStorage({
     destination: mediaRoot,
-    filename: (_request, file, callback) => callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase().slice(0, 6)}`),
+    filename: (_request, file, callback) => callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase().slice(0, 8)}`),
   }),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 60 * 1024 * 1024, files: 1 },
   fileFilter: (_request, file, callback) => {
-    if (allowedImageTypes.has(file.mimetype)) return callback(null, true)
-    const error = new Error('Solo se permiten imágenes PNG, JPEG, WEBP o GIF de hasta 5MB')
+    if (allowedMediaTypes.has(file.mimetype)) return callback(null, true)
+    const error = new Error('Solo se permiten imágenes (PNG, JPEG, WEBP, GIF), presentaciones PowerPoint (PPT/PPTX) o PDF de hasta 60MB')
     error.status = 415
     callback(error)
   },
@@ -365,8 +370,8 @@ surveysRouter.post('/:id/duplicate', surveysModule, create, async (request, resp
     const newSurveyId = inserted.rows[0].id
     for (const page of pages) {
       const newPage = await client.query(
-        `INSERT INTO survey_pages (survey_id, order_index, title, description) VALUES ($1,$2,$3,$4) RETURNING id`,
-        [newSurveyId, page.order_index, page.title, page.description],
+        `INSERT INTO survey_pages (survey_id, order_index, title, description, attachment_url, attachment_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [newSurveyId, page.order_index, page.title, page.description, page.attachment_url, page.attachment_name],
       )
       for (const question of page.questions) {
         await client.query(
@@ -438,8 +443,8 @@ surveysRouter.get('/:id/link', surveysModule, view, async (request, response, ne
 surveysRouter.post('/:id/media', surveysModule, edit, mediaUpload.single('file'), async (request, response, next) => {
   try {
     await assertSurvey(request)
-    if (!request.file) fail(400, 'Adjunta una imagen')
-    response.status(201).json({ url: `/uploads/surveys/${request.file.filename}` })
+    if (!request.file) fail(400, 'Adjunta un archivo')
+    response.status(201).json({ url: `/uploads/surveys/${request.file.filename}`, originalName: request.file.originalname })
   } catch (error) { next(error) }
 })
 
@@ -462,10 +467,19 @@ surveysRouter.patch('/:id/pages/:pageId', surveysModule, edit, async (request, r
   try {
     const survey = await assertSurvey(request)
     const body = request.body || {}
+    // Update dinamico (no COALESCE): attachmentUrl/attachmentName necesitan poder limpiarse a NULL
+    // al quitar la presentación, algo que COALESCE(nuevo, columna) nunca permite expresar.
+    const sets = []
+    const params = []
+    if (body.title !== undefined) { sets.push(`title = $${sets.length + 1}`); params.push(String(body.title)) }
+    if (body.description !== undefined) { sets.push(`description = $${sets.length + 1}`); params.push(String(body.description)) }
+    if (body.attachmentUrl !== undefined) { sets.push(`attachment_url = $${sets.length + 1}`); params.push(body.attachmentUrl || null) }
+    if (body.attachmentName !== undefined) { sets.push(`attachment_name = $${sets.length + 1}`); params.push(body.attachmentName || null) }
+    if (!sets.length) fail(400, 'Nada para actualizar')
+    params.push(Number(request.params.pageId), survey.id)
     const result = await query(
-      `UPDATE survey_pages SET title = COALESCE($1, title), description = COALESCE($2, description)
-       WHERE id = $3 AND survey_id = $4 RETURNING *`,
-      [body.title !== undefined ? String(body.title) : null, body.description !== undefined ? String(body.description) : null, Number(request.params.pageId), survey.id],
+      `UPDATE survey_pages SET ${sets.join(', ')} WHERE id = $${params.length - 1} AND survey_id = $${params.length} RETURNING *`,
+      params,
     )
     if (!result.rows[0]) fail(404, 'Página no encontrada')
     response.json(result.rows[0])

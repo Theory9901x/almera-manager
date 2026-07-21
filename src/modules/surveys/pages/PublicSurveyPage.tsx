@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Lock, Send } from 'lucide-react'
 import { ToastProvider, fadeSlideUp, semaphoreColor, useToast } from '@/design-system'
 import { publicSurveyService, PublicSurveyError } from '../services/publicSurveyService'
+import { PresentationEmbed } from '../components/PresentationEmbed'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { useTilt } from '../components/useTilt'
 import { resolveLineIcon } from '../components/lineIcons'
@@ -359,6 +360,7 @@ function StepCard({ page, answers, fieldErrors, color, onAnswer }: {
           {page.description && <p>{page.description}</p>}
         </div>
       )}
+      {page.attachment_url && <PresentationEmbed url={page.attachment_url} name={page.attachment_name} />}
       {page.questions
         .map(question => ({ question, effective: resolveEffectiveQuestion(question, answers) }))
         .filter((entry): entry is { question: PublicSurveyQuestion; effective: PublicSurveyQuestion } => entry.effective !== null)
