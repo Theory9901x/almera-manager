@@ -58,9 +58,15 @@ app.use('/api/carbon', requireAuth, carbonRouter)
 app.use('/api/public/surveys', surveysPublicRouter)
 app.use('/api', (_request, response) => response.status(404).json({ error: 'Ruta no encontrada' }))
 
-// Imagenes de opciones de encuestas (seleccion con imagenes / emparejamiento): a diferencia de las
-// evidencias de otros modulos, estas se muestran en el enlace publico y no requieren sesion.
-app.use('/uploads/surveys', express.static(resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys'), { maxAge: '30d' }))
+// Imagenes de opciones de encuestas (seleccion con imagenes / emparejamiento) y presentaciones de
+// apoyo: a diferencia de las evidencias de otros modulos, estas se muestran en el enlace publico y
+// no requieren sesion. Los PDF de presentacion se embeben en un iframe dentro de la propia pagina
+// de la encuesta — el X-Frame-Options: DENY global (arriba) bloquearia ese framing incluso siendo
+// mismo origen, asi que aqui se relaja a SAMEORIGIN solo para este directorio publico.
+app.use('/uploads/surveys', (_request, response, next) => {
+  response.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  next()
+}, express.static(resolve(process.env.SURVEYS_UPLOAD_DIR || 'uploads/surveys'), { maxAge: '30d' }))
 
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
