@@ -991,7 +991,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   width: 74px;
   height: 3px;
   border-radius: 99px 99px 0 0;
-  background: var(--gradient-brand);
+  background: var(--ds-accent, var(--gradient-brand));
   content: "";
 }
 .almera-dashboard-grid > .almera-panel:nth-child(2) .almera-panel-title::after,
@@ -1812,6 +1812,16 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Fondo de la vista con degradado radial violeta muy sutil, no gris plano detras de las cards. */
 .matrices-page-bg { background: radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--m-matrices) 6%, transparent), transparent 40%), var(--color-surface-page); }
+
+/* Tira de mini-KPIs en el header de "Evaluaciones" — de un vistazo, sin ocupar una fila propia. */
+.evaluations-stat-strip { display: flex; align-items: center; gap: 20px; padding: 0 18px; }
+.evaluations-stat-strip > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.evaluations-stat-strip .num { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1; }
+.evaluations-stat-strip .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; white-space: nowrap; }
+@media (max-width: 860px) { .evaluations-stat-strip { display: none; } }
+
+.evaluations-table .ds-table tbody tr:hover td { background: color-mix(in srgb, var(--m-matrices) 5%, #fff); }
+.evaluations-table .tabular-col { font-variant-numeric: tabular-nums; }
 
 /* Barra inline para registrar (ej. "Nueva area") — accion agil, no un bloque de formulario pesado. */
 .inline-action-bar { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); padding: var(--space-4); background: var(--color-surface-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); box-shadow: var(--shadow-card-sm); }

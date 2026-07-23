@@ -410,6 +410,10 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     )
   }
 
+  const closedCount = evaluations.filter(evaluation => evaluation.status === 'CLOSED').length
+  const complianceValues = evaluations.map(evaluation => evaluation.overall_compliance).filter((value): value is number => value !== null)
+  const avgCompliance = complianceValues.length ? complianceValues.reduce((sum, value) => sum + Number(value), 0) / complianceValues.length : null
+
   return (
     <div className="space-y-5">
       <ToastStack notice={notice} error={error} onDismissError={() => setError('')} />
@@ -443,7 +447,15 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
 
       <Card accent={identity.color} className="overflow-hidden">
         <div className="table-toolbar">
-          <div className="almera-panel-title"><span><ClipboardList size={19} /></span><div><h2>Evaluaciones</h2><p>{evaluations.length} registradas</p></div></div>
+          <div className="almera-panel-title" style={{ ['--ds-accent' as string]: identity.color }}>
+            <span><ClipboardList size={19} /></span>
+            <div><h2>Evaluaciones</h2><p>{evaluations.length} registradas</p></div>
+          </div>
+          <div className="evaluations-stat-strip">
+            <div><span className="num">{evaluations.length}</span><span className="lbl">Total</span></div>
+            <div><span className="num">{closedCount}</span><span className="lbl">Cerradas</span></div>
+            <div><span className="num" style={{ color: colorForPercent(avgCompliance) }}>{avgCompliance === null ? '—' : `${avgCompliance.toFixed(0)}%`}</span><span className="lbl">Cumpl. promedio</span></div>
+          </div>
           <div className="w-[220px]">
             <Select
               value={filterAreaId || 'ALL'}
@@ -452,24 +464,26 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             />
           </div>
         </div>
-        <Table>
-          <thead><tr><th>Profesional</th><th>Área</th><th>Mes</th><th>HC</th><th>Cumplimiento</th><th>Concepto</th><th>Estado</th><th></th></tr></thead>
-          <tbody>
-            {evaluations.map(evaluation => (
-              <tr key={evaluation.id}>
-                <td><strong>{evaluation.professional_name}</strong></td>
-                <td>{evaluation.area_name}</td>
-                <td>{evaluation.month_reported}</td>
-                <td>{evaluation.total_records}</td>
-                <td>{evaluation.overall_compliance === null ? '—' : `${Number(evaluation.overall_compliance).toFixed(1)}%`}</td>
-                <td><ConceptBadge concept={evaluation.concept as Concept | null} size="sm" /></td>
-                <td><Badge tone={evaluation.status === 'CLOSED' ? 'info' : 'neutral'}>{evaluation.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}</Badge></td>
-                <td><button className="row-action" style={{ color: identity.color }} onClick={() => void openEvaluation(evaluation.id)}>Abrir</button></td>
-              </tr>
-            ))}
-            {!evaluations.length && <tr><td colSpan={8}><div className="almera-empty"><ClipboardList size={30} /><p>Aún no hay evaluaciones registradas.</p></div></td></tr>}
-          </tbody>
-        </Table>
+        <div className="evaluations-table">
+          <Table>
+            <thead><tr><th>Profesional</th><th>Área</th><th>Mes</th><th>HC</th><th>Cumplimiento</th><th>Concepto</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {evaluations.map(evaluation => (
+                <tr key={evaluation.id}>
+                  <td><strong>{evaluation.professional_name}</strong></td>
+                  <td>{evaluation.area_name}</td>
+                  <td>{evaluation.month_reported}</td>
+                  <td className="tabular-col">{evaluation.total_records}</td>
+                  <td className="tabular-col">{evaluation.overall_compliance === null ? '—' : `${Number(evaluation.overall_compliance).toFixed(1)}%`}</td>
+                  <td><ConceptBadge concept={evaluation.concept as Concept | null} size="sm" /></td>
+                  <td><Badge tone={evaluation.status === 'CLOSED' ? 'info' : 'neutral'}>{evaluation.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}</Badge></td>
+                  <td><button className="row-action" style={{ color: identity.color }} onClick={() => void openEvaluation(evaluation.id)}>Abrir</button></td>
+                </tr>
+              ))}
+              {!evaluations.length && <tr><td colSpan={8}><div className="almera-empty"><ClipboardList size={30} /><p>Aún no hay evaluaciones registradas.</p></div></td></tr>}
+            </tbody>
+          </Table>
+        </div>
       </Card>
     </div>
   )

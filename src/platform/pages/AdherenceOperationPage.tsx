@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PageHeader, moduleIdentity } from '@/design-system'
+import { motion } from 'framer-motion'
+import { ModuleHero, moduleIdentity } from '@/design-system'
 import { adherenceService } from '@/modules/adherence/services/adherenceService'
 import type { Area, Position, Professional } from '@/modules/adherence/types'
 import EvaluationsPanel from '@/modules/adherence/pages/EvaluationsPanel'
@@ -29,24 +30,26 @@ export default function AdherenceOperationPage() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-5">
-      <PageHeader
-        eyebrow="Matrices de adherencia"
+    <div className="mx-auto max-w-[1500px] space-y-5 matrices-page-bg">
+      <ModuleHero
+        badge="Matrices de adherencia"
         title="Operación"
-        description="Registra evaluaciones de historia clínica por profesional y consulta el dashboard de cumplimiento."
-        identity={identity}
+        subtitle="Registra evaluaciones de historia clínica por profesional y consulta el dashboard de cumplimiento."
+        accent={identity.color}
+        className="matrices-hero"
       />
 
-      <div className="surface-panel is-header">
+      <div className="surface-panel is-header" style={{ ['--ds-accent' as string]: identity.color }}>
         <nav className="ds-tabs" aria-label="Secciones de operación">
           {sections.map(([key, label]) => (
             <button
               key={key}
               className={`ds-tabs-item ${section === key ? 'is-active' : ''}`}
-              style={section === key ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+              style={section === key ? { color: identity.color } : undefined}
               onClick={() => { setSection(key); setSearchParams(key === 'dashboard' ? { tab: 'dashboard' } : {}) }}
             >
               {label}
+              {section === key && <motion.div layoutId="operation-tab-indicator" className="ds-tabs-indicator" style={{ ['--tab-accent' as string]: identity.color }} />}
             </button>
           ))}
         </nav>
