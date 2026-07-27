@@ -10,7 +10,7 @@ import { checklistsService } from '../services/checklistsService'
 import { DataCenterPanel } from '../components/DataCenterPanel'
 import { RepositoryPanel } from '../components/RepositoryPanel'
 import { StartAuditDialog, type StartContext } from '../components/StartAuditDialog'
-import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate, SeedTemplate } from '../types'
+import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistProgram, ChecklistTemplate, SeedTemplate } from '../types'
 
 const identity = moduleIdentity('checklists')
 
@@ -45,6 +45,9 @@ function ChecklistsListContent() {
   const [form, setForm] = useState({ name: '', code: '', version: '01', areaId: '' })
   const [newAudit, setNewAudit] = useState({ templateId: '', auditDate: new Date().toISOString().slice(0, 10) })
   const [seeds, setSeeds] = useState<SeedTemplate[]>([])
+  const [programs, setPrograms] = useState<ChecklistProgram[]>([])
+  // Programa seleccionado en la pestaña de listas. '' = ver todos.
+  const [program, setProgram] = useState('')
   // Seleccion para el borrado multiple, y lo que se esta a punto de borrar. `pendingDelete` en
   // null significa que no hay confirmacion abierta: no se borra nada sin pasar por ahi.
   const [selected, setSelected] = useState<string[]>([])
@@ -62,9 +65,12 @@ function ChecklistsListContent() {
       setAssigned(assignedList)
       // Plantillas y areas se cargan siempre, no solo para quien administra: los filtros de la
       // pestaña de analitica las necesitan y esa pestaña la ve cualquiera con .view.
-      const [list, areaList] = await Promise.all([checklistsService.list(), checklistsService.areas()])
+      const [list, areaList, programList] = await Promise.all([
+        checklistsService.list(), checklistsService.areas(), checklistsService.programs(),
+      ])
       setTemplates(list)
       setAreas(areaList)
+      setPrograms(programList)
       if (canManage) setSeeds(await checklistsService.seedAvailable().catch(() => []))
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar el módulo') }
     finally { setLoading(false) }
@@ -135,6 +141,14 @@ function ChecklistsListContent() {
   }
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin" size={24} /></div>
+
+  // Filtrado en el cliente a proposito: son 13 listas, no miles. Ir al servidor por cada toque
+  // de pestaña seria un viaje para nada.
+  const visibleTemplates = program === ''
+    ? templates
+    : program === 'SIN'
+      ? templates.filter(item => !item.program_id)
+      : templates.filter(item => item.program_id === program)
 
   const closed = audits.filter(audit => audit.status === 'CERRADA')
   const closedPercents = closed.map(audit => Number(audit.adherence_percent)).filter(value => !Number.isNaN(value))
@@ -427,21 +441,60 @@ function ChecklistsListContent() {
                 <div className="table-toolbar">
                   <div className="almera-panel-title" style={{ ['--ds-accent' as string]: identity.color }}>
                     <span><ListChecks size={19} /></span>
-                    <div><h2>Listas institucionales</h2><p>{templates.length} registradas</p></div>
+                    <div>
+                      <h2>Listas institucionales</h2>
+                      <p>{visibleTemplates.length} de {templates.length} · {program ? programs.find(p => p.id === program)?.name : 'todos los programas'}</p>
+                    </div>
                   </div>
                 </div>
-                {templates.length ? (
+
+                {/* Programas: agrupan las listas por proceso institucional. No es lo mismo que el
+                    servicio de la ronda — una lista de Seguridad del Paciente se audita en
+                    Urgencias y en Hospitalización sin dejar de ser del mismo programa. */}
+                {programs.length > 0 && (
+                  <div className="program-tabs">
+                    <button
+                      className={`program-tab ${program === '' ? 'is-active' : ''}`}
+                      onClick={() => setProgram('')}
+                    >
+                      Todos <span>{templates.length}</span>
+                    </button>
+                    {programs.map(item => (
+                      <button
+                        key={item.id}
+                        className={`program-tab ${program === item.id ? 'is-active' : ''}`}
+                        onClick={() => setProgram(item.id)}
+                        title={item.description || undefined}
+                      >
+                        {item.name} <span>{item.template_count}</span>
+                      </button>
+                    ))}
+                    {templates.some(t => !t.program_id) && (
+                      <button
+                        className={`program-tab ${program === 'SIN' ? 'is-active' : ''}`}
+                        onClick={() => setProgram('SIN')}
+                      >
+                        Sin programa <span>{templates.filter(t => !t.program_id).length}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+                {visibleTemplates.length ? (
                   <div className="checklists-table">
                     <Table>
                       <thead>
-                        <tr><th>Lista</th><th>Código</th><th>Área / servicio</th><th>Audita</th><th>Dominios</th><th>Criterios</th><th>Estado</th><th></th></tr>
+                        <tr><th>Lista</th><th>Código</th><th>Programa</th><th>Audita</th><th>Dominios</th><th>Criterios</th><th>Estado</th><th></th></tr>
                       </thead>
                       <tbody>
-                        {templates.map(template => (
+                        {visibleTemplates.map(template => (
                           <tr key={template.id}>
                             <td><strong>{template.name}</strong></td>
                             <td className="tabular-col">{template.code || '—'}{template.code ? ` v${template.version}` : ''}</td>
-                            <td>{template.area_name || '—'}</td>
+                            <td>
+                              {template.program_name
+                                ? <span className="program-pill">{template.program_name}</span>
+                                : <span style={{ color: 'var(--muted)' }}>Sin programa</span>}
+                            </td>
                             <td>{template.subject_label}</td>
                             <td className="tabular-col">{template.domain_count ?? 0}</td>
                             <td className="tabular-col">{template.criteria_count ?? 0}</td>
@@ -476,7 +529,20 @@ function ChecklistsListContent() {
                   </div>
                 ) : (
                   <div className="p-5">
-                    <EmptyState icon={ListChecks} title="Aún no hay listas de chequeo" description="Crea la primera lista arriba: defínele sus dominios y criterios, publícala y asígnala a quien deba auditar." />
+                    {/* Con un programa filtrado, decir "aun no hay listas" seria falso: hay 13,
+                        solo que ninguna es de ese programa. */}
+                    {templates.length ? (
+                      <EmptyState
+                        icon={ListChecks}
+                        title={program === 'SIN' ? 'Todas las listas tienen programa' : 'Este programa aún no tiene listas'}
+                        description={program === 'SIN'
+                          ? 'No hay ninguna lista suelta sin asignar a un programa.'
+                          : `Hay ${templates.length} listas en otros programas. Puedes crear una aquí, o mover una existente desde su constructor.`}
+                        action={<Button variant="secondary" onClick={() => setProgram('')}>Ver todas las listas</Button>}
+                      />
+                    ) : (
+                      <EmptyState icon={ListChecks} title="Aún no hay listas de chequeo" description="Crea la primera lista arriba: defínele sus dominios y criterios, publícala y asígnala a quien deba auditar." />
+                    )}
                   </div>
                 )}
               </Card>

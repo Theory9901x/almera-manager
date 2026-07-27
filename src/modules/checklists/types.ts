@@ -43,10 +43,23 @@ export interface ChecklistDomain {
   criteria: ChecklistCriterion[]
 }
 
+/** Programa institucional al que pertenece una lista (Seguridad del Paciente, …).
+ *  Distinto de `ChecklistArea`, que es el servicio DONDE se hace la ronda. */
+export interface ChecklistProgram {
+  id: string
+  name: string
+  description: string
+  order_index: number
+  active: boolean
+  template_count: number
+}
+
 export interface ChecklistTemplate {
   id: string
   area_id: string | null
   area_name?: string | null
+  program_id?: string | null
+  program_name?: string | null
   code: string
   version: string
   name: string

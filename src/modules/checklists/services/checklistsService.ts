@@ -1,7 +1,7 @@
 import type {
   AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
   DataCenter, DataCenterFilters, DataCenterOptions, RepositoryFilters, RepositoryPage,
-  ChecklistArea, ChecklistMembership, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
+  ChecklistArea, ChecklistMembership, ChecklistProgram, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
 
@@ -50,9 +50,13 @@ export const checklistsService = {
   areas: () => call<ChecklistArea[]>('/areas'),
   createArea: (name: string) => call<ChecklistArea>('/areas', { method: 'POST', body: JSON.stringify({ name }) }),
 
+  programs: () => call<ChecklistProgram[]>('/programs'),
+  createProgram: (name: string, description = '') =>
+    call<ChecklistProgram>('/programs', { method: 'POST', body: JSON.stringify({ name, description }) }),
+
   list: () => call<ChecklistTemplate[]>('/'),
   detail: (id: string) => call<ChecklistTemplateDetail>(`/${id}`),
-  create: (data: { name: string; code?: string; version?: string; areaId?: string | null; subjectLabel?: string; numberedItems?: boolean }) =>
+  create: (data: { name: string; code?: string; version?: string; areaId?: string | null; programId?: string | null; subjectLabel?: string; numberedItems?: boolean }) =>
     call<ChecklistTemplateDetail>('/', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Record<string, unknown>) =>
     call<ChecklistTemplate>(`/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

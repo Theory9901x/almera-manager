@@ -3808,3 +3808,37 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .dc-kpi-delta { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .dc-kpi-delta.is-up { color: oklch(0.6 0.15 150); }
 .dc-kpi-delta.is-down { color: var(--danger); }
+
+/* --- Programas: agrupan las listas por proceso institucional --- */
+.program-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 0 18px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--m-listas) 14%, transparent);
+}
+.program-tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 7px 14px;
+  border-radius: 999px; cursor: pointer;
+  border: 1px solid color-mix(in oklch, var(--m-listas) 26%, transparent);
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent);
+  color: var(--m-listas-deep); font-size: 12.5px; font-weight: 700;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.program-tab:hover { border-color: var(--m-listas); }
+.program-tab span {
+  display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px;
+  border-radius: 999px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+  background: color-mix(in oklch, var(--m-listas) 16%, transparent);
+}
+.program-tab.is-active {
+  background: linear-gradient(135deg, var(--m-listas), var(--m-listas-light));
+  border-color: transparent; color: #fff;
+}
+.program-tab.is-active span { background: rgba(255, 255, 255, .26); color: #fff; }
+
+/* La etiqueta del programa en cada fila de la tabla. */
+.program-pill {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  background: color-mix(in oklch, var(--m-listas) 14%, transparent);
+  border: 1px solid color-mix(in oklch, var(--m-listas) 26%, transparent);
+  color: var(--m-listas-deep); font-size: 11px; font-weight: 700; white-space: nowrap;
+}

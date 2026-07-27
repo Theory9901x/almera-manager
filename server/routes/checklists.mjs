@@ -100,21 +100,53 @@ checklistsRouter.patch('/areas/:areaId', checklistsModule, manage, async (reques
   } catch (error) { next(error) }
 })
 
+
+// ---- Programas (a que proceso pertenece cada lista) ----
+
+checklistsRouter.get('/programs', checklistsModule, view, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT p.*, (SELECT COUNT(*)::int FROM checklist_templates t
+                     WHERE t.program_id = p.id) AS template_count
+         FROM checklist_programs p
+        WHERE p.organization_id = $1 AND p.active
+        ORDER BY p.order_index, p.name`,
+      [oid(request)],
+    )
+    response.json(result.rows.map(row => ({ ...row, id: String(row.id) })))
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.post('/programs', checklistsModule, manage, async (request, response, next) => {
+  try {
+    const name = String(request.body?.name || '').trim()
+    if (!name) fail(400, 'El nombre del programa es obligatorio')
+    const result = await query(
+      `INSERT INTO checklist_programs (organization_id, name, description, order_index)
+       VALUES ($1,$2,$3,COALESCE((SELECT MAX(order_index) + 1 FROM checklist_programs WHERE organization_id = $1), 0))
+       ON CONFLICT (organization_id, name) DO UPDATE SET active = TRUE RETURNING *`,
+      [oid(request), name, String(request.body?.description || '')],
+    )
+    response.status(201).json({ ...result.rows[0], id: String(result.rows[0].id) })
+  } catch (error) { next(error) }
+})
+
 // ---- Listas (plantillas) ----
 
 checklistsRouter.get('/', checklistsModule, view, async (request, response, next) => {
   try {
     const result = await query(
-      `SELECT t.*, a.name AS area_name, u.full_name AS created_by_name,
+      `SELECT t.*, a.name AS area_name, pr.name AS program_name, u.full_name AS created_by_name,
               (SELECT COUNT(*)::int FROM checklist_domains d WHERE d.template_id = t.id) AS domain_count,
               (SELECT COUNT(*)::int FROM checklist_criteria c
                  JOIN checklist_domains d ON d.id = c.domain_id
                 WHERE d.template_id = t.id AND c.active) AS criteria_count
        FROM checklist_templates t
        LEFT JOIN checklist_areas a ON a.id = t.area_id
+       LEFT JOIN checklist_programs pr ON pr.id = t.program_id
        JOIN users u ON u.id = t.created_by_id
        WHERE t.organization_id = $1
-       ORDER BY t.updated_at DESC`,
+       ORDER BY pr.order_index NULLS LAST, pr.name NULLS LAST, t.code, t.name`,
       [oid(request)],
     )
     response.json(result.rows)
@@ -135,9 +167,11 @@ checklistsRouter.post('/', checklistsModule, manage, async (request, response, n
       if (duplicate.rows[0]) fail(409, `Ya existe una lista con el código ${code} en esa versión`)
     }
     const inserted = await query(
-      `INSERT INTO checklist_templates (organization_id, area_id, code, version, name, description, subject_label, numbered_items, created_by_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [oid(request), body.areaId ? Number(body.areaId) : null, code, String(body.version || '01').trim(), name,
+      `INSERT INTO checklist_templates (organization_id, area_id, program_id, code, version, name, description, subject_label, numbered_items, created_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [oid(request), body.areaId ? Number(body.areaId) : null,
+        body.programId ? Number(body.programId) : null,
+        code, String(body.version || '01').trim(), name,
         String(body.description || ''), String(body.subjectLabel || 'Sujeto auditado').trim() || 'Sujeto auditado',
         Boolean(body.numberedItems), uid(request)],
     )
@@ -972,6 +1006,7 @@ checklistsRouter.patch('/:id', checklistsModule, manage, async (request, respons
     if (body.subjectLabel !== undefined) set('subject_label', String(body.subjectLabel).trim() || 'Sujeto auditado')
     if (body.numberedItems !== undefined) set('numbered_items', Boolean(body.numberedItems))
     if (body.areaId !== undefined) set('area_id', body.areaId ? Number(body.areaId) : null)
+    if (body.programId !== undefined) set('program_id', body.programId ? Number(body.programId) : null)
     if (body.status !== undefined) {
       if (!['BORRADOR', 'PUBLICADA', 'ARCHIVADA'].includes(body.status)) fail(400, 'Estado inválido')
       set('status', body.status)

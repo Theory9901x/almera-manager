@@ -1048,3 +1048,47 @@ CREATE INDEX IF NOT EXISTS checklist_evidences_idx ON checklist_evidences(audit_
 -- Observaciones generales de la ronda: van en la auditoria, no por criterio (esas ya existen en
 -- checklist_answers.observation).
 ALTER TABLE checklist_audits ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+
+-- ---------------------------------------------------------------------------
+-- Programas: a que proceso institucional pertenece cada LISTA.
+--
+-- No se reutiliza checklist_areas a proposito. Son dos preguntas distintas que se
+-- confundirian para siempre si compartieran tabla:
+--   programa  -> de que es la lista        (Seguridad del Paciente, ...)
+--   area      -> donde se hizo la ronda    (Hospitalizacion, Urgencias, ...)
+-- Una misma lista de Seguridad del Paciente se audita en varios servicios; el
+-- programa no cambia y el servicio si.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS checklist_programs (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  order_index INTEGER NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, name)
+);
+
+ALTER TABLE checklist_templates ADD COLUMN IF NOT EXISTS program_id BIGINT
+  REFERENCES checklist_programs(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS checklist_templates_program_idx ON checklist_templates(organization_id, program_id);
+
+-- Todas las entidades que ya tienen el modulo arrancan con el programa que hoy existe de verdad.
+INSERT INTO checklist_programs (organization_id, name, description, order_index)
+SELECT o.id, 'Seguridad del Paciente',
+       'Formatos GCM-SPA de rondas y practicas seguras', 0
+  FROM organizations o
+ WHERE EXISTS (SELECT 1 FROM checklist_templates t WHERE t.organization_id = o.id)
+ON CONFLICT (organization_id, name) DO NOTHING;
+
+-- Las 13 listas institucionales van a ese programa. Se reconocen por su codigo, que es el que
+-- las nombra en el papel; asi el relleno es explicito y no arrastra listas que alguien cree
+-- despues para otro proceso.
+UPDATE checklist_templates t
+   SET program_id = p.id
+  FROM checklist_programs p
+ WHERE p.organization_id = t.organization_id
+   AND p.name = 'Seguridad del Paciente'
+   AND t.program_id IS NULL
+   AND t.code LIKE 'GCM-SPA-%';
