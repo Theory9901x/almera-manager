@@ -1901,7 +1901,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   z-index: 90; overflow: hidden; border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
   box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.12); padding: 5px; min-width: var(--radix-select-trigger-width);
   animation: ds-popover-in 160ms ease;
+  /* Tope + scroll: con catalogos largos (47 servicios) la lista se salia de la pantalla y las
+     ultimas opciones quedaban inalcanzables. Radix reporta el alto disponible hasta el borde. */
+  max-height: min(var(--radix-select-content-available-height, 60vh), 360px);
+  display: flex; flex-direction: column;
 }
+.ds-select-content [data-radix-select-viewport] { overflow-y: auto; }
 .ds-select-item { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; outline: none; transition: background 120ms ease; }
 .ds-select-item[data-highlighted] { background: color-mix(in srgb, var(--ds-accent, #4F46E5) 10%, transparent); color: var(--ds-accent, #4F46E5); }
 .ds-select-check { margin-left: auto; display: inline-flex; color: var(--ds-accent, #4F46E5); }
@@ -4893,3 +4898,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* KPIs numericos del centro de datos con leve brillo de neon. */
 :root[data-theme="dark"] .dcx-kv { text-shadow: 0 0 22px rgba(139, 92, 246, .35); }
 :root[data-theme="dark"] .gauge .pct { text-shadow: 0 0 26px rgba(56, 189, 248, .3); }
+
+/* Desplegables de Radix en oscuro: el contenido tenia blanco fijo. */
+:root[data-theme="dark"] .ds-select-content {
+  background: #131c2e;
+  border-color: var(--neo-line, #24314b);
+  box-shadow: 0 10px 34px rgba(2, 6, 18, .6), inset 0 1px 0 rgba(148, 163, 255, .08);
+}
+:root[data-theme="dark"] .ds-select-item { color: var(--ink); }

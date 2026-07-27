@@ -184,6 +184,17 @@ export function DataCenterPanel() {
       if (!svg) return
       const clone = svg.cloneNode(true) as SVGElement
       clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      // ECharts posiciona su svg con style="position:absolute; width...; height..." dentro de un
+      // contenedor relativo. Serializado tal cual, en el PDF se iba a la esquina de la pagina y
+      // tapaba la cabecera. Se quita el estilo inline y se fijan dimensiones + viewBox, que es
+      // lo que permite escalarlo al ancho de su columna sin deformarse.
+      const rect = svg.getBoundingClientRect()
+      const width = Math.max(1, Math.round(rect.width))
+      const height = Math.max(1, Math.round(rect.height))
+      clone.removeAttribute('style')
+      clone.setAttribute('width', String(width))
+      clone.setAttribute('height', String(height))
+      if (!clone.getAttribute('viewBox')) clone.setAttribute('viewBox', `0 0 ${width} ${height}`)
       out.push({ title: node.dataset.chart || '', svg: new XMLSerializer().serializeToString(clone) })
     })
     return out

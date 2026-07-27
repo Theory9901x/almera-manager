@@ -400,7 +400,11 @@ export function renderDataCenterHtml({ organizationName, activeFilters = [], dat
     .charts figure { margin: 0; border: 1px solid #d6dde5; border-radius: 8px; padding: 8px; background: #fff;
                      break-inside: avoid; }
     .charts figcaption { font-size: 9.5px; font-weight: 700; color: #003452; margin-bottom: 4px; }
-    .charts svg { width: 100%; height: auto; }
+    /* El SVG que serializa ECharts trae position:absolute inline (asi lo pinta en pantalla,
+       dentro de un contenedor relativo). Suelto en el PDF se iria a la esquina de la pagina y
+       taparia la cabecera; el !important gana al estilo inline y lo devuelve al flujo. */
+    .charts svg { position: static !important; width: 100% !important; height: auto !important; display: block; }
+    .charts figure { overflow: hidden; }
   </style></head><body>
     ${docHead(organizationName, 'Centro de datos — Listas de Chequeo',
       'Adherencia del recorte seleccionado', '', '')}
