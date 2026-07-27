@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardCheck, Download, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
+import { BarChart3, ClipboardCheck, Download, Eye, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -175,11 +175,22 @@ function ChecklistsListContent() {
                     </div>
                   ) : (
                     <div className="mt-4">
-                      <EmptyState
-                        icon={ClipboardCheck}
-                        title="No tienes listas asignadas"
-                        description="Pídele al equipo de calidad que te asigne las listas que debes auditar; aparecerán aquí para iniciar la ronda."
-                      />
+                      {canManage ? (
+                        <EmptyState
+                          icon={ClipboardCheck}
+                          title={templates.length ? 'Ninguna lista está publicada todavía' : 'Aún no hay listas de chequeo'}
+                          description={templates.length
+                            ? 'Las listas importadas quedan en borrador para que calidad las revise. Ábrelas y publícalas, o mira cómo se diligencian sin publicarlas con «Ver como auditor».'
+                            : 'Carga las listas institucionales o crea una desde cero en la pestaña «Listas institucionales».'}
+                          action={<Button variant="secondary" onClick={() => setSection('listas')}><ListChecks size={15} /> Ir a las listas</Button>}
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={ClipboardCheck}
+                          title="No tienes listas asignadas"
+                          description="Pídele al equipo de calidad que te asigne las listas que debes auditar; aparecerán aquí para iniciar la ronda."
+                        />
+                      )}
                     </div>
                   )}
                 </Card>
@@ -315,9 +326,14 @@ function ChecklistsListContent() {
                             <td className="tabular-col">{template.criteria_count ?? 0}</td>
                             <td><Badge tone={STATUS_TONE[template.status] || 'neutral'}>{STATUS_LABEL[template.status] || template.status}</Badge></td>
                             <td>
-                              <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
-                                <Pencil size={13} /> Editar
-                              </button>
+                              <div className="row-action-group">
+                                <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/vista-previa`)}>
+                                  <Eye size={13} /> Ver como auditor
+                                </button>
+                                <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
+                                  <Pencil size={13} /> Editar
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}

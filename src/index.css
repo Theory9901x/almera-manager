@@ -3299,3 +3299,30 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .checklists-page-bg .ds-button-primary::after { display: none; }
   .checklists-page-bg::after { display: none; }
 }
+
+/* Accion dentro de un estado vacio. */
+.ds-empty-state-action { margin-top: 14px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+/* Dos acciones en una celda de tabla, sin que la fila crezca de alto. */
+.row-action-group { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.row-action-group .row-action { padding-left: 6px; padding-right: 6px; }
+
+/* Aviso de la vista previa. No es un estado de error ni un exito: es una advertencia de que
+   lo que se ve es real pero no se guarda, y tiene que leerse antes de tocar la grilla. */
+.checklist-preview-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: var(--radius-card-sm, 14px);
+  border: 1px solid color-mix(in oklch, var(--m-listas) 32%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in oklch, var(--m-listas) 14%, transparent),
+    color-mix(in oklch, var(--m-listas-light) 8%, transparent));
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  color: var(--m-listas-deep);
+}
+.checklist-preview-note svg { flex: none; margin-top: 1px; }
+.checklist-preview-note p { margin: 0; font-size: 12.5px; line-height: 1.55; text-wrap: pretty; }
+.checklist-preview-note strong { font-weight: 800; }

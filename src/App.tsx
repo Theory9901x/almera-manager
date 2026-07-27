@@ -23,6 +23,7 @@ import CarbonConfigPage from '@/modules/carbon/pages/CarbonConfigPage'
 import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
 import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
 import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
+import ChecklistPreviewPage from '@/modules/checklists/pages/ChecklistPreviewPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -106,6 +107,14 @@ function ChecklistBuilderRoute() {
   return <ChecklistBuilderPage />
 }
 
+function ChecklistPreviewRoute() {
+  const { session } = useAuth()
+  // Solo lectura y sin escribir nada, asi que basta .view: consultar como se audita un formato
+  // es parte de auditar bien, y no crea ni toca datos.
+  if (!session?.permissions.includes('checklists.view')) return <Navigate to="/app" replace />
+  return <ChecklistPreviewPage />
+}
+
 function ChecklistAuditRoute() {
   const { session } = useAuth()
   // Con .view se puede consultar una auditoria (incluidas las cerradas); marcar y cerrar exige
@@ -138,6 +147,7 @@ function AppRoutes() {
         <Route path="listas-chequeo" element={<ChecklistsRoute />} />
         <Route path="listas-chequeo/auditorias/:auditId" element={<ChecklistAuditRoute />} />
         <Route path="listas-chequeo/:templateId/constructor" element={<ChecklistBuilderRoute />} />
+        <Route path="listas-chequeo/:templateId/vista-previa" element={<ChecklistPreviewRoute />} />
         <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />
         <Route path="huella-carbono/captura" element={<CarbonRoute><CarbonCapturePage /></CarbonRoute>} />
         <Route path="huella-carbono/configuracion" element={<CarbonConfigRoute />} />
