@@ -89,6 +89,17 @@ function ChecklistsListContent() {
     finally { setBusy(false) }
   }
 
+  // Un toque desde la lista: crea la ronda y entra a diligenciarla. Es el camino que se usa en
+  // la tablet, donde pasar por el selector de arriba son cuatro pasos de mas.
+  async function fillNow(templateId: string) {
+    setBusy(true)
+    try {
+      const created = await checklistsService.createAudit({ templateId, auditDate: new Date().toISOString().slice(0, 10) })
+      navigate(`/app/listas-chequeo/auditorias/${created.id}`)
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible abrir la lista') }
+    finally { setBusy(false) }
+  }
+
   async function startAudit() {
     if (!newAudit.templateId) { toast.push('error', 'Elige la lista a diligenciar'); return }
     setBusy(true)
@@ -161,7 +172,7 @@ function ChecklistsListContent() {
                             onChange={value => setNewAudit({ ...newAudit, templateId: value === 'NONE' ? '' : value })}
                             options={[
                               { value: 'NONE', label: 'Selecciona una lista' },
-                              ...assigned.map(template => ({ value: template.id, label: `${template.name}${template.area_name ? ` — ${template.area_name}` : ''}` })),
+                              ...assigned.map(template => ({ value: template.id, label: `${template.name}${template.area_name ? ` — ${template.area_name}` : ''}${template.status && template.status !== 'PUBLICADA' ? ' (borrador)' : ''}` })),
                             ]}
                           />
                         </Field>
@@ -327,12 +338,21 @@ function ChecklistsListContent() {
                             <td><Badge tone={STATUS_TONE[template.status] || 'neutral'}>{STATUS_LABEL[template.status] || template.status}</Badge></td>
                             <td>
                               <div className="row-action-group">
+                                {canFill && (
+                                  <button className="row-action is-strong" style={{ color: identity.color }}
+                                          disabled={busy} onClick={() => void fillNow(template.id)}>
+                                    <Play size={13} /> Auditar en tablet
+                                  </button>
+                                )}
                                 <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/vista-previa`)}>
-                                  <Eye size={13} /> Ver como auditor
+                                  <Eye size={13} /> Ver
                                 </button>
-                                <a className="row-action" style={{ color: identity.color }}
+                                {/* El PDF en blanco es respaldo (cotejar contra el formato impreso, o
+                                    contingencia si falla una tablet), no un modo de auditoria: va
+                                    apagado para que no compita con "Auditar en tablet". */}
+                                <a className="row-action is-muted" title="PDF del formato en blanco — solo respaldo"
                                    href={checklistsService.formatUrl(template.id)} target="_blank" rel="noreferrer">
-                                  <FileText size={13} /> Formato
+                                  <FileText size={13} /> PDF
                                 </a>
                                 <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
                                   <Pencil size={13} /> Editar

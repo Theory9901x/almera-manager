@@ -214,6 +214,24 @@ function ChecklistAuditContent() {
 
   const percent = closed ? audit.adherence_percent : audit.adherence.overall.percent
 
+  // Avance y adherencia por dominio EN VIVO, contados sobre las marcas que hay en pantalla. El
+  // numero que manda sigue siendo el del servidor (se recalcula al guardar); esto solo evita que
+  // el auditor tenga que guardar para saber como va, que en una ronda de 40 criterios importa.
+  const totalCells = criteria.length * audit.subjects.length
+  const markedCells = Object.keys(marks).length
+  const progress = totalCells ? Math.round((markedCells / totalCells) * 100) : 0
+  const livePercent = (domain: typeof audit.domains[number]) => {
+    let c = 0, nc = 0
+    for (const criterion of domain.criteria) {
+      for (const subject of audit.subjects) {
+        const value = marks[answerKey(subject.id, criterion.id)]
+        if (value === 'C') c++
+        else if (value === 'NC') nc++
+      }
+    }
+    return c + nc > 0 ? (c / (c + nc)) * 100 : null
+  }
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 checklists-page-bg">
       <button className="row-action" style={{ color: identity.color }} onClick={() => navigate('/app/listas-chequeo')}>
@@ -325,6 +343,32 @@ function ChecklistAuditContent() {
             NA no penaliza: se excluye del cálculo. Toca de nuevo para deshacer la marca.
           </p>
 
+          <div className="checklist-progress mt-4">
+            <div className="checklist-progress-bar"><i style={{ width: `${progress}%`, background: identity.color }} /></div>
+            <span className="checklist-progress-label">
+              {markedCells} de {totalCells} marcas · <strong>{progress}%</strong>
+            </span>
+          </div>
+
+          {audit.domains.length > 1 && (
+            <nav className="checklist-domain-nav" aria-label="Ir a un dominio">
+              {audit.domains.map(domain => {
+                const value = livePercent(domain)
+                return (
+                  <button
+                    key={domain.id} type="button"
+                    onClick={() => document.getElementById(`dom-${domain.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  >
+                    <span>{domain.name}</span>
+                    <b style={{ color: value === null ? 'var(--muted)' : semaphoreColor(value) }}>
+                      {value === null ? '—' : `${value.toFixed(0)}%`}
+                    </b>
+                  </button>
+                )
+              })}
+            </nav>
+          )}
+
           <div className="checklist-fill-wrap mt-4">
             <table className="checklist-fill-grid">
               <thead>
@@ -338,7 +382,19 @@ function ChecklistAuditContent() {
               <tbody>
                 {audit.domains.map(domain => (
                   <Fragment key={domain.id}>
-                    <tr className="fill-domain-row"><td colSpan={audit.subjects.length + 1}>{domain.name}</td></tr>
+                    <tr className="fill-domain-row" id={`dom-${domain.id}`}>
+                      <td colSpan={audit.subjects.length + 1}>
+                        {domain.name}
+                        {(() => {
+                          const value = livePercent(domain)
+                          return (
+                            <em style={{ color: value === null ? 'var(--muted)' : semaphoreColor(value) }}>
+                              {value === null ? 'sin marcar' : `${value.toFixed(1)}%`}
+                            </em>
+                          )
+                        })()}
+                      </td>
+                    </tr>
                     {domain.criteria.map(criterion => (
                       <tr key={criterion.id}>
                         <td className="fill-criterion">

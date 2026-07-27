@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Eye, FileText, Info, Loader2, Pencil, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Eye, FileText, Info, Loader2, Pencil, Play, RotateCcw } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -43,6 +43,7 @@ function ChecklistPreviewContent() {
   const [loading, setLoading] = useState(true)
   const [marks, setMarks] = useState<Record<string, ChecklistValue>>({})
   const [result, setResult] = useState<AdherenceResult | null>(null)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (!templateId) return
@@ -70,6 +71,17 @@ function ChecklistPreviewContent() {
       .catch(() => { if (!cancelled) setResult(null) })
     return () => { cancelled = true }
   }, [marks, template])
+
+  // Sale de la prueba y abre una ronda de verdad sobre esta misma lista.
+  async function fillNow() {
+    if (!template) return
+    setBusy(true)
+    try {
+      const created = await checklistsService.createAudit({ templateId: template.id, auditDate: new Date().toISOString().slice(0, 10) })
+      navigate(`/app/listas-chequeo/auditorias/${created.id}`)
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible abrir la lista') }
+    finally { setBusy(false) }
+  }
 
   function toggle(subjectId: string, criterionId: string, value: ChecklistValue) {
     const key = answerKey(subjectId, criterionId)
@@ -104,12 +116,15 @@ function ChecklistPreviewContent() {
             <Badge tone={template.status === 'PUBLICADA' ? 'info' : 'neutral'}>
               {template.status === 'PUBLICADA' ? 'Publicada' : template.status === 'ARCHIVADA' ? 'Archivada' : 'Borrador'}
             </Badge>
+            <Button identity={identity} onClick={() => void fillNow()} disabled={busy}>
+              <Play size={15} /> Auditar en tablet
+            </Button>
             <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => setMarks({})}>
               <RotateCcw size={15} /> Limpiar marcas
             </Button>
             <a className="ds-button ds-button-secondary btn-on-hero-secondary"
                href={checklistsService.formatUrl(template.id)} target="_blank" rel="noreferrer">
-              <FileText size={15} /> Formato para imprimir
+              <FileText size={15} /> PDF de respaldo
             </a>
             <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
               <Pencil size={15} /> Abrir en el constructor

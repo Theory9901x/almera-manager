@@ -199,13 +199,17 @@ checklistsRouter.get('/assigned/mine', checklistsModule, view, async (request, r
   try {
     const canManage = request.auth.permissions.includes('checklists.manage')
     const params = [oid(request)]
-    let where = "t.organization_id = $1 AND t.status = 'PUBLICADA'"
+    // Quien administra ve tambien los borradores: el servidor le deja abrirlos, asi que
+    // ocultarlos aqui solo dejaria el selector vacio sin explicar por que.
+    let where = canManage
+      ? "t.organization_id = $1 AND t.status <> 'ARCHIVADA'"
+      : "t.organization_id = $1 AND t.status = 'PUBLICADA'"
     if (!canManage) {
       params.push(request.auth.membershipId)
       where += ` AND EXISTS (SELECT 1 FROM checklist_assignments a WHERE a.template_id = t.id AND a.membership_id = $${params.length})`
     }
     const result = await query(
-      `SELECT t.id, t.code, t.version, t.name, t.subject_label, t.numbered_items, a.name AS area_name
+      `SELECT t.id, t.code, t.version, t.name, t.subject_label, t.numbered_items, t.status, a.name AS area_name
        FROM checklist_templates t LEFT JOIN checklist_areas a ON a.id = t.area_id
        WHERE ${where} ORDER BY t.name`,
       params,
@@ -305,11 +309,16 @@ checklistsRouter.post('/audits', checklistsModule, fill, async (request, respons
     const templateId = Number(body.templateId)
     if (!templateId) fail(400, 'Selecciona la lista a diligenciar')
     const template = await query(
-      "SELECT * FROM checklist_templates WHERE id = $1 AND organization_id = $2 AND status = 'PUBLICADA'",
+      "SELECT * FROM checklist_templates WHERE id = $1 AND organization_id = $2 AND status <> 'ARCHIVADA'",
       [templateId, oid(request)],
     )
-    if (!template.rows[0]) fail(404, 'La lista no existe o no está publicada')
+    if (!template.rows[0]) fail(404, 'La lista no existe o está archivada')
+    // Publicar es un filtro de CIRCULACION, no de acceso: existe para que calidad revise antes
+    // de que la lista llegue a los auditores. Quien administra ya la reviso — obligarle a
+    // publicar solo para poder abrirla en la tablet no protege nada y deja las 13 listas
+    // recien cargadas sin forma de usarse.
     if (!request.auth.permissions.includes('checklists.manage')) {
+      if (template.rows[0].status !== 'PUBLICADA') fail(409, 'La lista todavía no está publicada')
       const assigned = await query(
         'SELECT 1 FROM checklist_assignments WHERE template_id = $1 AND membership_id = $2',
         [templateId, request.auth.membershipId],

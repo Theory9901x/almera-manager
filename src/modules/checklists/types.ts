@@ -108,6 +108,8 @@ export interface AssignedTemplate {
   subject_label: string
   numbered_items: boolean
   area_name: string | null
+  /** Solo lo ve quien administra: a un auditor nunca le llega una lista sin publicar. */
+  status?: ChecklistStatus
 }
 
 /** Sujeto del directorio reutilizable (se registra una vez y se trae en rondas siguientes). */
