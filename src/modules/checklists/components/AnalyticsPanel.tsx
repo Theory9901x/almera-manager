@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart3, Download, Loader2 } from 'lucide-react'
 import {
-  BarChart, Button, Card, EmptyState, Field, Input, LineChart, Select, Table,
+  BarChart, Button, Card, DatePicker, EmptyState, Field, LineChart, Select, Table,
   moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
@@ -59,8 +59,8 @@ export function AnalyticsPanel({ templates, areas }: { templates: ChecklistTempl
               />
             </Field>
           </div>
-          <div className="w-[170px]"><Field label="Desde"><Input type="date" value={filters.dateFrom || ''} onChange={event => setFilters({ ...filters, dateFrom: event.target.value || undefined })} /></Field></div>
-          <div className="w-[170px]"><Field label="Hasta"><Input type="date" value={filters.dateTo || ''} onChange={event => setFilters({ ...filters, dateTo: event.target.value || undefined })} /></Field></div>
+          <div className="w-[170px]"><Field label="Desde"><DatePicker value={filters.dateFrom || ''} onChange={value => setFilters({ ...filters, dateFrom: value || undefined })} /></Field></div>
+          <div className="w-[170px]"><Field label="Hasta"><DatePicker value={filters.dateTo || ''} onChange={value => setFilters({ ...filters, dateTo: value || undefined })} /></Field></div>
           <div className="ml-auto">
             <Button identity={identity} onClick={() => void exportConsolidated()} disabled={exporting || !data?.auditCount}>
               <Download size={15} /> {exporting ? 'Generando…' : 'Consolidado PDF'}

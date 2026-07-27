@@ -81,9 +81,9 @@ export const checklistsService = {
 
   audits: () => call<AuditSummary[]>('/audits/list'),
   audit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}`),
-  createAudit: (data: { templateId: string; auditDate?: string; headerValues?: Record<string, string> }) =>
+  createAudit: (data: { templateId: string; auditDate?: string; areaId?: string; shift?: string; headerValues?: Record<string, string> }) =>
     call<{ id: string }>('/audits', { method: 'POST', body: JSON.stringify(data) }),
-  updateAudit: (auditId: string, data: { auditDate?: string; headerValues?: Record<string, string> }) =>
+  updateAudit: (auditId: string, data: { auditDate?: string; areaId?: string; shift?: string; headerValues?: Record<string, string> }) =>
     call<AuditDetail>(`/audits/${auditId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   removeAudit: (auditId: string) => call<{ ok: true }>(`/audits/${auditId}`, { method: 'DELETE' }),
   removeAudits: (ids: string[]) =>

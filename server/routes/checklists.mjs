@@ -335,7 +335,8 @@ checklistsRouter.get('/audits/list', checklistsModule, view, async (request, res
     // Quien no administra ve solo sus propias auditorias.
     if (!canManage) { params.push(request.auth.user.id); where += ` AND a.auditor_id = $${params.length}` }
     const result = await query(
-      `SELECT a.id, a.audit_date, a.status, a.adherence_percent, a.concept, a.created_at,
+      `SELECT a.id, a.audit_date, a.shift, a.status, a.adherence_percent, a.concept, a.created_at,
+              a.template_code, a.template_version, a.area_id, a.template_id,
               t.name AS template_name, t.code, ar.name AS area_name, u.full_name AS auditor_name,
               (SELECT COUNT(*)::int FROM checklist_audit_subjects s WHERE s.audit_id = a.id) AS subject_count
        FROM checklist_audits a
@@ -354,6 +355,13 @@ checklistsRouter.post('/audits', checklistsModule, fill, async (request, respons
     const body = request.body || {}
     const templateId = Number(body.templateId)
     if (!templateId) fail(400, 'Selecciona la lista a diligenciar')
+    // Fecha y servicio se exigen tambien aqui, no solo en el formulario: son las dos claves con
+    // las que el tablero ubica la ronda despues, y una auditoria sin ellas no se puede filtrar
+    // ni corregir. El turno queda opcional porque no todas las listas se hacen por turno.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.auditDate || ''))) {
+      fail(400, 'Indica la fecha de la ronda (AAAA-MM-DD)')
+    }
+    if (!body.areaId) fail(400, 'Indica el servicio o área de la ronda')
     const template = await query(
       "SELECT * FROM checklist_templates WHERE id = $1 AND organization_id = $2 AND status <> 'ARCHIVADA'",
       [templateId, oid(request)],

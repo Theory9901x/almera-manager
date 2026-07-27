@@ -8,6 +8,7 @@ import {
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
 import { AnalyticsPanel } from '../components/AnalyticsPanel'
+import { StartAuditDialog, type StartContext } from '../components/StartAuditDialog'
 import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate, SeedTemplate } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -47,6 +48,8 @@ function ChecklistsListContent() {
   // null significa que no hay confirmacion abierta: no se borra nada sin pasar por ahi.
   const [selected, setSelected] = useState<string[]>([])
   const [pendingDelete, setPendingDelete] = useState<AuditSummary[] | null>(null)
+  // Lista para la que se esta pidiendo el contexto de la ronda. Null = dialogo cerrado.
+  const [starting, setStarting] = useState<{ id: string; name: string } | null>(null)
 
   async function load() {
     try {
@@ -93,12 +96,19 @@ function ChecklistsListContent() {
     finally { setBusy(false) }
   }
 
-  // Un toque desde la lista: crea la ronda y entra a diligenciarla. Es el camino que se usa en
-  // la tablet, donde pasar por el selector de arriba son cuatro pasos de mas.
-  async function fillNow(templateId: string) {
+  // Un toque desde la lista abre el contexto de la ronda; la auditoria se crea al confirmarlo.
+  // No se crea antes: una ronda sin fecha ni servicio no se puede ubicar despues, y quedaria
+  // como basura en el listado si el auditor se arrepiente.
+  async function startWithContext(context: StartContext) {
+    if (!starting) return
     setBusy(true)
     try {
-      const created = await checklistsService.createAudit({ templateId, auditDate: new Date().toISOString().slice(0, 10) })
+      const created = await checklistsService.createAudit({
+        templateId: starting.id,
+        auditDate: context.auditDate,
+        areaId: context.areaId,
+        shift: context.shift || undefined,
+      })
       navigate(`/app/listas-chequeo/auditorias/${created.id}`)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible abrir la lista') }
     finally { setBusy(false) }
@@ -120,16 +130,6 @@ function ChecklistsListContent() {
       setPendingDelete(null)
       await load()
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible eliminar') }
-    finally { setBusy(false) }
-  }
-
-  async function startAudit() {
-    if (!newAudit.templateId) { toast.push('error', 'Elige la lista a diligenciar'); return }
-    setBusy(true)
-    try {
-      const created = await checklistsService.createAudit({ templateId: newAudit.templateId, auditDate: newAudit.auditDate })
-      navigate(`/app/listas-chequeo/auditorias/${created.id}`)
-    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible iniciar la auditoría') }
     finally { setBusy(false) }
   }
 
@@ -157,6 +157,15 @@ function ChecklistsListContent() {
           </div>
         </div>
       </ModuleHero>
+
+      <StartAuditDialog
+        open={starting !== null}
+        templateName={starting?.name || ''}
+        areas={areas}
+        busy={busy}
+        onCancel={() => setStarting(null)}
+        onStart={context => void startWithContext(context)}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}
@@ -230,12 +239,15 @@ function ChecklistsListContent() {
                           />
                         </Field>
                       </div>
-                      <div className="w-[190px]">
-                        <Field label="Fecha de la ronda">
-                          <Input type="date" value={newAudit.auditDate} onChange={event => setNewAudit({ ...newAudit, auditDate: event.target.value })} />
-                        </Field>
-                      </div>
-                      <Button identity={identity} onClick={() => void startAudit()} disabled={busy}><Play size={15} /> Iniciar</Button>
+                      <Button
+                        identity={identity}
+                        disabled={busy}
+                        onClick={() => {
+                          const chosen = assigned.find(item => item.id === newAudit.templateId)
+                          if (!chosen) { toast.push('error', 'Elige la lista a diligenciar'); return }
+                          setStarting({ id: chosen.id, name: chosen.name })
+                        }}
+                      ><Play size={15} /> Iniciar</Button>
                     </div>
                   ) : (
                     <div className="mt-4">
@@ -430,7 +442,7 @@ function ChecklistsListContent() {
                               <div className="row-action-group">
                                 {canFill && (
                                   <button className="row-action is-strong" style={{ color: identity.color }}
-                                          disabled={busy} onClick={() => void fillNow(template.id)}>
+                                          disabled={busy} onClick={() => setStarting({ id: template.id, name: template.name })}>
                                     <Play size={13} /> Auditar en tablet
                                   </button>
                                 )}

@@ -3443,3 +3443,17 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .row-action.is-danger { color: var(--danger) !important; }
 .row-action.is-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); border-radius: 8px; }
 .checklists-table tbody tr.is-selected td { background: color-mix(in oklch, var(--m-listas) 10%, transparent) !important; }
+
+/* --- Contexto de la ronda (fecha, servicio, turno) --- */
+.ds-confirm.start-audit { width: min(520px, 100%); }
+.start-audit-form { display: grid; gap: 16px; margin-top: 20px; }
+/* Los campos venian pegados unos a otros: la pista de uno se leia como etiqueta del siguiente. */
+.start-audit-form .ds-field { display: grid; gap: 6px; }
+.start-audit .ds-confirm-body { margin-bottom: 2px; }
+.start-audit-error {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger); font-size: 12px; font-weight: 650; line-height: 1.5;
+}
+/* En tablet el dialogo no puede pasarse de alto: el teclado se come media pantalla. */
+.ds-confirm.start-audit { max-height: min(88vh, 720px); overflow: auto; }
