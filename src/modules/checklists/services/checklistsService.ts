@@ -114,6 +114,13 @@ export const checklistsService = {
   removeSignature: (auditId: string, signatureId: string) =>
     call<{ ok: true }>(`/audits/${auditId}/signatures/${signatureId}`, { method: 'DELETE' }),
 
+  // ---- Personal de turno ----
+
+  addStaff: (auditId: string, fullName: string, role = '') =>
+    call<{ id: string }>(`/audits/${auditId}/staff`, { method: 'POST', body: JSON.stringify({ fullName, role }) }),
+  removeStaff: (auditId: string, staffId: string) =>
+    call<{ ok: true }>(`/audits/${auditId}/staff/${staffId}`, { method: 'DELETE' }),
+
   // ---- Evidencias y observaciones ----
 
   /** Sube un archivo. Va por FormData, no JSON: una foto en base64 crece un tercio y hay que

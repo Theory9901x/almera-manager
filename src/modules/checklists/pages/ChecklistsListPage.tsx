@@ -111,7 +111,8 @@ function ChecklistsListContent() {
     setBusy(true)
     try {
       const created = await checklistsService.createAudit({
-        templateId: starting.id,
+        // El formato puede haberse cambiado dentro del propio dialogo.
+        templateId: context.templateId || starting.id,
         auditDate: context.auditDate,
         areaId: context.areaId,
         shift: context.shift || undefined,
@@ -176,6 +177,8 @@ function ChecklistsListContent() {
       <StartAuditDialog
         open={starting !== null}
         templateName={starting?.name || ''}
+        templateId={starting?.id}
+        templates={visibleTemplates.map(item => ({ id: item.id, name: item.name }))}
         areas={areas}
         busy={busy}
         onCancel={() => setStarting(null)}
@@ -446,6 +449,19 @@ function ChecklistsListContent() {
                       <p>{visibleTemplates.length} de {templates.length} · {program ? programs.find(p => p.id === program)?.name : 'todos los programas'}</p>
                     </div>
                   </div>
+                  {canFill && (
+                    <Button
+                      identity={identity}
+                      disabled={busy || !visibleTemplates.length}
+                      onClick={() => {
+                        // Se abre el contexto de la ronda con la primera lista visible ya elegida;
+                        // dentro se puede cambiar. Es el camino corto que se pidio: elegir formato
+                        // y empezar, sin pasar por la pestaña de auditorias.
+                        const first = visibleTemplates[0]
+                        setStarting({ id: first.id, name: first.name })
+                      }}
+                    ><Plus size={16} /> Nueva auditoría</Button>
+                  )}
                 </div>
 
                 {/* Programas: agrupan las listas por proceso institucional. No es lo mismo que el

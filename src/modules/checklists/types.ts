@@ -257,6 +257,8 @@ export interface AuditDetail {
   answers: ChecklistAnswer[]
   signatures: ChecklistSignature[]
   evidences: ChecklistEvidence[]
+  /** Personal de turno de la ronda. Lista, no campo de texto: pueden ser varios. */
+  staff: { id: string; full_name: string; role: string; order_index: number }[]
   notes: string
   adherence: AdherenceResult
   /** Solo al reabrir: cuántas firmas se invalidaron por volver a editar la auditoría. */

@@ -11,17 +11,17 @@
   color-scheme: light;
   /* Superficies con temperatura calida sutil (antes gris-azulado frio generico) —
      mismo nivel de luminosidad que antes, solo se retira el sesgo azul. */
-  --canvas: #eef1ea;
-  --canvas-soft: #f5f6f1;
+  --canvas: #F4F6FB;
+  --canvas-soft: #FAFBFE;
   --surface: #ffffff;
-  --surface-soft: #f4f6f1;
+  --surface-soft: #FAFBFE;
   --surface-glass: rgba(255, 255, 255, 0.82);
   --ink: #161922;
   --ink-soft: #344054;
-  --muted: #56624f;
-  --muted-light: #86917e;
-  --line: #d6dccd;
-  --line-strong: #bcc4b0;
+  --muted: #6B7488;
+  --muted-light: #9AA1B2;
+  --line: #EAEDF3;
+  --line-strong: #D8DEEA;
   /* SGIMR COLOR CONTRACT — unica fuente de verdad para todos los modulos */
   --color-brand: #c7192d;
   --color-brand-2: oklch(0.58 0.16 22);
@@ -31,12 +31,12 @@
   --color-navy-900: #101827;
   --color-navy-800: #1b2940;
   --color-navy-700: #2b3b56;
-  --color-surface-page: #e7ebe0;
+  --color-surface-page: #F4F6FB;
   --color-surface-card: #ffffff;
-  --color-surface-soft: #f7f8f4;
-  --color-border: #dde2d4;
+  --color-surface-soft: #FAFBFE;
+  --color-border: #EAEDF3;
   --color-text: #172033;
-  --color-text-muted: #6b7568;
+  --color-text-muted: #6B7488;
   --color-surface-dark: var(--color-navy-900);
   --color-interactive: var(--color-navy-900);
   --brand: var(--color-brand);
@@ -4281,3 +4281,42 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* En una sola hoja, el pie de la columna izquierda va pegado a los dominios. */
 .eval-body > .eval-footer { margin-top: 4px; }
 .eval-body > .scale-note { margin-top: 0; }
+
+/* --- Separadores con degradado: se ven, sin ser una linea dura --- */
+.checklists-page-bg .ds-table thead th {
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 0 transparent;
+  background:
+    linear-gradient(180deg, #FFFFFF, #FAFBFE) padding-box,
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--m-listas) 40%, transparent), transparent) border-box;
+  border-bottom: 1px solid transparent;
+}
+.checklists-page-bg .ds-table tbody td {
+  border-bottom: 1px solid transparent;
+  background-image: linear-gradient(90deg, transparent, #EDEFF6 12%, #EDEFF6 88%, transparent);
+  background-size: 100% 1px; background-position: bottom; background-repeat: no-repeat;
+}
+.checklists-page-bg .ds-table tbody tr:last-child td { background-image: none; }
+
+/* Lo mismo dentro de la evaluacion: las divisorias se ven pero no cortan. */
+.crit { border-bottom: 0; background-image: linear-gradient(90deg, transparent, #EDEFF6 4%, #EDEFF6 96%, transparent); background-size: 100% 1px; background-position: bottom; background-repeat: no-repeat; }
+.crit:last-child { background-image: none; }
+.eval-context .eval-fields, .eval-context .eval-subjects, .eval-strip {
+  border-top: 0;
+  background-image: linear-gradient(90deg, transparent, #EAEDF3 3%, #EAEDF3 97%, transparent);
+  background-size: 100% 1px; background-position: top; background-repeat: no-repeat;
+}
+/* Alta rapida de personal de turno: se escribe y se agrega sin abrir un formulario aparte. */
+.eval-staff-add { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.eval-staff-add input {
+  height: 38px; min-width: 160px; border: 1px solid #E1E5EE; border-radius: 9px; padding: 0 11px;
+  font-family: inherit; font-size: 12.5px; background: #FAFBFE; color: var(--ink);
+}
+.eval-staff-add input:focus { outline: none; border-color: var(--m-listas); background: #fff; }
+.eval-staff-add button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 8px 14px;
+  border: 1px dashed #C7CDE0; border-radius: 999px; background: #fff;
+  color: var(--m-listas); font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.eval-staff-add button:disabled { opacity: .5; cursor: default; }
+.eval-subject > b svg { display: block; }

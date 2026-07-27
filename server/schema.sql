@@ -1092,3 +1092,16 @@ UPDATE checklist_templates t
    AND p.name = 'Seguridad del Paciente'
    AND t.program_id IS NULL
    AND t.code LIKE 'GCM-SPA-%';
+
+-- Personal de turno de la ronda. Es una LISTA, no un campo de texto: en una ronda puede haber
+-- varios turnos o varios profesionales, igual que hay varios pacientes. Guardarlo como texto
+-- suelto en la cabecera impedia buscarlo despues.
+CREATE TABLE IF NOT EXISTS checklist_audit_staff (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT '',
+  order_index INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS checklist_audit_staff_idx ON checklist_audit_staff(audit_id, order_index);
+CREATE INDEX IF NOT EXISTS checklist_audit_staff_name_idx ON checklist_audit_staff(lower(full_name));

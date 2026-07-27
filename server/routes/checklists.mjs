@@ -347,7 +347,7 @@ async function persistResults(client, auditId, result) {
 
 async function auditPayload(audit) {
   const structure = await loadStructure(audit.template_id)
-  const [subjects, answers, headerFields, signatures, evidences] = await Promise.all([
+  const [subjects, answers, headerFields, signatures, evidences, staff] = await Promise.all([
     query('SELECT * FROM checklist_audit_subjects WHERE audit_id = $1 ORDER BY order_index, id', [audit.id]),
     query('SELECT * FROM checklist_answers WHERE audit_id = $1', [audit.id]),
     query('SELECT * FROM checklist_header_fields WHERE template_id = $1 ORDER BY order_index, id', [audit.template_id]),
@@ -355,6 +355,7 @@ async function auditPayload(audit) {
     query(`SELECT e.*, u.full_name AS uploaded_by_name FROM checklist_evidences e
              LEFT JOIN users u ON u.id = e.uploaded_by_id
             WHERE e.audit_id = $1 ORDER BY e.created_at`, [audit.id]),
+    query('SELECT * FROM checklist_audit_staff WHERE audit_id = $1 ORDER BY order_index, id', [audit.id]),
   ])
   const result = computeAdherence({
     domains: structure.domains,
@@ -373,6 +374,7 @@ async function auditPayload(audit) {
     answers: answers.rows,
     signatures: signatures.rows,
     evidences: evidences.rows.map(row => ({ ...row, id: String(row.id) })),
+    staff: staff.rows.map(row => ({ ...row, id: String(row.id) })),
     adherence: { ...result, concept: conceptFromPercent(result.overall.percent) },
   }
 }
@@ -641,6 +643,35 @@ checklistsRouter.put('/audits/:auditId/answers', checklistsModule, fill, async (
   } finally { client.release() }
 })
 
+
+
+// ---- Personal de turno de la ronda ----
+// Es una lista y no un campo de texto: en una ronda puede haber varios profesionales, igual que
+// hay varios pacientes, y como texto suelto no se podia buscar despues.
+
+checklistsRouter.post('/audits/:auditId/staff', checklistsModule, fill, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request, { requireOpen: true })
+    const fullName = String(request.body?.fullName || '').trim()
+    if (!fullName) fail(400, 'Escribe el nombre del profesional')
+    const inserted = await query(
+      `INSERT INTO checklist_audit_staff (audit_id, full_name, role, order_index)
+       VALUES ($1,$2,$3,COALESCE((SELECT MAX(order_index) + 1 FROM checklist_audit_staff WHERE audit_id = $1), 0))
+       RETURNING *`,
+      [audit.id, fullName, String(request.body?.role || '').trim()],
+    )
+    response.status(201).json({ ...inserted.rows[0], id: String(inserted.rows[0].id) })
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.delete('/audits/:auditId/staff/:staffId', checklistsModule, fill, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request, { requireOpen: true })
+    await query('DELETE FROM checklist_audit_staff WHERE id = $1 AND audit_id = $2',
+      [Number(request.params.staffId), audit.id])
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
 
 // ---- Evidencias de una auditoria ----
 //
@@ -918,7 +949,13 @@ function repositoryFilters(request) {
   }
 
   // Personal de turno / responsable: vive en los valores de la cabecera, que tambien son jsonb.
-  if (q.staff) add(`%${String(q.staff).toLowerCase()}%`, 'lower(a.header_values::text) LIKE $$')
+  if (q.staff) {
+    params.push(`%${String(q.staff).toLowerCase()}%`)
+    const i = params.length
+    where.push(`(lower(a.header_values::text) LIKE $${i}
+                 OR EXISTS (SELECT 1 FROM checklist_audit_staff st
+                             WHERE st.audit_id = a.id AND lower(st.full_name) LIKE $${i}))`)
+  }
 
   return { params, where: where.join(' AND '), canManage }
 }

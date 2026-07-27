@@ -20,6 +20,10 @@ import {
 
 const identity = moduleIdentity('checklists')
 
+/** Campos de cabecera que la banda superior ya muestra: repetirlos abajo era pedir dos veces
+ *  el mismo dato. La fecha, el servicio y el auditor se fijan al abrir la ronda. */
+const YA_EN_LA_BANDA = /^(fecha|servicio|área|area|centro de atenci|evaluador|responsable|auditor|turno)/i
+
 /** Etiqueta del anillo. Usa los mismos cortes que el semaforo del sistema, no unos propios. */
 const CONCEPT_TEXT: Record<string, string> = {
   OPTIMO: 'Excelente', ACEPTABLE: 'Bueno', DEFICIENTE: 'Regular', MUY_DEFICIENTE: 'Crítico',
@@ -65,6 +69,7 @@ function ChecklistAuditContent() {
   const [elapsed, setElapsed] = useState(0)
   const [notes, setNotes] = useState('')
   const [notesByAnswer, setNotesByAnswer] = useState<Record<string, string>>({})
+  const [staffDraft, setStaffDraft] = useState({ name: '', role: '' })
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -137,6 +142,23 @@ function ChecklistAuditContent() {
     })
     setDirty(true)
     setSaveState('idle')
+  }
+
+  async function addStaff() {
+    if (!audit || !staffDraft.name.trim()) return
+    setBusy(true)
+    try {
+      await checklistsService.addStaff(audit.id, staffDraft.name.trim(), staffDraft.role.trim())
+      setStaffDraft({ name: '', role: '' })
+      await load()
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible agregar') }
+    finally { setBusy(false) }
+  }
+
+  async function removeStaff(staffId: string) {
+    if (!audit) return
+    try { await checklistsService.removeStaff(audit.id, staffId); await load() }
+    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible quitar') }
   }
 
   async function addEvidence(file: File) {
@@ -354,7 +376,7 @@ function ChecklistAuditContent() {
           <span className="eval-context-icon"><CalendarDays size={16} /></span>
           <div>
             <dt>Fecha</dt>
-            <dd>{new Date(`${audit.audit_date}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            <dd>{new Date(`${String(audit.audit_date).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               {audit.shift ? <small>Turno {audit.shift.toLowerCase()}</small> : null}
             </dd>
           </div>
@@ -377,13 +399,13 @@ function ChecklistAuditContent() {
             </div>
           </div>
         )}
-        {Object.entries(audit.subjects[0]?.attributes_snapshot || {})
-          .filter(([, value]) => value)
+        {audit.subjectFields
+          .filter(field => (audit.subjects[0]?.attributes_snapshot || {})[field.id])
           .slice(0, 2)
-          .map(([label, value]) => (
-            <div className="eval-context-cell" key={label}>
+          .map(field => (
+            <div className="eval-context-cell" key={field.id}>
               <span className="eval-context-icon"><CreditCard size={16} /></span>
-              <div><dt>{label}</dt><dd>{value}</dd></div>
+              <div><dt>{field.label}</dt><dd>{audit.subjects[0].attributes_snapshot[field.id]}</dd></div>
             </div>
           ))}
         <div className="eval-context-cell">
@@ -417,9 +439,9 @@ function ChecklistAuditContent() {
 
         {/* Campos propios de la lista y sujetos de la ronda: van en la MISMA banda. Antes eran
             dos tarjetas grandes para tres datos, y en una sola hoja eso es ruido. */}
-        {audit.headerFields.length > 0 && (
+        {audit.headerFields.filter(f => !YA_EN_LA_BANDA.test(f.label)).length > 0 && (
           <div className="eval-fields">
-            {audit.headerFields.map(field => (
+            {audit.headerFields.filter(f => !YA_EN_LA_BANDA.test(f.label)).map(field => (
               <label key={field.id} className="eval-field">
                 <span>{field.label}{field.required ? ' *' : ''}</span>
                 {field.field_type === 'SELECT' ? (
@@ -443,13 +465,50 @@ function ChecklistAuditContent() {
         )}
 
         <div className="eval-subjects">
+          <span className="eval-strip-label">Personal de turno</span>
+          {(audit.staff || []).map(person => (
+            <span className="eval-subject" key={person.id}>
+              <b><UserCheck size={12} /></b>
+              <span>
+                {person.full_name}
+                <small>{person.role || 'Sin cargo'}</small>
+              </span>
+              {!closed && <button title="Quitar" onClick={() => void removeStaff(person.id)}><Trash2 size={13} /></button>}
+            </span>
+          ))}
+          {!closed && (
+            <span className="eval-staff-add">
+              <input
+                placeholder="Nombre del profesional"
+                value={staffDraft.name}
+                onChange={event => setStaffDraft({ ...staffDraft, name: event.target.value })}
+                onKeyDown={event => { if (event.key === 'Enter') void addStaff() }}
+              />
+              <input
+                placeholder="Cargo (opcional)"
+                value={staffDraft.role}
+                onChange={event => setStaffDraft({ ...staffDraft, role: event.target.value })}
+                onKeyDown={event => { if (event.key === 'Enter') void addStaff() }}
+              />
+              <button onClick={() => void addStaff()} disabled={busy || !staffDraft.name.trim()}>
+                <UserPlus size={14} /> Agregar
+              </button>
+            </span>
+          )}
+        </div>
+
+        <div className="eval-subjects">
           <span className="eval-strip-label">{audit.subject_label}s de esta ronda</span>
           {audit.subjects.map((subject, index) => (
             <span className="eval-subject" key={subject.id}>
               <b>{index + 1}</b>
               <span>
                 {subject.display_name}
-                <small>{Object.values(subject.attributes_snapshot || {}).filter(Boolean).join(' · ') || '—'}</small>
+                <small>{
+                  audit.subjectFields
+                    .map(field => (subject.attributes_snapshot || {})[field.id])
+                    .filter(Boolean).join(' · ') || '—'
+                }</small>
               </span>
               {!closed && (
                 <button title="Quitar" onClick={() => void removeSubject(subject.id)}><Trash2 size={13} /></button>

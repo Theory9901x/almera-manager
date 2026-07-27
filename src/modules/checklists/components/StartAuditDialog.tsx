@@ -14,6 +14,8 @@ export interface StartContext {
   auditDate: string
   areaId: string
   shift: string
+  /** Solo cuando el diálogo ofrece elegir el formato. */
+  templateId?: string
 }
 
 /**
@@ -24,20 +26,23 @@ export interface StartContext {
  * dia siguiente, y una fecha puesta sola sin que nadie la mire ensucia toda la serie temporal.
  * Se propone hoy, pero el auditor tiene que confirmarla.
  */
-export function StartAuditDialog({ open, templateName, areas, busy, onCancel, onStart }: {
+export function StartAuditDialog({ open, templateName, templateId, templates, areas, busy, onCancel, onStart }: {
   open: boolean
   templateName: string
+  templateId?: string
+  /** Si se pasan, el diálogo deja elegir el formato aquí mismo en vez de volver atrás. */
+  templates?: { id: string; name: string }[]
   areas: ChecklistArea[]
   busy?: boolean
   onCancel(): void
   onStart(context: StartContext): void
 }) {
-  const [context, setContext] = useState<StartContext>({ auditDate: '', areaId: '', shift: '' })
+  const [context, setContext] = useState<StartContext>({ auditDate: '', areaId: '', shift: '', templateId: '' })
   const [touched, setTouched] = useState(false)
 
   useEffect(() => {
-    if (open) { setContext({ auditDate: '', areaId: '', shift: '' }); setTouched(false) }
-  }, [open, templateName])
+    if (open) { setContext({ auditDate: '', areaId: '', shift: '', templateId: templateId || '' }); setTouched(false) }
+  }, [open, templateId])
 
   useEffect(() => {
     if (!open) return
@@ -50,7 +55,7 @@ export function StartAuditDialog({ open, templateName, areas, busy, onCancel, on
 
   const missingDate = !context.auditDate
   const missingArea = !context.areaId
-  const canStart = !missingDate && !missingArea
+  const canStart = !missingDate && !missingArea && !(templates && templates.length > 1 && !context.templateId)
 
   return createPortal(
     <div className="ds-confirm-backdrop" onClick={() => !busy && onCancel()}>
@@ -66,6 +71,15 @@ export function StartAuditDialog({ open, templateName, areas, busy, onCancel, on
         </p>
 
         <div className="start-audit-form">
+          {templates && templates.length > 1 && (
+            <Field label="Lista a diligenciar *">
+              <Select
+                value={context.templateId || ''}
+                onChange={value => setContext({ ...context, templateId: value })}
+                options={templates.map(item => ({ value: item.id, label: item.name }))}
+              />
+            </Field>
+          )}
           <Field label="Fecha de la ronda *" hint={touched && missingDate ? 'Elige la fecha' : 'No se asume hoy: confírmala'}>
             <DatePicker value={context.auditDate} onChange={value => setContext({ ...context, auditDate: value })} />
           </Field>
