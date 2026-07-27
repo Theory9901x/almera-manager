@@ -293,21 +293,45 @@ constructor está bien hecho; si no, hay que corregir el modelo antes de seguir 
 
 ## 9. Inventario de formatos
 
-| Código | Nombre | Tipo |
-|---|---|---|
-| GCM-SPA-FO-24 | Formato ronda diaria de seguridad del paciente | **A** (analizado) |
-| GCM-SPA-FO-26 | Lista de chequeo ronda de seguridad — farmacovigilancia | **B** (analizado) |
-| GCM-SPA-FO-28 | Administración segura de medicamentos | por analizar |
-| GCM-SPA-FO-29 | Reducir el riesgo — atención a pacientes con enfermedad mental | por analizar |
-| GCM-SPA-FO-30 | Prevención malnutrición y nutrición | por analizar |
-| GCM-SPA-FO-32 | Prácticas seguras en la obtención de ayudas diagnósticas | por analizar |
-| GCM-SPA-FO-33 | Uso adecuado de herramientas de reporte | por analizar |
-| GCM-SPA-FO-35 | Consentimiento informado | por analizar |
-| GCM-SPA-FO-36 | Adherencia a la política de seguridad del paciente | por analizar |
-| GCM-SPA-FO-39 | Prevención de caídas | por analizar |
-| GCM-SPA-FO-40 | Identificación del paciente | por analizar |
-| GCM-SPA-FO-41 | Comunicación efectiva | **duplicado** en la carpeta |
-| GCM-SPA-FO-46 | Procedimiento quirúrgico seguro | por analizar |
+Las trece están cargadas. El **maquetado** de la columna «Tipo» es el del papel, no el del
+modelo de datos: los tres caben en el mismo `lista → dominios → criterios`.
+
+| Código | Nombre | Maquetado | Dom. | Crit. |
+|---|---|---|---|---|
+| GCM-SPA-FO-24 | Ronda diaria de seguridad del paciente | A · criterios en columnas | 7 | 17 |
+| GCM-SPA-FO-26 | Ronda de seguridad — farmacovigilancia | B · criterios en filas | 3 | 16 |
+| GCM-SPA-FO-28 | Administración segura de medicamentos | C · dominios en mayúscula | 3 | 15 |
+| GCM-SPA-FO-29 | Reducir el riesgo — pacientes con enfermedad mental | C | 1 | 7 |
+| GCM-SPA-FO-30 | Prevención de malnutrición y nutrición | C | 1 | 7 |
+| GCM-SPA-FO-32 | Prácticas seguras en la obtención de ayudas diagnósticas | C | 1 | 9 |
+| GCM-SPA-FO-33 | Uso adecuado de herramientas de reporte | C | 1 | 6 |
+| GCM-SPA-FO-35 | Consentimiento informado | D · dos secciones de indagación | 2 | 11 |
+| GCM-SPA-FO-36 | Adherencia a la política de seguridad del paciente | A | 1 | 5 |
+| GCM-SPA-FO-39 | Prevención de caídas | D | 2 | 11 |
+| GCM-SPA-FO-40 | Identificación del paciente | D | 2 | 11 |
+| GCM-SPA-FO-41 | Comunicación efectiva | D | 2 | 10 |
+| GCM-SPA-FO-46 | Procedimiento quirúrgico seguro | B | 1 | 12 |
+
+**Total: 13 listas, 137 criterios.**
+
+Los cuatro maquetados del papel y cómo se leyeron:
+
+- **A — criterios en columnas, sujetos en filas.** FO-24 pone los dominios en una fila y los
+  criterios en la siguiente; FO-36 solo tiene criterios, sin agrupar.
+- **B — un criterio por fila, numerado**, con el número en la columna A.
+- **C — un criterio por fila, sin numerar**, y los dominios como filas en MAYÚSCULA dentro de la
+  misma columna del texto. Las columnas de respuesta vienen en tripletes C/NC/NA por persona.
+- **D — dos secciones de indagación** («INDAGUE AL PERSONAL DE TURNO» / «INDAGUE AL PACIENTE Y
+  FAMILIAR»), que se cargan como dos dominios. Entre sección y sección el formato mete una línea
+  de firma y repite el encabezado: son filas de relleno, no criterios.
+
+**FO-41 venía duplicado en la carpeta.** Se comparó y es la misma lista: solo cambian tildes y
+erratas («Sabe donde» vs. «Sabe dónde», «comuncacion» vs. «comunicación»). Se carga **una sola
+vez**, quedándose con la copia mejor acentuada.
+
+**Numeración que no es correlativa.** FO-26 salta el 12 (va 11 → 13) y FO-40 reinicia en 7 en la
+segunda sección, quedando dos ítems «7». Se respetan tal cual: el auditor tiene el papel al lado
+y el número es su referencia para encontrar la fila, no una clave.
 
 Para leer un `.xlsx` sin dependencias nuevas: es un ZIP; se expande y se parsean
 `xl/sharedStrings.xml` y `xl/worksheets/sheetN.xml`. **Cuidado:** las celdas
@@ -582,9 +606,21 @@ con la numeración `10,11,13,14,15,16,17` intacta —el salto del 12 se conserva
 comillas sobreviviendo el viaje a la base («daño», «conservación», `"LASA"`). Cero plantillas de
 ensayo residuales.
 
+### Las trece, cargadas
+
+El generador se corrió sobre los trece `.xlsx` y las trece entraron **solo con configuración,
+sin una línea de código por lista** — el criterio de éxito declarado del constructor genérico.
+Ver §9 para el inventario, los cuatro maquetados de papel y los casos raros de numeración.
+
+Al ampliar de dos listas a trece aparecieron dos trampas del papel que valen la pena anotar:
+
+- Las listas de dos secciones **repiten el encabezado y meten una línea de firma en medio**. Un
+  lector que corte al ver «FIRMA» se queda con media lista; hay que saltar esas filas, no parar.
+- FO-30 y FO-32 traen como rótulo de sección «REPORTE DE SUCESOS INSEGUROS», que es copia y pega
+  de otro formato y no tiene que ver con su contenido. Se les puso el nombre de dominio que
+  corresponde en vez de arrastrar el error.
+
 ### Pendiente
 
-- Las **11 listas restantes** siguen sin cargar: el generador ya existe, es cuestión de correrlo
-  sobre los otros `.xlsx` una vez confirmados los puntos de §2.5.
 - El **instructivo de FO-24** (`guidance`) se dejó vacío a propósito: sus criterios no calzan 1:1
   con los de la grilla (§2.5 punto 1) y asignarlos a ojo sería inventar. Falta esa decisión.

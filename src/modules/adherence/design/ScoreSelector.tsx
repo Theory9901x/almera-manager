@@ -14,15 +14,15 @@ const OPTIONS: { value: string; score: Score; label: string }[] = [
 // blanco — se lee mas rapido en una grilla densa de cientos de celdas porque el color queda como
 // contexto de fondo, no como una mancha solida que compite por atencion celda a celda.
 const STYLES: Record<string, { bg: string; fg: string; border: string }> = {
-  '2': { bg: 'color-mix(in oklch, oklch(0.62 0.16 145) 18%, white)', fg: 'oklch(0.45 0.16 145)', border: 'transparent' },
-  '1': { bg: 'color-mix(in oklch, oklch(0.8 0.14 90) 26%, white)', fg: 'oklch(0.52 0.13 88)', border: 'transparent' },
+  '2': { bg: 'color-mix(in oklch, oklch(0.6 0.15 150) 18%, white)', fg: 'oklch(0.45 0.15 150)', border: 'transparent' },
+  '1': { bg: 'color-mix(in oklch, oklch(0.7 0.16 60) 20%, white)', fg: 'oklch(0.5 0.16 55)', border: 'transparent' },
   '0': { bg: 'color-mix(in oklch, var(--danger) 15%, white)', fg: 'var(--danger)', border: 'transparent' },
   NA: { bg: '#f1f3f5', fg: 'var(--ink-soft)', border: 'transparent' },
 }
 
 // Puntos del menu desplegable: color solido y saturado, no el pastel de la celda — un punto de
 // 9px necesita ser reconocible de un vistazo, el pastel de fondo se ve todo igual de palido a ese tamano.
-const DOT_COLOR: Record<string, string> = { '2': '#16A34A', '1': '#CA8A04', '0': '#DC2626', NA: '#94A3B8' }
+const DOT_COLOR: Record<string, string> = { '2': '#059669', '1': '#D97706', '0': '#DC2626', NA: '#94A3B8' }
 
 function keyFor(score: Score | undefined) {
   if (score === undefined) return ''
