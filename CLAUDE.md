@@ -384,7 +384,7 @@ El fondo del sistema tambien cambio: los tokens tenian un sesgo calido (`--canva
 que el usuario describio como "verdoso feo". Ahora es neutro (#F4F6FB). Afecta a TODOS los
 modulos, que era el punto.
 
-## 13. Matriz de HC: motor compartido y modo ampliado
+## 12. Matriz de HC: motor compartido y modo ampliado
 
 `shared/adherenceScoring.mjs` es el motor ponderado (2/1/0/NA con peso por criterio, NA fuera del
 denominador). Lo importan **los dos lados**: `server/routes/adherence.mjs` al guardar y cerrar, y
@@ -400,7 +400,7 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
 - Sticky en los dos ejes con `left` fijos en px (260 / 312): si se cambia el ancho de la columna
   de criterio hay que ajustar los tres, o las columnas fijas se solapan.
 
-## 14. Vidrio del módulo de Listas de Chequeo
+## 13. Vidrio del módulo de Listas de Chequeo
 
 Es el único módulo con tratamiento de vidrio en las superficies base (el resto lo reserva
 para overlays). Cuatro cosas que costó descubrir y conviene no deshacer:
