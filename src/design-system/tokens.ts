@@ -57,8 +57,8 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   surveys: { key: 'surveys', color: '#008c8e', gradientFrom: '#008c8e', gradientTo: '#00b2b3' },
   // --m-huella (verde, tono 155)
   'carbon-footprint': { key: 'carbon-footprint', color: '#008b45', gradientFrom: '#008b45', gradientTo: '#3fb171' },
-  // --m-seguridad (naranja-terracota, tono 40) — Listas de Chequeo (seguridad del paciente)
-  checklists: { key: 'checklists', color: '#bb4717', gradientFrom: '#bb4717', gradientTo: '#df7752' },
+  // --m-listas (azul, tono 230) — Listas de Chequeo
+  checklists: { key: 'checklists', color: '#007fbc', gradientFrom: '#007fbc', gradientTo: '#00a7dd' },
   // --m-usuarios (rosa-fucsia, tono 350)
   admin: { key: 'admin', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
   users: { key: 'users', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },

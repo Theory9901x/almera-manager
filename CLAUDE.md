@@ -155,8 +155,8 @@ tono, para que **ningún módulo pese visualmente más que otro**.
 | `--m-huella` | 155 | Huella de Carbono |
 | `--m-usuarios` | 350 | Usuarios / Admin |
 | `--m-planes` | 130 | **libre** (`#518200`) |
-| `--m-documentos` | 230 | **libre** (`#007fbc`) |
-| `--m-seguridad` | 40 | Listas de Chequeo (`#bb4717`) |
+| `--m-listas` | 230 | Listas de Chequeo (`#007fbc`) |
+| `--m-seguridad` | 40 | **libre** (`#bb4717`) |
 | `--m-riesgos` | 70 | **libre** (`#aa5b00`) |
 | `--m-indicadores` | 330 | **libre** (`#a3489d`) |
 

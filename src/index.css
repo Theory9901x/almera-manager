@@ -104,8 +104,10 @@
   --m-huella-soft:      oklch(0.95 0.03 155);
   --m-planes:           oklch(0.55 0.16 130);   /* verde-lima — libre, sin modulo asignado aun */
   --m-planes-soft:      oklch(0.95 0.03 130);
-  --m-documentos:       oklch(0.55 0.16 230);   /* azul — libre, sin modulo asignado aun */
-  --m-documentos-soft:  oklch(0.95 0.03 230);
+  --m-listas:           oklch(0.55 0.16 230);   /* azul — Listas de Chequeo */
+  --m-listas-soft:      oklch(0.95 0.03 230);
+  --m-listas-light:     oklch(0.68 0.14 230);
+  --m-listas-deep:      oklch(0.30 0.09 230);
   --m-seguridad:        oklch(0.55 0.16 40);    /* naranja — libre, sin modulo asignado aun */
   --m-seguridad-soft:   oklch(0.95 0.03 40);
   --m-riesgos:          oklch(0.55 0.16 70);    /* ambar-dorado — libre, sin modulo asignado aun */
@@ -2657,74 +2659,151 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 
 /* ================================================================
-   LISTAS DE CHEQUEO — identidad --m-seguridad (naranja-terracota).
-   Reutiliza el hero, las cards y los controles del sistema; aqui solo
-   va lo propio del constructor y de la grilla de prueba de calculo.
+   LISTAS DE CHEQUEO — identidad --m-listas (azul, tono 230).
+   Unico modulo con tratamiento de vidrio en las superficies base: el resto del
+   sistema reserva el glassmorphism para overlays. Para que el vidrio funcione y
+   no se vea como una tarjeta blanca deslavada hace falta ALGO DETRAS que
+   desenfocar — por eso el fondo de pagina es una malla azul con varios radiales,
+   no un gris plano. Sin ese fondo, el efecto no se lee.
    ================================================================ */
-.checklists-page-bg { background: radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--m-seguridad) 6%, transparent), transparent 40%), var(--color-surface-page); }
-
-/* Misma textura de malla del hero rico de Matrices, con el acento del modulo. */
-.checklists-hero::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: linear-gradient(135deg, #000, transparent 70%);
-  -webkit-mask-image: linear-gradient(135deg, #000, transparent 70%);
+/* Sin `background-attachment: fixed` a proposito: en tablet (Safari iOS sobre todo) provoca
+   saltos al hacer scroll y a veces deja de pintar — y este modulo se usa justamente en tablet.
+   El degradado se dimensiona al bloque, que siempre cubre el alto de la vista. */
+.checklists-page-bg {
+  position: relative;
+  min-height: 100%;
+  background:
+    radial-gradient(1100px 620px at 12% 0%, color-mix(in oklch, var(--m-listas-light) 26%, transparent), transparent 62%),
+    radial-gradient(900px 520px at 92% 12%, color-mix(in oklch, var(--m-listas) 20%, transparent), transparent 58%),
+    radial-gradient(760px 620px at 78% 88%, color-mix(in oklch, var(--m-listas-light) 16%, transparent), transparent 60%),
+    linear-gradient(168deg, #f2f9ff 0%, #e8f4fd 46%, #eaf6ff 100%);
+  padding-bottom: 8px;
 }
 
-.checklists-table .ds-table tbody tr:hover td { background: color-mix(in srgb, var(--m-seguridad) 5%, #fff); }
+/* Superficie de vidrio compartida. Se aplica sobre .ds-card, que ya trae radio y
+   sombra; aqui solo se cambia el relleno por vidrio. */
+.checklists-page-bg .ds-card,
+.checklists-page-bg .surface-panel {
+  background: rgba(255, 255, 255, .68);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, .75);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .85) inset,
+    0 10px 28px rgba(0, 62, 96, .10),
+    0 2px 6px rgba(0, 62, 96, .05);
+}
+
+/* Franja de acento de las tarjetas: degradado azul en vez de color plano. */
+.checklists-page-bg .ds-card-accent::before,
+.checklists-page-bg .surface-panel.is-header::before {
+  background: linear-gradient(90deg, var(--m-listas), var(--m-listas-light));
+}
+
+/* Hero: azul profundo con malla de puntos y halo, no el gris oscuro generico. */
+.checklists-hero {
+  background:
+    radial-gradient(760px 420px at 88% -20%, color-mix(in oklch, var(--m-listas-light) 55%, transparent), transparent 62%),
+    linear-gradient(140deg, var(--m-listas-deep) 0%, #05263c 58%, #041b2c 100%);
+  border: 1px solid rgba(255, 255, 255, .10);
+  box-shadow: 0 18px 46px rgba(0, 48, 78, .30);
+}
+.checklists-hero::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, .07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(135deg, #000, transparent 72%);
+  -webkit-mask-image: linear-gradient(135deg, #000, transparent 72%);
+}
+.checklists-hero .hero-stat-inline .num { text-shadow: 0 1px 12px rgba(0, 167, 221, .35); }
+
+/* Botones del modulo: primario con degradado azul y halo; secundario de vidrio. */
+.checklists-page-bg .ds-button-primary { box-shadow: 0 8px 20px rgba(0, 127, 188, .30); }
+.checklists-page-bg .ds-button-primary:hover:not(:disabled) { box-shadow: 0 10px 26px rgba(0, 127, 188, .40); }
+.checklists-page-bg .ds-button-secondary {
+  background: rgba(255, 255, 255, .55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, .8);
+  color: var(--m-listas-deep);
+}
+.checklists-page-bg .ds-button-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, .78); }
+
+/* Campos sobre vidrio: el input opaco cortaria el efecto, se translucen. */
+.checklists-page-bg .ds-input,
+.checklists-page-bg .ds-select-trigger,
+.checklists-page-bg .ds-datepicker-trigger {
+  background: rgba(255, 255, 255, .72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-color: rgba(0, 90, 135, .16);
+}
+.checklists-page-bg .ds-input:focus,
+.checklists-page-bg .ds-select-trigger:focus-visible {
+  border-color: var(--m-listas);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-listas) 16%, transparent);
+}
+
+.checklists-table .ds-table tbody tr:hover td { background: color-mix(in srgb, var(--m-listas) 7%, transparent); }
 .checklists-table .tabular-col { font-variant-numeric: tabular-nums; }
+.checklists-page-bg .ds-table th { color: var(--m-listas-deep); }
 
 /* --- Constructor: dominios y criterios --- */
 .checklist-domain-head { display: flex; align-items: flex-end; gap: 12px; }
 .checklist-criteria { display: grid; gap: 12px; }
 .checklist-criterion {
   display: grid; gap: 8px; padding: 14px;
-  border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px);
-  background: var(--color-surface-soft, #f7f8fb);
-  border-left: 3px solid color-mix(in srgb, var(--m-seguridad) 45%, transparent);
+  border: 1px solid rgba(255, 255, 255, .7); border-radius: var(--radius-card-sm, 14px);
+  background: rgba(255, 255, 255, .5);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-left: 3px solid color-mix(in srgb, var(--m-listas) 55%, transparent);
 }
 .checklist-criterion-top { display: flex; align-items: flex-start; gap: 10px; }
 
 .checklist-fields { display: grid; gap: 12px; }
 .checklist-field-row {
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 12px 14px;
-  border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px);
-  background: var(--color-surface-soft, #f7f8fb);
+  border: 1px solid rgba(255, 255, 255, .7); border-radius: var(--radius-card-sm, 14px);
+  background: rgba(255, 255, 255, .5);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 
-/* --- Prueba de calculo: grilla densa criterio x sujeto --- */
-.checklist-sim-wrap { overflow: auto; max-height: 60vh; border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); }
+/* --- Grilla de prueba (constructor) --- */
+.checklist-sim-wrap { overflow: auto; max-height: 60vh; border: 1px solid rgba(255,255,255,.7); border-radius: var(--radius-card-sm, 14px); background: rgba(255,255,255,.42); }
 .checklist-sim-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
-.checklist-sim-grid th, .checklist-sim-grid td { border-bottom: 1px solid var(--border-hairline); padding: 8px 10px; text-align: center; }
-.checklist-sim-grid thead th { position: sticky; top: 0; z-index: 2; background: var(--color-surface-soft, #f7f8fb); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 800; }
+.checklist-sim-grid th, .checklist-sim-grid td { border-bottom: 1px solid rgba(0,90,135,.10); padding: 8px 10px; text-align: center; }
+.checklist-sim-grid thead th { position: sticky; top: 0; z-index: 2; background: rgba(240,249,255,.94); backdrop-filter: blur(10px); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--m-listas-deep); font-weight: 800; }
 .checklist-sim-grid td.sim-criterion, .checklist-sim-grid th.sim-criterion {
-  position: sticky; left: 0; z-index: 1; background: #fff; text-align: left;
-  min-width: 280px; max-width: 420px; white-space: normal; line-height: 1.45;
+  position: sticky; left: 0; z-index: 1; background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+  text-align: left; min-width: 280px; max-width: 420px; white-space: normal; line-height: 1.45;
 }
-.checklist-sim-grid thead th.sim-criterion { z-index: 3; background: var(--color-surface-soft, #f7f8fb); }
-.checklist-sim-grid tbody tr:hover td { background: color-mix(in srgb, var(--m-seguridad) 4%, #fff); }
+.checklist-sim-grid thead th.sim-criterion { z-index: 3; background: rgba(240,249,255,.96); }
+.checklist-sim-grid tbody tr:hover td { background: color-mix(in srgb, var(--m-listas) 6%, transparent); }
 .checklist-sim-grid tr.sim-domain-row td {
-  background: var(--m-seguridad-soft); color: var(--m-seguridad); text-align: left;
+  background: color-mix(in srgb, var(--m-listas) 12%, transparent); color: var(--m-listas-deep); text-align: left;
   font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
-  border-left: 3px solid var(--m-seguridad);
+  border-left: 3px solid var(--m-listas);
 }
 
-/* Objetivos tactiles amplios: esta grilla se usa en tablet durante la ronda. */
 .sim-value-group { display: inline-flex; gap: 4px; }
 .sim-value {
-  min-width: 34px; height: 30px; border-radius: 8px; border: 1px dashed #d8dde5;
-  background: transparent; color: #b9c0c9; font-size: 11px; font-weight: 800; cursor: pointer;
+  min-width: 34px; height: 30px; border-radius: 8px; border: 1px dashed rgba(0,90,135,.28);
+  background: rgba(255,255,255,.35); color: #7c8b98; font-size: 11px; font-weight: 800; cursor: pointer;
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
-.sim-value:hover { border-color: #9aa3ad; color: #6b7480; }
+.sim-value:hover { border-color: var(--m-listas); color: var(--m-listas-deep); }
 .sim-value.is-active { border-style: solid; border-color: transparent; }
-.sim-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 18%, white); color: oklch(0.45 0.15 150); }
-.sim-value--nc.is-active { background: color-mix(in srgb, var(--danger) 15%, white); color: var(--danger); }
-.sim-value--na.is-active { background: #f1f3f5; color: var(--ink-soft); }
+.sim-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 20%, white); color: oklch(0.42 0.15 150); }
+.sim-value--nc.is-active { background: color-mix(in srgb, var(--danger) 16%, white); color: var(--danger); }
+.sim-value--na.is-active { background: rgba(255,255,255,.85); color: var(--ink-soft); }
 
 /* --- Resultado --- */
-.checklist-result-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; padding: 18px 20px; border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); background: var(--color-surface-soft, #f7f8fb); }
+.checklist-result-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 28px; padding: 18px 20px;
+  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
+  background: linear-gradient(135deg, rgba(255,255,255,.66), rgba(219,243,255,.5));
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
 .checklist-result-main { display: flex; flex-direction: column; }
 .checklist-result-main .num { font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .checklist-result-main .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-top: 6px; }
@@ -2734,138 +2813,153 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-result-tallies span { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-top: 3px; }
 
 .checklist-domain-results { display: grid; gap: 8px; }
-.checklist-domain-result { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px; border: 1px solid var(--border-hairline); border-radius: 10px; background: #fff; }
+.checklist-domain-result {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,.7); border-radius: 10px;
+  background: rgba(255,255,255,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
 .checklist-domain-result .name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .checklist-domain-result .value { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
-@media (max-width: 720px) {
-  .checklist-field-row > div { width: 100%; }
-  .checklist-sim-grid td.sim-criterion, .checklist-sim-grid th.sim-criterion { min-width: 200px; }
-}
-
-/* --- Fase 2: diligenciamiento (tablet-first) --- */
-
-/* Sujetos de la ronda: chips compactos, no una tabla — son pocos y se consultan de un vistazo. */
+/* --- Diligenciamiento (tablet-first) --- */
 .checklist-subject-chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .checklist-subject-chip {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  border: 1px solid var(--border-hairline); border-radius: 999px; background: #fff;
-  box-shadow: var(--shadow-card-sm);
+  border: 1px solid rgba(255,255,255,.8); border-radius: 999px;
+  background: rgba(255,255,255,.62); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(0,62,96,.08);
 }
 .checklist-subject-chip .idx {
   display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 999px;
-  background: var(--m-seguridad-soft); color: var(--m-seguridad); font-size: 11px; font-weight: 800;
+  background: linear-gradient(135deg, var(--m-listas), var(--m-listas-light)); color: #fff; font-size: 11px; font-weight: 800;
 }
 .checklist-subject-chip strong { display: block; font-size: 12.5px; color: var(--ink); }
 .checklist-subject-chip small { display: block; font-size: 10.5px; color: var(--muted); }
 
-.checklist-subject-form {
+.checklist-subject-form,
+.signature-capture {
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px;
-  border: 1px dashed color-mix(in srgb, var(--m-seguridad) 40%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--m-listas) 45%, transparent);
   border-radius: var(--radius-card-sm, 14px);
-  background: color-mix(in srgb, var(--m-seguridad) 4%, #fff);
+  background: rgba(255,255,255,.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
+.signature-capture { display: block; }
 
-/* Grilla de calificacion. Misma densidad que Matrices de Adherencia, pero con objetivos
-   tactiles mas grandes: se usa con el dedo, en tablet, durante la ronda. */
-.checklist-fill-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); }
+/* Grilla de calificacion: el vidrio va en el marco, NO en cada celda —
+   un backdrop-filter por celda mataria el scroll en una tabla larga. */
+.checklist-fill-wrap {
+  overflow: auto; max-height: 72vh;
+  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
+  background: rgba(255,255,255,.42);
+}
 .checklist-fill-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
-.checklist-fill-grid th, .checklist-fill-grid td { border-bottom: 1px solid var(--border-hairline); padding: 10px 12px; text-align: center; vertical-align: top; }
+.checklist-fill-grid th, .checklist-fill-grid td { border-bottom: 1px solid rgba(0,90,135,.10); padding: 10px 12px; text-align: center; vertical-align: top; }
 .checklist-fill-grid thead th {
-  position: sticky; top: 0; z-index: 2; background: var(--color-surface-soft, #f7f8fb);
-  font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 800;
+  position: sticky; top: 0; z-index: 2;
+  background: rgba(240,249,255,.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--m-listas-deep); font-weight: 800;
 }
 .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion {
-  position: sticky; left: 0; z-index: 1; background: #fff; text-align: left;
-  min-width: 320px; max-width: 460px; white-space: normal; line-height: 1.45;
+  position: sticky; left: 0; z-index: 1;
+  background: rgba(255,255,255,.93); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  text-align: left; min-width: 320px; max-width: 460px; white-space: normal; line-height: 1.45;
 }
-.checklist-fill-grid thead th.fill-criterion { z-index: 3; background: var(--color-surface-soft, #f7f8fb); }
-.checklist-fill-grid tbody tr:hover td { background: color-mix(in srgb, var(--m-seguridad) 4%, #fff); }
-.checklist-fill-grid tbody tr:hover td.fill-criterion { background: color-mix(in srgb, var(--m-seguridad) 4%, #fff); }
+.checklist-fill-grid thead th.fill-criterion { z-index: 3; background: rgba(240,249,255,.96); }
+.checklist-fill-grid tbody tr:hover td { background: color-mix(in srgb, var(--m-listas) 6%, transparent); }
 .checklist-fill-grid tr.fill-domain-row td {
-  background: var(--m-seguridad-soft); color: var(--m-seguridad); text-align: left;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--m-listas) 16%, transparent), color-mix(in srgb, var(--m-listas) 5%, transparent));
+  color: var(--m-listas-deep); text-align: left;
   font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
-  border-left: 3px solid var(--m-seguridad); position: sticky; left: 0;
+  border-left: 3px solid var(--m-listas); position: sticky; left: 0;
 }
 .fill-subject-head { display: inline-block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .fill-criterion-text { display: flex; align-items: flex-start; gap: 6px; }
-.fill-num { font-weight: 800; color: var(--m-seguridad); flex: none; }
-.fill-guidance { color: var(--muted); flex: none; margin-top: 1px; }
+.fill-num { font-weight: 800; color: var(--m-listas); flex: none; }
+.fill-guidance { color: var(--m-listas); flex: none; margin-top: 1px; opacity: .7; }
 .fill-guidance-text { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
 
-/* Celda sin responder: se marca en el fondo para que salte a la vista que falta, sin gritar. */
-.checklist-fill-grid td.is-unanswered { background: color-mix(in srgb, #f59e0b 7%, #fff); }
-.checklist-fill-grid tbody tr:hover td.is-unanswered { background: color-mix(in srgb, #f59e0b 12%, #fff); }
+/* Celda sin responder: ambar tenue para que salte a la vista lo que falta. */
+.checklist-fill-grid td.is-unanswered { background: color-mix(in srgb, #f59e0b 9%, transparent); }
+.checklist-fill-grid tbody tr:hover td.is-unanswered { background: color-mix(in srgb, #f59e0b 15%, transparent); }
 
 .fill-value-group { display: inline-flex; gap: 5px; }
 .fill-value {
-  min-width: 42px; height: 38px; border-radius: 10px; border: 1px dashed #d8dde5;
-  background: transparent; color: #b9c0c9; font-size: 12px; font-weight: 800; cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 120ms ease;
+  min-width: 42px; height: 38px; border-radius: 10px; border: 1px dashed rgba(0,90,135,.28);
+  background: rgba(255,255,255,.5); color: #7c8b98; font-size: 12px; font-weight: 800; cursor: pointer;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 120ms ease, box-shadow 140ms ease;
 }
-.fill-value:hover:not(:disabled) { border-color: #9aa3ad; color: #6b7480; }
+.fill-value:hover:not(:disabled) { border-color: var(--m-listas); color: var(--m-listas-deep); }
 .fill-value:active:not(:disabled) { transform: scale(.94); }
 .fill-value:disabled { cursor: default; opacity: .55; }
-.fill-value.is-active { border-style: solid; border-color: transparent; }
-.fill-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 20%, white); color: oklch(0.45 0.15 150); }
-.fill-value--nc.is-active { background: color-mix(in srgb, var(--danger) 16%, white); color: var(--danger); }
-.fill-value--na.is-active { background: #eef0f3; color: var(--ink-soft); }
+.fill-value.is-active { border-style: solid; border-color: transparent; box-shadow: 0 4px 12px rgba(0,62,96,.12); }
+.fill-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 22%, white); color: oklch(0.42 0.15 150); }
+.fill-value--nc.is-active { background: color-mix(in srgb, var(--danger) 18%, white); color: var(--danger); }
+.fill-value--na.is-active { background: rgba(255,255,255,.9); color: var(--ink-soft); }
 
 /* --- Asignacion --- */
 .checklist-assign-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 .checklist-assign-row {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;
-  border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); background: #fff;
-  transition: border-color 140ms ease, background 140ms ease;
+  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
+  background: rgba(255,255,255,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
-.checklist-assign-row:hover { border-color: color-mix(in srgb, var(--m-seguridad) 45%, transparent); }
-.checklist-assign-row.is-selected { border-color: var(--m-seguridad); background: color-mix(in srgb, var(--m-seguridad) 5%, #fff); }
-.checklist-assign-row input { width: 18px; height: 18px; flex: none; accent-color: var(--m-seguridad); }
+.checklist-assign-row:hover { border-color: color-mix(in srgb, var(--m-listas) 50%, transparent); }
+.checklist-assign-row.is-selected {
+  border-color: var(--m-listas);
+  background: linear-gradient(135deg, rgba(255,255,255,.8), color-mix(in srgb, var(--m-listas) 12%, transparent));
+  box-shadow: 0 6px 18px rgba(0,127,188,.14);
+}
+.checklist-assign-row input { width: 18px; height: 18px; flex: none; accent-color: var(--m-listas); }
 .checklist-assign-row strong { display: block; font-size: 12.5px; color: var(--ink); }
 .checklist-assign-row small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 
-@media (max-width: 900px) {
-  .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion { min-width: 220px; }
-  .fill-value { min-width: 38px; height: 40px; }
-}
-
-/* --- Fase 3: firmas digitales --- */
+/* --- Firmas --- */
 .signature-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .signature-item {
   position: relative; display: grid; gap: 8px; padding: 12px;
-  border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); background: #fff;
+  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
+  background: rgba(255,255,255,.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-.signature-item img {
-  width: 100%; height: 90px; object-fit: contain; background: #fcfcfd;
-  border-bottom: 1px solid var(--border-hairline);
-}
+.signature-item img { width: 100%; height: 90px; object-fit: contain; background: rgba(255,255,255,.7); border-bottom: 1px solid rgba(0,90,135,.12); border-radius: 8px; }
 .signature-item-meta strong { display: block; font-size: 12.5px; color: var(--ink); }
 .signature-item-meta small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 1px; }
 .signature-item-meta time { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .signature-item > .survey-icon-button { position: absolute; top: 8px; right: 8px; }
 
-.signature-capture {
-  padding: 16px; border-radius: var(--radius-card-sm, 14px);
-  border: 1px dashed color-mix(in srgb, var(--m-seguridad) 40%, transparent);
-  background: color-mix(in srgb, var(--m-seguridad) 4%, #fff);
-}
 .signature-capture-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
-
 .signature-pad { position: relative; }
 .signature-pad-canvas {
   display: block; width: 100%; max-width: 600px; aspect-ratio: 600 / 180;
-  border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
+  border: 1px solid rgba(255,255,255,.85); border-radius: 12px;
+  background: rgba(255,255,255,.85);
+  box-shadow: 0 6px 18px rgba(0,62,96,.10) inset;
   /* Sin esto, arrastrar el dedo para firmar hace scroll de la pagina en vez de trazar. */
   touch-action: none; cursor: crosshair;
 }
-.signature-pad-hint {
-  position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
-  color: #b9c0c9; font-size: 12.5px; font-weight: 600; max-width: 600px;
-}
+.signature-pad-hint { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #93a3b1; font-size: 12.5px; font-weight: 600; max-width: 600px; }
 .signature-pad-clear {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
-  border: 1px solid var(--border-hairline); border-radius: 8px; background: #fff;
-  padding: 6px 12px; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer;
+  border: 1px solid rgba(255,255,255,.8); border-radius: 8px; background: rgba(255,255,255,.6);
+  backdrop-filter: blur(6px); padding: 6px 12px; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer;
 }
-.signature-pad-clear:hover { color: var(--ink); border-color: #9aa3ad; }
+.signature-pad-clear:hover { color: var(--m-listas-deep); border-color: var(--m-listas); }
+
+@media (max-width: 900px) {
+  .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion { min-width: 220px; }
+  .fill-value { min-width: 38px; height: 40px; }
+}
+@media (max-width: 720px) {
+  .checklist-field-row > div { width: 100%; }
+  .checklist-sim-grid td.sim-criterion, .checklist-sim-grid th.sim-criterion { min-width: 200px; }
+}
+/* El desenfoque es caro al hacer scroll; en equipos que piden menos movimiento se cae a
+   superficies solidas, que ademas suben el contraste. */
+@media (prefers-reduced-motion: reduce) {
+  .checklists-page-bg .ds-card, .checklists-page-bg .surface-panel,
+  .checklist-criterion, .checklist-field-row, .checklist-assign-row, .signature-item {
+    backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(255,255,255,.92);
+  }
+}
