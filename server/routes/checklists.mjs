@@ -253,6 +253,41 @@ async function assertAudit(request, { requireOpen = false } = {}) {
   return audit
 }
 
+/**
+ * Deja constancia en la bitacora. Se le pasa `client` cuando va dentro de una transaccion, para
+ * que el registro se revierta con ella y no queden apuntes de cosas que no llegaron a pasar.
+ */
+async function logAudit(request, { auditId, label, action, detail = '' }, client = null) {
+  const run = client ? client.query.bind(client) : query
+  await run(
+    `INSERT INTO checklist_audit_log (organization_id, audit_id, audit_label, action, detail, actor_id, actor_name)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [oid(request), auditId, label, action, detail, uid(request), request.auth.user.fullName || ''],
+  )
+}
+
+/**
+ * Congela la adherencia por dominio y por sujeto. El tablero agrega sobre miles de respuestas y
+ * recalcular en cada consulta no escala; ademas un resultado ya firmado tiene que quedar tal
+ * como se firmo, aunque despues cambie la lista.
+ */
+async function persistResults(client, auditId, result) {
+  await client.query('DELETE FROM checklist_audit_domain_results WHERE audit_id = $1', [auditId])
+  await client.query('DELETE FROM checklist_audit_subject_results WHERE audit_id = $1', [auditId])
+  for (const row of result.byDomain) {
+    await client.query(
+      `INSERT INTO checklist_audit_domain_results (audit_id, domain_id, c, nc, na, percent)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [auditId, row.domainId, row.c, row.nc, row.na, row.percent])
+  }
+  for (const row of result.bySubject) {
+    await client.query(
+      `INSERT INTO checklist_audit_subject_results (audit_id, audit_subject_id, c, nc, na, percent)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [auditId, row.subjectId, row.c, row.nc, row.na, row.percent])
+  }
+}
+
 async function auditPayload(audit) {
   const structure = await loadStructure(audit.template_id)
   const [subjects, answers, headerFields, signatures] = await Promise.all([
@@ -326,11 +361,21 @@ checklistsRouter.post('/audits', checklistsModule, fill, async (request, respons
       if (!assigned.rows[0]) fail(403, 'No tienes asignada esta lista')
     }
     const inserted = await query(
-      `INSERT INTO checklist_audits (organization_id, template_id, area_id, audit_date, header_values, auditor_id)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6) RETURNING *`,
-      [oid(request), templateId, template.rows[0].area_id, body.auditDate || new Date().toISOString().slice(0, 10),
-        JSON.stringify(body.headerValues || {}), uid(request)],
+      `INSERT INTO checklist_audits (organization_id, template_id, area_id, audit_date, shift, header_values,
+                                     template_code, template_version, auditor_id, updated_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$9) RETURNING *`,
+      [oid(request), templateId,
+        body.areaId ? Number(body.areaId) : template.rows[0].area_id,
+        body.auditDate || new Date().toISOString().slice(0, 10),
+        body.shift ? String(body.shift).trim() : null,
+        JSON.stringify(body.headerValues || {}),
+        template.rows[0].code, template.rows[0].version, uid(request)],
     )
+    await logAudit(request, {
+      auditId: inserted.rows[0].id,
+      label: `${template.rows[0].code || 'Lista'} · ${template.rows[0].name}`,
+      action: 'CREADA',
+    })
     response.status(201).json(inserted.rows[0])
   } catch (error) { next(error) }
 })
@@ -444,7 +489,9 @@ checklistsRouter.put('/audits/:auditId/answers', checklistsModule, fill, async (
         [audit.id, subjectRowId, criterionId, entry.value, String(entry.observation || '')],
       )
     }
-    await client.query('UPDATE checklist_audits SET updated_at = NOW() WHERE id = $1', [audit.id])
+    await client.query(
+      'UPDATE checklist_audits SET updated_at = NOW(), updated_by_id = $2 WHERE id = $1',
+      [audit.id, uid(request)])
     await client.query('COMMIT')
     const refreshed = await assertAudit(request)
     response.json(await auditPayload(refreshed))
@@ -517,12 +564,26 @@ checklistsRouter.post('/audits/:auditId/close', checklistsModule, fill, async (r
       fail(409, `Faltan ${payload.adherence.pending} respuestas por marcar. Complétalas antes de cerrar.`)
     }
     const percent = payload.adherence.overall.percent
-    const updated = await query(
-      `UPDATE checklist_audits SET status = 'CERRADA', adherence_percent = $1, concept = $2,
-              closed_at = NOW(), updated_at = NOW()
-       WHERE id = $3 RETURNING *`,
-      [percent, conceptFromPercent(percent), audit.id],
-    )
+    const client = await pool.connect()
+    let updated
+    try {
+      await client.query('BEGIN')
+      updated = await client.query(
+        `UPDATE checklist_audits SET status = 'CERRADA', adherence_percent = $1, concept = $2,
+                closed_at = NOW(), updated_at = NOW(), updated_by_id = $3
+         WHERE id = $4 RETURNING *`,
+        [percent, conceptFromPercent(percent), uid(request), audit.id],
+      )
+      await persistResults(client, audit.id, payload.adherence)
+      await logAudit(request, {
+        auditId: audit.id, label: `${audit.template_code || ''} · ${audit.template_name || ''}`.trim(),
+        action: 'CERRADA', detail: percent === null ? 'Sin dato (todo NA)' : `${Number(percent).toFixed(1)} %`,
+      }, client)
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw error
+    } finally { client.release() }
     response.json({ ...payload, ...updated.rows[0] })
   } catch (error) { next(error) }
 })
@@ -539,9 +600,17 @@ checklistsRouter.post('/audits/:auditId/reopen', checklistsModule, fill, async (
     const removed = await client.query('DELETE FROM checklist_signatures WHERE audit_id = $1 RETURNING id', [audit.id])
     await client.query(
       `UPDATE checklist_audits SET status = 'BORRADOR', adherence_percent = NULL, concept = NULL,
-              closed_at = NULL, updated_at = NOW() WHERE id = $1`,
-      [audit.id],
+              closed_at = NULL, updated_at = NOW(), updated_by_id = $2 WHERE id = $1`,
+      [audit.id, uid(request)],
     )
+    // Los resultados congelados dejan de valer en cuanto la auditoria vuelve a ser editable.
+    await client.query('DELETE FROM checklist_audit_domain_results WHERE audit_id = $1', [audit.id])
+    await client.query('DELETE FROM checklist_audit_subject_results WHERE audit_id = $1', [audit.id])
+    await logAudit(request, {
+      auditId: audit.id, label: `${audit.template_code || ''} · ${audit.template_name || ''}`.trim(),
+      action: 'REABIERTA',
+      detail: removed.rowCount ? `Se invalidaron ${removed.rowCount} firma(s)` : 'Sin firmas que invalidar',
+    }, client)
     await client.query('COMMIT')
     const refreshed = await assertAudit(request)
     response.json({ ...await auditPayload(refreshed), invalidatedSignatures: removed.rowCount })

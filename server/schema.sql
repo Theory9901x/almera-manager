@@ -940,3 +940,73 @@ CREATE TABLE IF NOT EXISTS checklist_signatures (
   signed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS checklist_signatures_idx ON checklist_signatures(audit_id);
+
+-- ---------------------------------------------------------------------------
+-- Listas de Chequeo — trazabilidad y resultados persistidos
+--
+-- El centro de datos filtra por profesional, fecha, servicio, turno, dominio y
+-- criterio. Eso exige que la auditoria GUARDE ese contexto, no que se deduzca.
+-- Todo idempotente: se aplica en cada arranque.
+-- ---------------------------------------------------------------------------
+
+-- Turno: parte del contexto de la ronda y filtro del tablero. Nulo = la lista no lo pide.
+ALTER TABLE checklist_audits ADD COLUMN IF NOT EXISTS shift TEXT;
+
+-- Codigo y version CONGELADOS el dia de la ronda. Sin esto, publicar la version 02 de una
+-- lista reescribiria la identidad de todas las auditorias hechas con la 01.
+ALTER TABLE checklist_audits ADD COLUMN IF NOT EXISTS template_code TEXT NOT NULL DEFAULT '';
+ALTER TABLE checklist_audits ADD COLUMN IF NOT EXISTS template_version TEXT NOT NULL DEFAULT '';
+
+-- Quien la toco por ultima vez. `updated_at` sola no sirve para responder "¿quien cambio esto?".
+ALTER TABLE checklist_audits ADD COLUMN IF NOT EXISTS updated_by_id BIGINT REFERENCES users(id);
+
+-- Relleno para las auditorias que ya existen.
+UPDATE checklist_audits a
+   SET template_code = t.code, template_version = t.version
+  FROM checklist_templates t
+ WHERE t.id = a.template_id AND a.template_code = '';
+
+-- Adherencia por dominio y por sujeto, guardada al cerrar. Se puede recalcular desde las
+-- respuestas, pero el tablero agrega sobre miles de filas y recalcular en cada consulta no
+-- escala; ademas, un resultado firmado debe quedar tal como se firmo.
+CREATE TABLE IF NOT EXISTS checklist_audit_domain_results (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  domain_id BIGINT NOT NULL REFERENCES checklist_domains(id) ON DELETE CASCADE,
+  c INTEGER NOT NULL DEFAULT 0,
+  nc INTEGER NOT NULL DEFAULT 0,
+  na INTEGER NOT NULL DEFAULT 0,
+  percent NUMERIC,
+  UNIQUE (audit_id, domain_id)
+);
+CREATE INDEX IF NOT EXISTS checklist_audit_domain_results_idx ON checklist_audit_domain_results(audit_id);
+
+CREATE TABLE IF NOT EXISTS checklist_audit_subject_results (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  audit_subject_id BIGINT NOT NULL REFERENCES checklist_audit_subjects(id) ON DELETE CASCADE,
+  c INTEGER NOT NULL DEFAULT 0,
+  nc INTEGER NOT NULL DEFAULT 0,
+  na INTEGER NOT NULL DEFAULT 0,
+  percent NUMERIC,
+  UNIQUE (audit_id, audit_subject_id)
+);
+CREATE INDEX IF NOT EXISTS checklist_audit_subject_results_idx ON checklist_audit_subject_results(audit_id);
+
+-- Bitacora. Una auditoria firmada que luego se edita o se borra tiene que dejar rastro de
+-- quien lo hizo y cuando; es el requisito que convierte esto en un registro de calidad y no
+-- en una hoja de calculo compartida.
+CREATE TABLE IF NOT EXISTS checklist_audit_log (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  audit_id BIGINT,
+  audit_label TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL CHECK (action IN ('CREADA', 'EDITADA', 'CERRADA', 'REABIERTA', 'ELIMINADA')),
+  detail TEXT NOT NULL DEFAULT '',
+  actor_id BIGINT REFERENCES users(id),
+  actor_name TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- audit_id sin FK a proposito: al BORRAR la auditoria el registro tiene que sobrevivir, que es
+-- justo el caso que mas importa auditar.
+CREATE INDEX IF NOT EXISTS checklist_audit_log_idx ON checklist_audit_log(organization_id, created_at DESC);
