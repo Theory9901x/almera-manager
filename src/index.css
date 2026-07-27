@@ -3390,3 +3390,56 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .checklist-fill-grid th.fill-criterion { min-width: 240px; max-width: 300px; }
   .fill-value-group { gap: 3px; }
 }
+
+/* --- Confirmacion de acciones irreversibles (design system) --- */
+.ds-confirm-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(8, 22, 34, .55);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: ds-confirm-in 160ms ease both;
+}
+.ds-confirm {
+  position: relative; width: min(460px, 100%);
+  border-radius: 20px; padding: 26px 26px 22px;
+  background: #fff; border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 24px 60px rgba(0, 40, 70, .28), 0 2px 8px rgba(0, 40, 70, .12);
+  animation: ds-confirm-pop 200ms cubic-bezier(.2, .9, .3, 1) both;
+  text-wrap: pretty;
+}
+.ds-confirm h2 { margin: 14px 0 0; font-size: 17px; font-weight: 800; color: var(--ink); text-wrap: balance; }
+.ds-confirm-body { margin-top: 8px; font-size: 13px; line-height: 1.6; color: var(--ink-soft); }
+.ds-confirm-body strong { color: var(--ink); }
+.ds-confirm-icon {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px;
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent); color: var(--color-brand);
+}
+.ds-confirm-icon.is-danger { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.ds-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.ds-confirm-close {
+  position: absolute; top: 14px; right: 14px; border: 0; background: transparent;
+  color: var(--muted); cursor: pointer; padding: 4px; border-radius: 8px; line-height: 0;
+}
+.ds-confirm-close:hover { color: var(--ink); background: rgba(0, 0, 0, .05); }
+@keyframes ds-confirm-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ds-confirm-pop { from { opacity: 0; transform: translateY(10px) scale(.97) } to { opacity: 1; transform: none } }
+@media (prefers-reduced-motion: reduce) {
+  .ds-confirm-backdrop, .ds-confirm { animation: none; }
+}
+
+/* Barra de seleccion multiple sobre una tabla. */
+.ds-bulk-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 0 0 2px; padding: 10px 16px;
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--m-listas) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--m-listas) 28%, transparent);
+  font-size: 12.5px; font-weight: 700; color: var(--m-listas-deep);
+}
+.ds-bulk-bar .spacer { margin-left: auto; }
+.checklists-table td .row-check, .checklists-table th .row-check { width: 20px; height: 20px; accent-color: var(--m-listas); cursor: pointer; }
+.ds-confirm-list { margin: 12px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.7; color: var(--ink-soft); }
+.ds-confirm-list strong { color: var(--ink); }
+.row-action.is-danger { color: var(--danger) !important; }
+.row-action.is-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); border-radius: 8px; }
+.checklists-table tbody tr.is-selected td { background: color-mix(in oklch, var(--m-listas) 10%, transparent) !important; }

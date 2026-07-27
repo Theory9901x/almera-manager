@@ -140,6 +140,7 @@ export interface ChecklistAnswer {
 export interface AuditSummary {
   id: string
   audit_date: string
+  shift?: string | null
   status: AuditStatus
   adherence_percent: number | null
   concept: string | null
@@ -148,6 +149,17 @@ export interface AuditSummary {
   area_name: string | null
   auditor_name: string
   subject_count: number
+}
+
+/** Una entrada de la bitácora. Sobrevive al borrado de la auditoría, por eso guarda el texto. */
+export interface AuditLogEntry {
+  id: string
+  audit_id: string | null
+  audit_label: string
+  action: 'CREADA' | 'EDITADA' | 'CERRADA' | 'REABIERTA' | 'ELIMINADA'
+  detail: string
+  actor_name: string
+  created_at: string
 }
 
 // ---- Fase 4: analítica ----

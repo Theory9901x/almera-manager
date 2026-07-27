@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardCheck, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
+import { BarChart3, ClipboardCheck, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import {
-  Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
+  Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
@@ -43,6 +43,10 @@ function ChecklistsListContent() {
   const [form, setForm] = useState({ name: '', code: '', version: '01', areaId: '' })
   const [newAudit, setNewAudit] = useState({ templateId: '', auditDate: new Date().toISOString().slice(0, 10) })
   const [seeds, setSeeds] = useState<SeedTemplate[]>([])
+  // Seleccion para el borrado multiple, y lo que se esta a punto de borrar. `pendingDelete` en
+  // null significa que no hay confirmacion abierta: no se borra nada sin pasar por ahi.
+  const [selected, setSelected] = useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = useState<AuditSummary[] | null>(null)
 
   async function load() {
     try {
@@ -100,6 +104,25 @@ function ChecklistsListContent() {
     finally { setBusy(false) }
   }
 
+  function toggleSelected(id: string) {
+    setSelected(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    setBusy(true)
+    try {
+      const ids = pendingDelete.map(audit => audit.id)
+      if (ids.length === 1) await checklistsService.removeAudit(ids[0])
+      else await checklistsService.removeAudits(ids)
+      toast.push('success', ids.length === 1 ? 'Auditoria eliminada' : `${ids.length} auditorias eliminadas`)
+      setSelected(current => current.filter(id => !ids.includes(id)))
+      setPendingDelete(null)
+      await load()
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible eliminar') }
+    finally { setBusy(false) }
+  }
+
   async function startAudit() {
     if (!newAudit.templateId) { toast.push('error', 'Elige la lista a diligenciar'); return }
     setBusy(true)
@@ -134,6 +157,36 @@ function ChecklistsListContent() {
           </div>
         </div>
       </ModuleHero>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        tone="danger"
+        title={pendingDelete && pendingDelete.length > 1
+          ? `¿Eliminar ${pendingDelete.length} auditorías?`
+          : '¿Eliminar esta auditoría?'}
+        confirmLabel={pendingDelete && pendingDelete.length > 1 ? `Sí, eliminar ${pendingDelete.length}` : 'Sí, eliminar'}
+        busy={busy}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => void confirmDelete()}
+        description={pendingDelete && (
+          <>
+            <p>
+              Se borran sus respuestas, sujetos y firmas. <strong>No se puede deshacer.</strong>
+              {' '}Queda constancia de quién la eliminó y cuándo.
+            </p>
+            <ul className="ds-confirm-list">
+              {pendingDelete.slice(0, 6).map(audit => (
+                <li key={audit.id}>
+                  <strong>{audit.template_name}</strong> · {audit.audit_date}
+                  {audit.status === 'CERRADA' ? ' · cerrada' : ' · borrador'}
+                  {audit.adherence_percent !== null ? ` · ${Number(audit.adherence_percent).toFixed(1)} %` : ''}
+                </li>
+              ))}
+              {pendingDelete.length > 6 && <li>y {pendingDelete.length - 6} más…</li>}
+            </ul>
+          </>
+        )}
+      />
 
       <div className="surface-panel is-header" style={{ ['--ds-accent' as string]: identity.color }}>
         <nav className="ds-tabs" aria-label="Secciones de listas de chequeo">
@@ -216,16 +269,46 @@ function ChecklistsListContent() {
                 </div>
                 {audits.length ? (
                   <div className="checklists-table">
+                    {canManage && selected.length > 0 && (
+                      <div className="ds-bulk-bar">
+                        <span>{selected.length} seleccionada{selected.length === 1 ? '' : 's'}</span>
+                        <button className="row-action" onClick={() => setSelected([])}>Quitar selección</button>
+                        <span className="spacer" />
+                        <Button variant="danger" onClick={() => setPendingDelete(audits.filter(a => selected.includes(a.id)))}>
+                          <Trash2 size={15} /> Eliminar seleccionadas
+                        </Button>
+                      </div>
+                    )}
                     <Table>
                       <thead>
-                        <tr><th>Lista</th><th>Área</th><th>Fecha</th><th>Sujetos</th><th>Adherencia</th><th>Concepto</th><th>Auditor</th><th>Estado</th><th></th></tr>
+                        <tr>
+                          {canManage && (
+                            <th style={{ width: 36 }}>
+                              <input
+                                type="checkbox" className="row-check" aria-label="Seleccionar todas"
+                                checked={selected.length === audits.length && audits.length > 0}
+                                onChange={event => setSelected(event.target.checked ? audits.map(a => a.id) : [])}
+                              />
+                            </th>
+                          )}
+                          <th>Lista</th><th>Área</th><th>Fecha</th><th>Turno</th><th>Sujetos</th><th>Adherencia</th><th>Concepto</th><th>Auditor</th><th>Estado</th><th></th>
+                        </tr>
                       </thead>
                       <tbody>
                         {audits.map(audit => (
-                          <tr key={audit.id}>
+                          <tr key={audit.id} className={selected.includes(audit.id) ? 'is-selected' : ''}>
+                            {canManage && (
+                              <td>
+                                <input
+                                  type="checkbox" className="row-check" aria-label={`Seleccionar ${audit.template_name}`}
+                                  checked={selected.includes(audit.id)} onChange={() => toggleSelected(audit.id)}
+                                />
+                              </td>
+                            )}
                             <td><strong>{audit.template_name}</strong></td>
                             <td>{audit.area_name || '—'}</td>
                             <td className="tabular-col">{new Date(`${audit.audit_date}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                            <td>{audit.shift || '—'}</td>
                             <td className="tabular-col">{audit.subject_count}</td>
                             <td className="tabular-col">
                               {audit.adherence_percent === null
@@ -236,9 +319,16 @@ function ChecklistsListContent() {
                             <td>{audit.auditor_name}</td>
                             <td><Badge tone={audit.status === 'CERRADA' ? 'info' : 'neutral'}>{audit.status === 'CERRADA' ? 'Cerrada' : 'Borrador'}</Badge></td>
                             <td>
-                              <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/auditorias/${audit.id}`)}>
-                                {audit.status === 'CERRADA' ? 'Ver' : 'Continuar'}
-                              </button>
+                              <div className="row-action-group">
+                                <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/auditorias/${audit.id}`)}>
+                                  <Pencil size={13} /> {audit.status === 'CERRADA' ? 'Ver y editar' : 'Continuar'}
+                                </button>
+                                {canManage && (
+                                  <button className="row-action is-danger" onClick={() => setPendingDelete([audit])}>
+                                    <Trash2 size={13} /> Eliminar
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}

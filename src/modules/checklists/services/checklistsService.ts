@@ -1,5 +1,5 @@
 import type {
-  AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditSummary,
+  AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
   ChecklistArea, ChecklistMembership, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
@@ -86,6 +86,9 @@ export const checklistsService = {
   updateAudit: (auditId: string, data: { auditDate?: string; headerValues?: Record<string, string> }) =>
     call<AuditDetail>(`/audits/${auditId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   removeAudit: (auditId: string) => call<{ ok: true }>(`/audits/${auditId}`, { method: 'DELETE' }),
+  removeAudits: (ids: string[]) =>
+    call<{ ok: true; deleted: number }>('/audits/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+  auditLog: () => call<AuditLogEntry[]>('/audits/log'),
 
   addSubject: (auditId: string, data: { displayName: string; attributes?: Record<string, string>; subjectId?: string | null }) =>
     call<{ id: string }>(`/audits/${auditId}/subjects`, { method: 'POST', body: JSON.stringify(data) }),

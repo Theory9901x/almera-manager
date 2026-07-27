@@ -257,6 +257,17 @@ async function assertAudit(request, { requireOpen = false } = {}) {
  * Deja constancia en la bitacora. Se le pasa `client` cuando va dentro de una transaccion, para
  * que el registro se revierta con ella y no queden apuntes de cosas que no llegaron a pasar.
  */
+/** Etiqueta legible de la auditoria para la bitacora: tiene que seguir diciendo algo cuando la
+ *  fila ya no exista, asi que se guarda el texto, no el id. */
+function auditLabel(audit) {
+  const code = audit.template_code || audit.code || ''
+  // pg devuelve DATE como objeto Date: cortarlo como texto daba "Mon Jul 13 2026" en la
+  // bitacora. Se normaliza a AAAA-MM-DD, que es lo que se lee y se ordena.
+  const raw = audit.audit_date
+  const date = raw instanceof Date ? raw.toISOString().slice(0, 10) : String(raw || '').slice(0, 10)
+  return [code, audit.template_name, date].filter(Boolean).join(' · ')
+}
+
 async function logAudit(request, { auditId, label, action, detail = '' }, client = null) {
   const run = client ? client.query.bind(client) : query
   await run(
@@ -373,10 +384,23 @@ checklistsRouter.post('/audits', checklistsModule, fill, async (request, respons
     )
     await logAudit(request, {
       auditId: inserted.rows[0].id,
-      label: `${template.rows[0].code || 'Lista'} · ${template.rows[0].name}`,
+      label: auditLabel({ ...inserted.rows[0], template_name: template.rows[0].name }),
       action: 'CREADA',
     })
     response.status(201).json(inserted.rows[0])
+  } catch (error) { next(error) }
+})
+
+// Bitacora consultable: quien creo, cerro, reabrio, edito o elimino cada auditoria.
+checklistsRouter.get('/audits/log', checklistsModule, manage, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT id, audit_id, audit_label, action, detail, actor_name, created_at
+         FROM checklist_audit_log WHERE organization_id = $1
+        ORDER BY created_at DESC, id DESC LIMIT 200`,
+      [oid(request)],
+    )
+    response.json(result.rows)
   } catch (error) { next(error) }
 })
 
@@ -394,23 +418,75 @@ checklistsRouter.patch('/audits/:auditId', checklistsModule, fill, async (reques
     const sets = []
     const params = []
     const set = (column, value) => { params.push(value); sets.push(`${column} = $${params.length}`) }
-    if (body.auditDate !== undefined) set('audit_date', body.auditDate)
-    if (body.areaId !== undefined) set('area_id', body.areaId ? Number(body.areaId) : null)
-    if (body.headerValues !== undefined) { params.push(JSON.stringify(body.headerValues)); sets.push(`header_values = $${params.length}::jsonb`) }
+    const changed = []
+    if (body.auditDate !== undefined) { set('audit_date', body.auditDate); changed.push('fecha') }
+    if (body.areaId !== undefined) { set('area_id', body.areaId ? Number(body.areaId) : null); changed.push('servicio') }
+    if (body.shift !== undefined) { set('shift', body.shift ? String(body.shift).trim() : null); changed.push('turno') }
+    if (body.headerValues !== undefined) {
+      params.push(JSON.stringify(body.headerValues)); sets.push(`header_values = $${params.length}::jsonb`)
+      changed.push('cabecera')
+    }
     if (!sets.length) return response.json(audit)
+    set('updated_by_id', uid(request))
     params.push(audit.id)
     await query(`UPDATE checklist_audits SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${params.length}`, params)
+    await logAudit(request, {
+      auditId: audit.id, label: auditLabel(audit), action: 'EDITADA',
+      detail: `Cambió ${changed.join(', ')}`,
+    })
     const refreshed = await assertAudit(request)
     response.json(await auditPayload(refreshed))
   } catch (error) { next(error) }
 })
 
-checklistsRouter.delete('/audits/:auditId', checklistsModule, fill, async (request, response, next) => {
+// Borrar exige `manage`, no `fill`: un auditor diligencia lo suyo, pero eliminar el registro de
+// una ronda -- incluso una ya cerrada y firmada -- es una decision de calidad. La constancia se
+// escribe ANTES del DELETE y sobrevive a la fila borrada.
+checklistsRouter.delete('/audits/:auditId', checklistsModule, manage, async (request, response, next) => {
   try {
-    const audit = await assertAudit(request, { requireOpen: true })
+    const audit = await assertAudit(request)
+    await logAudit(request, {
+      auditId: audit.id, label: auditLabel(audit), action: 'ELIMINADA',
+      detail: `${audit.status === 'CERRADA' ? 'Estaba cerrada' : 'Estaba en borrador'}${
+        audit.adherence_percent !== null && audit.adherence_percent !== undefined
+          ? ` con ${Number(audit.adherence_percent).toFixed(1)} %` : ''}`,
+    })
     await query('DELETE FROM checklist_audits WHERE id = $1 AND organization_id = $2', [audit.id, oid(request)])
     response.json({ ok: true })
   } catch (error) { next(error) }
+})
+
+// Borrado por seleccion. En una transaccion: o se van todas o no se va ninguna, para que una
+// seleccion de veinte no quede a medias sin que nadie sepa cuales cayeron.
+checklistsRouter.post('/audits/bulk-delete', checklistsModule, manage, async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    const ids = (Array.isArray(request.body?.ids) ? request.body.ids : []).map(Number).filter(Boolean)
+    if (!ids.length) fail(400, 'No seleccionaste ninguna auditoría')
+    const found = await client.query(
+      `SELECT a.*, t.name AS template_name FROM checklist_audits a
+         JOIN checklist_templates t ON t.id = a.template_id
+        WHERE a.id = ANY($1::bigint[]) AND a.organization_id = $2`,
+      [ids, oid(request)],
+    )
+    if (!found.rows.length) fail(404, 'No se encontraron esas auditorías')
+    await client.query('BEGIN')
+    for (const audit of found.rows) {
+      await logAudit(request, {
+        auditId: audit.id, label: auditLabel(audit), action: 'ELIMINADA',
+        detail: `Borrado por selección (${found.rows.length} auditorías)`,
+      }, client)
+    }
+    await client.query(
+      'DELETE FROM checklist_audits WHERE id = ANY($1::bigint[]) AND organization_id = $2',
+      [found.rows.map(row => row.id), oid(request)],
+    )
+    await client.query('COMMIT')
+    response.json({ ok: true, deleted: found.rows.length })
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {})
+    next(error)
+  } finally { client.release() }
 })
 
 // ---- Sujetos de la auditoria ----
