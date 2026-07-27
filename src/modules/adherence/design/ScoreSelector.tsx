@@ -30,9 +30,20 @@ function keyFor(score: Score | undefined) {
   return String(score)
 }
 
-export function ScoreSelector({ value, onChange, disabled }: { value: Score | undefined; onChange(score: Score): void; disabled?: boolean }) {
+/**
+ * Variante `compact`: la misma celda, en caja solida de 30x24 con el digito — es la que exige el
+ * modo ampliado, donde hay hasta 25 columnas y la pastilla pastel con chevron no cabe. El color
+ * semantico (2 verde, 1 ambar, 0 rojo, NA gris) NO cambia entre variantes.
+ */
+export function ScoreSelector({ value, onChange, disabled, compact, onFocus }: {
+  value: Score | undefined
+  onChange(score: Score): void
+  disabled?: boolean
+  compact?: boolean
+  onFocus?(): void
+}) {
   const key = keyFor(value)
-  const style = STYLES[key]
+  const style = compact ? undefined : STYLES[key]
 
   return (
     <Select.Root
@@ -44,16 +55,18 @@ export function ScoreSelector({ value, onChange, disabled }: { value: Score | un
       disabled={disabled}
     >
       <Select.Trigger
-        className="score-selector-trigger"
+        className={`score-selector-trigger${compact ? ' is-compact' : ''}${compact && key ? ` sc-${key.toLowerCase()}` : ''}`}
         style={style ? { background: style.bg, color: style.fg, borderColor: style.border } : undefined}
         aria-label="Calificación"
+        onFocus={onFocus}
+        onPointerEnter={onFocus}
       >
         <Select.Value placeholder={<Minus size={12} />}>
           <motion.span key={key} initial={{ scale: 0.6, opacity: 0.4 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.22, ease: 'easeOut' }} style={{ display: 'inline-block' }}>
             {key ? (key === 'NA' ? 'NA' : key) : <Minus size={12} />}
           </motion.span>
         </Select.Value>
-        <Select.Icon><ChevronDown size={11} /></Select.Icon>
+        {!compact && <Select.Icon><ChevronDown size={11} /></Select.Icon>}
       </Select.Trigger>
       <Select.Portal>
         <Select.Content className="score-selector-content" position="popper" sideOffset={4}>

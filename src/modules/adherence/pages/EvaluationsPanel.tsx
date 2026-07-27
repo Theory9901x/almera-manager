@@ -1,16 +1,19 @@
-import { Fragment, useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ClipboardList, Download, Lock, Plus, Save, Send, Unlock } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, Layers, ListChecks, Lock,
+  Maximize2, Plus, Save, Search, Send, Sparkles, Unlock, X,
+} from 'lucide-react'
 import { Badge, Button, Card, DatePicker, Field, ModuleHero, Select, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
-import type { Area, CriterionResult, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score, ScopeResult } from '../types'
-import { ScoreSelector } from '../design/ScoreSelector'
+import type { Area, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score } from '../types'
 import { ConceptBadge } from '../design/ConceptBadge'
 import { ComplianceRing } from '../design/ComplianceRing'
-import { HcChip } from '../design/HcChip'
 import { GradientButton } from '../design/GradientButton'
+import { HcMatrix } from '../design/HcMatrix'
+import { HcMatrixFullscreen } from '../design/HcMatrixFullscreen'
 import { ToastStack } from '../design/Toast'
-import { colorForPercent, scopeColor, type Concept } from '../design/scopeColors'
+import { useLiveCompliance, type ScoreMap } from '../design/useLiveCompliance'
+import { colorForPercent, conceptFromPercent, CONCEPT_LABELS, type Concept } from '../design/scopeColors'
 
 const identity = moduleIdentity('adherence-matrix')
 
@@ -28,8 +31,6 @@ function newClosureForm() {
   return { generalObservations: '', commitments: '', improvementPlanPercent: '' }
 }
 
-type ScoreMap = Record<string, Record<string, Score>>
-
 export default function EvaluationsPanel({ areas, professionals }: { areas: Area[]; professionals: Professional[] }) {
   const [evaluations, setEvaluations] = useState<EvaluationSummary[]>([])
   const [filterAreaId, setFilterAreaId] = useState('')
@@ -42,9 +43,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   const [detail, setDetail] = useState<EvaluationDetail | null>(null)
   const [scores, setScores] = useState<ScoreMap>({})
   const [newRecordNumber, setNewRecordNumber] = useState('')
-  const [criterionResults, setCriterionResults] = useState<CriterionResult[]>([])
-  const [scopeResults, setScopeResults] = useState<ScopeResult[]>([])
-  const [overallCompliance, setOverallCompliance] = useState(0)
   const [concept, setConcept] = useState<string | null>(null)
   const [closureForm, setClosureForm] = useState(newClosureForm)
   const [evaluatorSignedNameInput, setEvaluatorSignedNameInput] = useState('')
@@ -52,9 +50,63 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   const [reopenJustification, setReopenJustification] = useState('')
   const [improvementPlan, setImprovementPlan] = useState<ImprovementPlan | null>(null)
   const [planForm, setPlanForm] = useState({ description: '', plannedStartDate: '', plannedEndDate: '' })
+  // Modo ampliado y filtros de la matriz. El filtro de sección y la búsqueda recortan LO QUE SE
+  // MUESTRA, nunca lo calificado: el cálculo sigue corriendo sobre la matriz completa.
+  const [fullscreen, setFullscreen] = useState(false)
+  const [scopeFilter, setScopeFilter] = useState('')
+  const [matrixSearch, setMatrixSearch] = useState('')
+  const [activeRecordId, setActiveRecordId] = useState<string | null>(null)
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3500) }
   const fail = (caught: unknown, fallback: string) => setError(caught instanceof Error ? caught.message : fallback)
+
+  // Cumplimiento EN VIVO con el motor compartido con el servidor. El hook va al nivel superior
+  // (no dentro del bloque de detalle) porque las reglas de hooks exigen el mismo orden en cada
+  // render; con la evaluación cerrada o sin abrir, recibe listas vacías.
+  const live = useLiveCompliance(detail?.criteria || [], detail?.scopes || [], detail?.records || [], scores)
+
+  // Criterios y ámbitos visibles según el filtro de sección y la búsqueda de la Parte A.
+  const visibleScopes = useMemo(() => {
+    if (!detail) return []
+    return detail.scopes.filter(scope => !scopeFilter || scope.id === scopeFilter)
+  }, [detail, scopeFilter])
+  const visibleCriteria = useMemo(() => {
+    if (!detail) return []
+    const needle = matrixSearch.trim().toLowerCase()
+    return detail.criteria.filter(criterion => !needle || criterion.text.toLowerCase().includes(needle))
+  }, [detail, matrixSearch])
+  const visibleRecords = useMemo(() => {
+    if (!detail) return []
+    const needle = matrixSearch.trim().toLowerCase()
+    // La búsqueda sirve para las dos cosas que el auditor teclea: un criterio o un nº de HC.
+    // Si coincide con alguna HC, se recorta a esas; si no, no toca las columnas.
+    if (!needle) return detail.records
+    const matching = detail.records.filter(record => record.record_number.toLowerCase().includes(needle))
+    return matching.length ? matching : detail.records
+  }, [detail, matrixSearch])
+
+  /** Hallazgos críticos: las celdas en 0 (no cumple), dichas como «HC 3333 — criterio». */
+  const criticalFindings = useMemo(() => {
+    if (!detail) return []
+    const out: { recordNumber: string; criterionText: string }[] = []
+    for (const record of detail.records) {
+      const byCriterion = scores[record.id] || {}
+      for (const criterion of detail.criteria) {
+        if (byCriterion[criterion.id] === 0) out.push({ recordNumber: record.record_number, criterionText: criterion.text })
+      }
+    }
+    return out
+  }, [detail, scores])
+
+  /** Los criterios que peor van, con dato. Ordenados de menor a mayor cumplimiento. */
+  const worstCriteria = useMemo(() => {
+    if (!detail) return []
+    return detail.criteria
+      .map(criterion => ({ criterion, percent: live.byCriterion.get(criterion.id) ?? null }))
+      .filter((row): row is { criterion: typeof row.criterion; percent: number } => row.percent !== null)
+      .sort((a, b) => a.percent - b.percent)
+      .slice(0, 5)
+  }, [detail, live])
 
   const loadEvaluations = () => adherenceService.evaluations(filterAreaId ? { areaId: filterAreaId } : {}).then(setEvaluations).catch(caught => fail(caught, 'No fue posible cargar las evaluaciones'))
   useEffect(() => { void loadEvaluations() }, [filterAreaId])
@@ -71,9 +123,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         map[scoreRow.evaluation_record_id][scoreRow.criterion_id] = scoreRow.score
       }
       setScores(map)
-      setCriterionResults(result.criterionResults)
-      setScopeResults(result.scopeResults)
-      setOverallCompliance(result.overallCompliance)
       setConcept(result.evaluation.concept)
       setClosureForm({
         generalObservations: result.evaluation.general_observations || '',
@@ -153,16 +202,11 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       const payload = Object.entries(scores).flatMap(([recordId, byCriterion]) =>
         Object.entries(byCriterion).map(([criterionId, score]) => ({ recordId, criterionId, score })))
       const result = await adherenceService.saveScores(selectedId, payload)
-      setCriterionResults(result.criterionResults)
-      setScopeResults(result.scopeResults)
-      setOverallCompliance(result.overallCompliance)
       setConcept(result.concept)
       notify('Calificaciones guardadas')
     } catch (caught) { fail(caught, 'No fue posible guardar las calificaciones') } finally { setBusy(false) }
   }
 
-  const scopeCompliance = (scopeId: string) => scopeResults.find(result => result.scopeId === scopeId)?.compliancePercent ?? null
-  const criterionCompliance = (criterionId: string) => criterionResults.find(result => result.criterionId === criterionId)?.compliancePercent ?? null
 
   const updateRecordObservations = async (recordId: string, observations: string) => {
     if (!selectedId) return
@@ -243,91 +287,193 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={isClosed ? 'info' : 'neutral'}>{isClosed ? 'Cerrada' : 'Borrador'}</Badge>
-              <ConceptBadge concept={concept as Concept | null} />
+              {/* Concepto EN VIVO, no el ultimo guardado: con el del servidor la cabecera decia
+                  "Sin calificar" junto a un 84 % ya calculado en pantalla. Al guardar, el
+                  servidor lo recalcula con los umbrales de la entidad y `concept` manda. */}
+              <ConceptBadge concept={(concept || conceptFromPercent(live.overall)) as Concept | null} />
               <Button identity={identity} onClick={() => void downloadReport()} disabled={busy}><Download size={15} />Informe PDF</Button>
             </div>
           }
         >
           <div className="hero-stat-inline">
             <div><div className="num">{detail.records.length}</div><div className="lbl">HC evaluadas</div></div>
-            <div><div className="num" style={{ color: colorForPercent(overallCompliance) }}>{Math.round(overallCompliance)}%</div><div className="lbl">Cumplimiento general</div></div>
+            <div><div className="num" style={{ color: colorForPercent(live.overall) }}>{live.overall === null ? '—' : `${Math.round(live.overall)}%`}</div><div className="lbl">Cumplimiento general</div></div>
           </div>
         </ModuleHero>
 
-        <Card accent={identity.color} className="p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {/* --- A1: KPIs de la evaluación, en vivo --- */}
+        <div className="hcop-kpis">
+          <div className="hcop-kpi">
+            <span className="ic"><ClipboardCheck size={17} /></span>
+            <div><div className="l">HC evaluadas</div><div className="v">{live.completedRecordIds.size}</div><div className="d">de {detail.records.length}</div></div>
+          </div>
+          <div className="hcop-kpi">
+            <span className="ic"><Sparkles size={17} /></span>
             <div>
-              <p className="ds-eyebrow">Calificación</p>
-              <h2 className="mt-1 text-xl font-black">Calificación por historia clínica</h2>
-              <p className="mt-1 text-xs text-[var(--muted)]">Cada columna es una HC. Marca 2 (cumple), 1 (parcial), 0 (no cumple) o NA (no aplica) por criterio.</p>
+              <div className="l">Cumplimiento general</div>
+              <div className="v" style={{ color: colorForPercent(live.overall) }}>{live.overall === null ? '—' : `${Math.round(live.overall)}%`}</div>
+              <div className="d">ponderado, NA excluido</div>
             </div>
-            {!isClosed && (
-              <div className="flex items-end gap-3">
-                <div className="min-w-[200px]"><Field label="Nueva HC (No.)"><input className="ds-input" value={newRecordNumber} onChange={event => setNewRecordNumber(event.target.value)} placeholder="Ej. 100234" /></Field></div>
-                <GradientButton onClick={() => void addRecord()} disabled={busy}><Plus size={16} />Agregar HC</GradientButton>
+          </div>
+          <div className="hcop-kpi">
+            <span className="ic"><ListChecks size={17} /></span>
+            <div><div className="l">Celdas calificadas</div><div className="v">{live.graded}/{live.totalCells}</div><div className="d">{live.totalCells ? Math.round((live.graded / live.totalCells) * 100) : 0}% del total</div></div>
+          </div>
+          <div className="hcop-kpi">
+            <span className="ic"><AlertTriangle size={17} /></span>
+            <div><div className="l">No conformidades</div><div className="v">{live.counts.zero}</div><div className="d">requieren acción</div></div>
+          </div>
+          <div className="hcop-kpi">
+            <span className="ic"><Layers size={17} /></span>
+            <div>
+              <div className="l">Estado semaforización</div>
+              <div className="v is-sm">{live.overall === null ? 'Sin dato' : CONCEPT_LABELS[conceptFromPercent(live.overall) as Concept]}</div>
+              <div className="hcop-dots">
+                <i style={{ background: '#059669' }} /><i style={{ background: '#65A30D' }} />
+                <i style={{ background: '#D97706' }} /><i style={{ background: '#DC2626' }} />
               </div>
-            )}
-          </div>
-
-          {detail.records.length ? (
-            <div className="hc-grid-wrap">
-              <table className="hc-grid">
-                <thead>
-                  <tr>
-                    <th className="hc-criterion">Criterio</th>
-                    <th className="hc-summary">% Cumpl.</th>
-                    <AnimatePresence initial={false}>
-                      {detail.records.map(record => (
-                        <motion.th
-                          key={record.id}
-                          initial={{ opacity: 0, x: -16 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 16 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <HcChip number={record.record_number} onRemove={!isClosed ? () => void removeRecord(record.id) : undefined} />
-                        </motion.th>
-                      ))}
-                    </AnimatePresence>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.scopes.map((scope, scopeIndex) => {
-                    const color = scopeColor(scopeIndex)
-                    return (
-                      <Fragment key={scope.id}>
-                        <tr className="hc-scope-row">
-                          <td className="scope-header-row">{scope.name}</td>
-                          <td className="hc-summary"><ComplianceRing percent={scopeCompliance(scope.id)} size={30} strokeWidth={3.5} /></td>
-                          {detail.records.map(record => <td key={record.id} />)}
-                        </tr>
-                        {detail.criteria.filter(criterion => criterion.scope_id === scope.id).map(criterion => (
-                          <tr key={criterion.id} className="scope-criterion-row" style={{ borderLeftColor: color.from }}>
-                            <td className="hc-criterion">{criterion.text} <em className="text-[var(--muted)]">({Number(criterion.weight).toFixed(0)}%)</em></td>
-                            <td className="hc-summary"><ComplianceRing percent={criterionCompliance(criterion.id)} size={28} strokeWidth={3.5} /></td>
-                            {detail.records.map(record => (
-                              <td key={record.id}>
-                                <ScoreSelector
-                                  value={scores[record.id]?.[criterion.id]}
-                                  disabled={isClosed}
-                                  onChange={value => setScore(record.id, criterion.id, value)}
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
             </div>
-          ) : <div className="almera-empty"><p>Agrega al menos una historia clínica para empezar a calificar.</p></div>}
-
-          <div className="mt-4 flex justify-end">
-            <GradientButton onClick={() => void saveScores()} disabled={busy || isClosed}><Save size={16} />Guardar calificaciones</GradientButton>
           </div>
-        </Card>
+        </div>
+
+        {/* --- A1: filtros de la matriz --- */}
+        <div className="hcop-filters">
+          <label className="hcop-f">
+            <span>Sección</span>
+            <Select
+              value={scopeFilter || 'ALL'}
+              onChange={value => setScopeFilter(value === 'ALL' ? '' : value)}
+              options={[{ value: 'ALL', label: 'Todas las secciones' }, ...detail.scopes.map(scope => ({ value: scope.id, label: scope.name }))]}
+            />
+          </label>
+          <label className="hcop-f is-grow">
+            <span>Buscar criterio o HC</span>
+            <span className="hcop-search">
+              <Search size={14} />
+              <input value={matrixSearch} onChange={event => setMatrixSearch(event.target.value)} placeholder="Texto del criterio o nº de historia clínica" />
+            </span>
+          </label>
+          {(scopeFilter || matrixSearch) && (
+            <Button variant="secondary" onClick={() => { setScopeFilter(''); setMatrixSearch('') }}><X size={15} /> Limpiar filtros</Button>
+          )}
+          <Button variant="secondary" onClick={() => void downloadReport()} disabled={busy}><Download size={15} /> Exportar</Button>
+        </div>
+
+        {/* --- A2 + A3: matriz y panel de análisis --- */}
+        <div className="hcop-content">
+          <Card accent={identity.color} className="overflow-hidden">
+            <div className="hcop-mhead">
+              <div>
+                <p className="ds-eyebrow">Calificación</p>
+                <h2 className="mt-1 text-lg font-black">Matriz de evaluación por historia clínica</h2>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Escala 2 (cumple) · 1 (parcial) · 0 (no cumple) · NA (no aplica), ponderada por el peso del criterio.
+                </p>
+              </div>
+              <div className="hcop-macts">
+                {!isClosed && (
+                  <div className="hcop-addhc">
+                    <input className="ds-input" value={newRecordNumber} onChange={event => setNewRecordNumber(event.target.value)} placeholder="Nueva HC (No.)" />
+                    <GradientButton onClick={() => void addRecord()} disabled={busy}><Plus size={15} />Agregar</GradientButton>
+                  </div>
+                )}
+                {/* B1: la misma matriz con más espacio. No duplica estado, así que al volver
+                    no se pierde ninguna calificación. */}
+                <Button identity={identity} onClick={() => setFullscreen(true)} disabled={!detail.records.length}>
+                  <Maximize2 size={15} /> Pantalla completa
+                </Button>
+              </div>
+            </div>
+
+            {detail.records.length ? (
+              <>
+                <div className="hcop-tablewrap">
+                  <HcMatrix
+                    variant="embedded"
+                    scopes={visibleScopes}
+                    criteria={visibleCriteria}
+                    records={visibleRecords}
+                    scores={scores}
+                    live={live}
+                    disabled={isClosed}
+                    activeRecordId={activeRecordId}
+                    onFocusRecord={setActiveRecordId}
+                    onScore={setScore}
+                    onRemoveRecord={!isClosed ? recordId => void removeRecord(recordId) : undefined}
+                  />
+                </div>
+                <p className="hcop-hint">
+                  Desplázate horizontalmente para ver más historias clínicas · con muchas HC usa «Pantalla completa»
+                </p>
+              </>
+            ) : <div className="almera-empty"><p>Agrega al menos una historia clínica para empezar a calificar.</p></div>}
+          </Card>
+
+          <aside className="hcop-rpanel">
+            <Card accent={identity.color} className="p-4">
+              <div className="hcop-rh"><b>Cumplimiento general</b></div>
+              <div className="hcop-cmp">
+                <ComplianceRing percent={live.overall} size={86} strokeWidth={7} />
+                <div className="hcop-cmpstat">
+                  <div><span>Objetivo</span><b>90%</b></div>
+                  <div><span>Celdas</span><b>{live.graded}/{live.totalCells}</b></div>
+                  <div>
+                    <span>Estado</span>
+                    <ConceptBadge concept={conceptFromPercent(live.overall) as Concept | null} size="sm" />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card accent={identity.color} className="p-4">
+              <div className="hcop-rh"><b>Semaforización</b></div>
+              <div className="hcop-semrow">
+                <div className="hcop-sem is-ok"><div className="n">{live.counts.two}</div><div className="l">Cumple</div></div>
+                <div className="hcop-sem is-pa"><div className="n">{live.counts.one}</div><div className="l">Parcial</div></div>
+                <div className="hcop-sem is-no"><div className="n">{live.counts.zero}</div><div className="l">No cumple</div></div>
+                <div className="hcop-sem is-na"><div className="n">{live.counts.na}</div><div className="l">No aplica</div></div>
+              </div>
+            </Card>
+
+            <Card accent={identity.color} className="p-4">
+              <div className="hcop-rh"><b>Adherencia por sección</b></div>
+              {detail.scopes.map(scope => {
+                const percent = live.byScope.get(scope.id) ?? null
+                return (
+                  <div className="hcop-secbar" key={scope.id}>
+                    <span className="nm" title={scope.name}>{scope.name}</span>
+                    <span className="tk"><i style={{ width: `${percent ?? 0}%`, background: colorForPercent(percent) }} /></span>
+                    <span className="pv" style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${Math.round(percent)}%`}</span>
+                  </div>
+                )
+              })}
+            </Card>
+
+            <Card accent={identity.color} className="p-4">
+              <div className="hcop-rh">
+                <b>Hallazgos críticos</b>
+                <span className="hcop-tag">{criticalFindings.length}</span>
+              </div>
+              {criticalFindings.length ? criticalFindings.slice(0, 6).map((finding, index) => (
+                <div className="hcop-hall" key={`${finding.recordNumber}-${index}`}>
+                  <span className="d" />
+                  <div><b>HC {finding.recordNumber}</b> — {finding.criterionText}</div>
+                </div>
+              )) : <p className="hcop-muted">Ninguna celda calificada en 0 (no cumple).</p>}
+            </Card>
+
+            <Card accent={identity.color} className="p-4">
+              <div className="hcop-rh"><b>Criterios con menor cumplimiento</b></div>
+              {worstCriteria.length ? worstCriteria.map(row => (
+                <div className="hcop-secbar" key={row.criterion.id}>
+                  <span className="nm" title={row.criterion.text}>{row.criterion.text}</span>
+                  <span className="tk"><i style={{ width: `${row.percent}%`, background: colorForPercent(row.percent) }} /></span>
+                  <span className="pv" style={{ color: colorForPercent(row.percent) }}>{Math.round(row.percent)}%</span>
+                </div>
+              )) : <p className="hcop-muted">Aún no hay criterios calificados.</p>}
+            </Card>
+          </aside>
+        </div>
 
         {detail.records.length > 0 && (
           <Card accent={identity.color} className="p-5">
@@ -348,6 +494,25 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             </div>
           </Card>
         )}
+
+        {/* --- B1..B4: modo ampliado. Recibe el MISMO buffer de calificaciones. --- */}
+        <HcMatrixFullscreen
+          open={fullscreen}
+          onClose={() => setFullscreen(false)}
+          evaluationTitle={detail.evaluation.professional_name}
+          evaluationSubtitle={`${detail.evaluation.area_name} · ${detail.evaluation.month_reported} · ${detail.records.length} historias clínicas`}
+          scopes={detail.scopes}
+          criteria={detail.criteria}
+          records={detail.records}
+          scores={scores}
+          live={live}
+          disabled={isClosed}
+          onScore={setScore}
+          onSave={() => void saveScores()}
+          saving={busy}
+          onExportPdf={() => void downloadReport()}
+          exporting={busy}
+        />
 
         <Card accent={identity.color} className="p-5">
           <p className="ds-eyebrow">Seguimiento</p>
@@ -406,6 +571,31 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             </div>
           )}
         </Card>
+
+        {/* --- A4: pie con el progreso y las acciones. Pegado al scroll: con una matriz larga,
+            «Guardar» al final de la página obliga a bajar hasta el fondo para no perder nada. --- */}
+        <div className="hcop-foot">
+          <div className="hcop-prog">
+            <span className="ic"><ListChecks size={16} /></span>
+            <div>
+              <div className="l">Progreso de la evaluación</div>
+              <div className="v">{live.graded} de {live.totalCells} celdas calificadas</div>
+            </div>
+            <span className="tk"><i style={{ width: `${live.totalCells ? (live.graded / live.totalCells) * 100 : 0}%` }} /></span>
+            <b>{live.totalCells ? Math.round((live.graded / live.totalCells) * 100) : 0}%</b>
+          </div>
+          <div className="hcop-fbtns">
+            <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
+              <Save size={15} /> Guardar borrador
+            </Button>
+            <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
+              <ClipboardCheck size={15} /> Guardar calificaciones
+            </Button>
+            {!isClosed
+              ? <GradientButton onClick={() => void closeEvaluationAction()} disabled={busy}><Lock size={15} />Finalizar evaluación</GradientButton>
+              : <Button variant="secondary" onClick={() => void reopenEvaluationAction()} disabled={busy}><Unlock size={15} />Reabrir</Button>}
+          </div>
+        </div>
       </div>
     )
   }

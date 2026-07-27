@@ -8,6 +8,9 @@ import { requireAnyModuleAccess, requireAnyPermission } from '../auth.mjs'
 import { renderPdf } from '../pdf.mjs'
 import { renderAdherenceReportHtml } from '../templates/adherenceReport.mjs'
 import { renderAdherenceDashboardHtml } from '../templates/adherenceDashboardReport.mjs'
+// El motor ponderado vive en shared/ porque el cliente lo importa tambien para recalcular en
+// vivo mientras se califica; dos copias es como la pantalla acaba mostrando otro porcentaje.
+import { computeCompliance } from '../../shared/adherenceScoring.mjs'
 
 export const adherenceRouter = Router()
 
@@ -120,37 +123,6 @@ async function assertEvaluationAccess(request) {
 async function ownProfessionalId(request) {
   const result = await query('SELECT id FROM adherence_professionals WHERE membership_id = $1 AND organization_id = $2', [mid(request), oid(request)])
   return result.rows[0]?.id ?? null
-}
-
-function computeCompliance(criteria, scores) {
-  const byCriterion = new Map(criteria.map(criterion => [String(criterion.id), { weight: Number(criterion.weight), scopeId: String(criterion.scope_id), pointsSum: 0, appliedCount: 0 }]))
-  for (const scoreRow of scores) {
-    if (scoreRow.score === null || scoreRow.score === undefined) continue
-    const entry = byCriterion.get(String(scoreRow.criterion_id))
-    if (!entry) continue
-    entry.pointsSum += (Number(scoreRow.score) / 2) * entry.weight
-    entry.appliedCount += 1
-  }
-  const criterionResults = [...byCriterion.entries()].map(([criterionId, entry]) => {
-    const applicable = entry.appliedCount > 0
-    const ab = applicable ? entry.pointsSum / entry.appliedCount : 0
-    const s = applicable ? entry.weight : 0
-    return { criterionId, scopeId: entry.scopeId, ab, s, compliancePercent: applicable ? (ab / entry.weight) * 100 : null }
-  })
-  const byScope = new Map()
-  for (const result of criterionResults) {
-    const bucket = byScope.get(result.scopeId) || { abSum: 0, sSum: 0 }
-    bucket.abSum += result.ab
-    bucket.sSum += result.s
-    byScope.set(result.scopeId, bucket)
-  }
-  const scopeResults = [...byScope.entries()].map(([scopeId, bucket]) => ({
-    scopeId, compliancePercent: bucket.sSum > 0 ? (bucket.abSum / bucket.sSum) * 100 : null,
-  }))
-  const abTotal = criterionResults.reduce((sum, result) => sum + result.ab, 0)
-  const sTotal = criterionResults.reduce((sum, result) => sum + result.s, 0)
-  const overallCompliance = sTotal > 0 ? (abTotal / sTotal) * 100 : 0
-  return { criterionResults, scopeResults, overallCompliance }
 }
 
 async function resolveConcept(organizationId, percent) {

@@ -282,7 +282,7 @@ guardar algo sensible.
 | Gestión ALMERA | `almera` | `/app/modulos/almera` | Operativo |
 | Asistencias Técnicas | `technical-assistances` | `/app/modulos/technical-assistances` | Operativo, rediseñado |
 | Auditorías Internas | `internal-audits` | — | **Inactivo** (`active = FALSE`) |
-| Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
+| Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado; matriz de HC con **modo ampliado** (§13) |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
 | Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | Operativo en produccion; 13 listas publicadas y en uso |
@@ -384,7 +384,23 @@ El fondo del sistema tambien cambio: los tokens tenian un sesgo calido (`--canva
 que el usuario describio como "verdoso feo". Ahora es neutro (#F4F6FB). Afecta a TODOS los
 modulos, que era el punto.
 
-## 12. Vidrio del módulo de Listas de Chequeo
+## 13. Matriz de HC: motor compartido y modo ampliado
+
+`shared/adherenceScoring.mjs` es el motor ponderado (2/1/0/NA con peso por criterio, NA fuera del
+denominador). Lo importan **los dos lados**: `server/routes/adherence.mjs` al guardar y cerrar, y
+el cliente con `useLiveCompliance` para recalcular mientras se califica. No duplicar la formula:
+una segunda copia en el navegador es como el porcentaje en pantalla acaba difiriendo del guardado.
+
+- `HcMatrix.tsx` es **una sola** matriz para las dos vistas (`variant="embedded"` clara /
+  `"fullscreen"` oscura). El modo ampliado no es otra tabla, es esta con mas espacio.
+- El overlay (`HcMatrixFullscreen.tsx`) **no guarda estado de calificaciones**: recibe el mismo
+  buffer y el mismo `onScore` de la vista embebida. Por eso abrir y cerrar no pierde nada.
+- El **zoom escala con `font-size`/`padding`, nunca con `transform`**: `transform` rompe
+  `position: sticky` y con 25 columnas el sticky es justo lo que hace usable la matriz.
+- Sticky en los dos ejes con `left` fijos en px (260 / 312): si se cambia el ancho de la columna
+  de criterio hay que ajustar los tres, o las columnas fijas se solapan.
+
+## 14. Vidrio del módulo de Listas de Chequeo
 
 Es el único módulo con tratamiento de vidrio en las superficies base (el resto lo reserva
 para overlays). Cuatro cosas que costó descubrir y conviene no deshacer:
