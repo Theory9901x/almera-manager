@@ -7,12 +7,22 @@ function getBrowser() {
   return browserPromise
 }
 
-export async function renderPdf(html) {
+/**
+ * @param {string} html
+ * @param {{ landscape?: boolean }} [options] Apaisado para los formatos con muchas columnas de
+ *   evaluado: en vertical, el texto del criterio se estruja hasta ser ilegible.
+ */
+export async function renderPdf(html, options = {}) {
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
     await page.setContent(html, { waitUntil: 'networkidle0' })
-    return await page.pdf({ format: 'A4', printBackground: true, margin: { top: '16mm', bottom: '16mm', left: '14mm', right: '14mm' } })
+    return await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      landscape: Boolean(options.landscape),
+      margin: { top: '16mm', bottom: '16mm', left: '14mm', right: '14mm' },
+    })
   } finally {
     await page.close()
   }

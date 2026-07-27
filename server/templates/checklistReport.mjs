@@ -273,3 +273,86 @@ export function renderChecklistConsolidatedHtml({ organizationName, filters, aud
     <div class="foot">${escapeHtml(organizationName)} · Consolidado generado por SGIMR</div>
   </body></html>`
 }
+
+/**
+ * El FORMATO EN BLANCO de una lista: la misma hoja que se imprime y se lleva a la ronda.
+ *
+ * No es el informe de una auditoria (eso ya existe arriba) sino el formato vacio, con sus
+ * dominios, sus criterios numerados y las casillas C / NC / NA por cada sujeto evaluado. Sirve
+ * para dos cosas que la pantalla no cubre: revisar de un vistazo que la lista cargada coincide
+ * con el papel institucional, y salir a auditar con la hoja impresa cuando no hay tablet.
+ */
+export function renderChecklistBlankFormatHtml({ organizationName, template, columns = 5 }) {
+  const subject = template.subject_label || 'Evaluado'
+  const criteriaCount = template.domains.reduce((total, domain) => total + domain.criteria.length, 0)
+
+  const headerBoxes = (template.headerFields || [])
+    .map(field => `<div><dt>${escapeHtml(field.label)}</dt><dd>&nbsp;</dd></div>`).join('')
+
+  // Una columna por sujeto, cada una con su triplete C/NC/NA — igual que el formato impreso.
+  const subjectHeads = Array.from({ length: columns }, (_, i) =>
+    `<th class="num" colspan="3">${i + 1}</th>`).join('')
+  const valueHeads = Array.from({ length: columns }, () =>
+    '<th class="num tick">C</th><th class="num tick">NC</th><th class="num tick">NA</th>').join('')
+
+  const attributeRows = (template.subjectFields || []).map(field =>
+    `<tr class="attr"><td>${escapeHtml(field.label)}</td>${Array.from({ length: columns }, () => '<td colspan="3"></td>').join('')}</tr>`).join('')
+
+  const bodyRows = template.domains.map(domain => {
+    const head = `<tr class="dom"><td colspan="${columns * 3 + 1}">${escapeHtml(domain.name)}</td></tr>`
+    const rows = domain.criteria.map(criterion => {
+      const number = template.numbered_items && criterion.item_number
+        ? `<b>${escapeHtml(criterion.item_number)}.</b> ` : ''
+      const cells = Array.from({ length: columns }, () => '<td class="box"></td><td class="box"></td><td class="box"></td>').join('')
+      return `<tr><td class="crit">${number}${escapeHtml(criterion.text)}</td>${cells}</tr>`
+    }).join('')
+    return head + rows
+  }).join('')
+
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8" /><style>${baseStyles()}
+    .meta dd { min-height: 14px; border-bottom: 1px solid #cbd5e1; }
+    th.tick { text-align: center; font-size: 8px; padding: 3px 0; width: 22px; }
+    td.box { width: 22px; height: 20px; background: #fff; }
+    td.crit { font-size: 10px; line-height: 1.35; }
+    tr.dom td { background: #eef7fc; font-weight: 700; color: #003452; font-size: 9.5px;
+                text-transform: uppercase; letter-spacing: .04em; }
+    tr.attr td { background: #f8fbfe; font-size: 9px; color: #526074; height: 18px; }
+    .legend { margin-top: 8px; color: #526074; font-size: 9px; }
+    .totals td { font-weight: 700; background: #f8fbfe; height: 22px; }
+  </style></head><body>
+    ${docHead(organizationName, template.name, `Formato para diligenciar · audita ${escapeHtml(subject.toLowerCase())} · ${template.domains.length} dominios · ${criteriaCount} criterios`, template.code, template.version)}
+
+    <h2>Datos generales</h2>
+    <div class="meta">${headerBoxes || '<div><dt>Sin campos de cabecera</dt><dd>&nbsp;</dd></div>'}</div>
+
+    <h2>Criterios de verificación</h2>
+    <table>
+      <thead>
+        <tr><th rowspan="2">Criterio</th><th class="num" colspan="${columns * 3}">${escapeHtml(subject)} evaluado</th></tr>
+        <tr>${subjectHeads}</tr>
+        <tr><th>Nombre</th>${Array.from({ length: columns }, () => '<th colspan="3"></th>').join('')}</tr>
+        <tr><th></th>${valueHeads}</tr>
+      </thead>
+      <tbody>
+        ${attributeRows}
+        ${bodyRows}
+        <tr class="totals"><td>Cumplimiento de adherencia (%)</td>${Array.from({ length: columns }, () => '<td colspan="3"></td>').join('')}</tr>
+      </tbody>
+    </table>
+    <p class="legend">C = Cumple · NC = No cumple · NA = No aplica. Los criterios marcados «No aplica» se excluyen del denominador:
+      adherencia = C / (C + NC) × 100.</p>
+
+    <h2>Observaciones y retroalimentación</h2>
+    <table><tbody>
+      <tr><td style="height:54px"></td></tr>
+    </tbody></table>
+
+    <h2>Firmas</h2>
+    <div class="sign-grid">
+      <div class="sign-box" style="height:70px"><small>Firma del evaluador</small></div>
+      <div class="sign-box" style="height:70px"><small>Firma del ${escapeHtml(subject.toLowerCase())} o usuario</small></div>
+    </div>
+
+    <p class="foot">${escapeHtml(template.name)}${template.code ? ` · ${escapeHtml(template.code)} v${escapeHtml(template.version)}` : ''} · Formato en blanco · Generado por SGIMR</p>
+  </body></html>`
+}

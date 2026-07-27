@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardCheck, Download, Eye, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
+import { BarChart3, ClipboardCheck, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -330,6 +330,10 @@ function ChecklistsListContent() {
                                 <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/vista-previa`)}>
                                   <Eye size={13} /> Ver como auditor
                                 </button>
+                                <a className="row-action" style={{ color: identity.color }}
+                                   href={checklistsService.formatUrl(template.id)} target="_blank" rel="noreferrer">
+                                  <FileText size={13} /> Formato
+                                </a>
                                 <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
                                   <Pencil size={13} /> Editar
                                 </button>

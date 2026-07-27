@@ -3,7 +3,7 @@ import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { computeAdherence, conceptFromPercent, isChecklistValue } from '../checklistScoring.mjs'
 import { renderPdf } from '../pdf.mjs'
-import { renderChecklistAuditReportHtml, renderChecklistConsolidatedHtml } from '../templates/checklistReport.mjs'
+import { renderChecklistAuditReportHtml, renderChecklistBlankFormatHtml, renderChecklistConsolidatedHtml } from '../templates/checklistReport.mjs'
 import { CHECKLIST_SEEDS } from '../checklistSeed.mjs'
 
 export const checklistsRouter = Router()
@@ -540,6 +540,27 @@ checklistsRouter.post('/audits/:auditId/reopen', checklistsModule, fill, async (
     await client.query('ROLLBACK').catch(() => {})
     next(error)
   } finally { client.release() }
+})
+
+// El formato EN BLANCO de la lista, listo para imprimir. Se registra antes que GET /:id porque
+// si no, Express toma "formato.pdf" como si fuera el id y la consulta se va a NaN.
+checklistsRouter.get('/:id/formato.pdf', checklistsModule, view, async (request, response, next) => {
+  try {
+    const template = await assertTemplate(request)
+    const structure = await loadStructure(template.id)
+    const organization = await query('SELECT name FROM organizations WHERE id = $1', [oid(request)])
+    // Cuantas columnas de evaluado caben en una hoja apaisada sin que el criterio se estruje.
+    const columns = Math.min(8, Math.max(1, Number(request.query.columnas) || 5))
+    const html = renderChecklistBlankFormatHtml({
+      organizationName: organization.rows[0]?.name || 'Entidad',
+      template: { ...template, ...structure },
+      columns,
+    })
+    const pdf = await renderPdf(html, { landscape: true })
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', `inline; filename="${template.code || 'lista'}-formato.pdf"`)
+    response.send(pdf)
+  } catch (error) { next(error) }
 })
 
 checklistsRouter.get('/:id', checklistsModule, view, async (request, response, next) => {

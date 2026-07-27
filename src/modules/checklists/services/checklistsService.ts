@@ -62,6 +62,10 @@ export const checklistsService = {
   saveStructure: (id: string, payload: StructurePayload) =>
     call<ChecklistTemplateDetail>(`/${id}/structure`, { method: 'PUT', body: JSON.stringify(payload) }),
 
+  /** El formato en blanco, listo para imprimir. Se abre en pestaña nueva en vez de descargarse:
+   *  casi siempre se quiere mirar, no guardar. */
+  formatUrl: (id: string) => `/api/checklists/${id}/formato.pdf`,
+
   simulate: (id: string, subjects: { id: string }[], answers: { subject_id: string; criterion_id: string; value: ChecklistValue }[]) =>
     call<AdherenceResult>(`/${id}/simulate`, { method: 'POST', body: JSON.stringify({ subjects, answers }) }),
 

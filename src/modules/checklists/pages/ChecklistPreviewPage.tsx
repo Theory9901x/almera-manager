@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Eye, Info, Loader2, Pencil, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Eye, FileText, Info, Loader2, Pencil, RotateCcw } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -107,6 +107,10 @@ function ChecklistPreviewContent() {
             <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => setMarks({})}>
               <RotateCcw size={15} /> Limpiar marcas
             </Button>
+            <a className="ds-button ds-button-secondary btn-on-hero-secondary"
+               href={checklistsService.formatUrl(template.id)} target="_blank" rel="noreferrer">
+              <FileText size={15} /> Formato para imprimir
+            </a>
             <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
               <Pencil size={15} /> Abrir en el constructor
             </Button>
