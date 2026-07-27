@@ -49,7 +49,6 @@ function ChecklistBuilderContent() {
   const canManage = Boolean(session?.permissions.includes('checklists.manage'))
 
   const [template, setTemplate] = useState<ChecklistTemplateDetail | null>(null)
-  const [areas, setAreas] = useState<ChecklistArea[]>([])
   const [loading, setLoading] = useState(true)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [dirty, setDirty] = useState(false)
@@ -78,9 +77,8 @@ function ChecklistBuilderContent() {
   async function load() {
     if (!templateId) return
     try {
-      const [detail, areaList] = await Promise.all([checklistsService.detail(templateId), checklistsService.areas()])
+      const detail = await checklistsService.detail(templateId)
       hydrate(detail)
-      setAreas(areaList)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar la lista') }
     finally { setLoading(false) }
   }
@@ -208,13 +206,6 @@ function ChecklistBuilderContent() {
                 <h2 className="mt-1 text-xl font-black">Datos de la lista</h2>
                 <div className="dialog-form mt-4">
                   <Field label="Nombre"><Input value={meta.name} disabled={!canManage} onChange={event => patchMeta({ name: event.target.value })} /></Field>
-                  <Field label="Área / servicio">
-                    <Select
-                      value={meta.areaId || 'NONE'} disabled={!canManage}
-                      onChange={value => patchMeta({ areaId: value === 'NONE' ? '' : value })}
-                      options={[{ value: 'NONE', label: 'Sin asignar' }, ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
-                    />
-                  </Field>
                   <Field label="Código" hint="Ej. GCM-SPA-FO-24"><Input value={meta.code} disabled={!canManage} onChange={event => patchMeta({ code: event.target.value })} /></Field>
                   <Field label="Versión"><Input value={meta.version} disabled={!canManage} onChange={event => patchMeta({ version: event.target.value })} /></Field>
                   <Field label="¿Qué audita?" hint="Paciente, Colaborador, Consultorio…"><Input value={meta.subjectLabel} disabled={!canManage} onChange={event => patchMeta({ subjectLabel: event.target.value })} /></Field>

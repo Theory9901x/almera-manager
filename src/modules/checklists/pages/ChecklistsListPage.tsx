@@ -42,7 +42,7 @@ function ChecklistsListContent() {
   const [assigned, setAssigned] = useState<AssignedTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ name: '', code: '', version: '01', areaId: '' })
+  const [form, setForm] = useState({ name: '', code: '', version: '01' })
   const [newAudit, setNewAudit] = useState({ templateId: '', auditDate: new Date().toISOString().slice(0, 10) })
   const [seeds, setSeeds] = useState<SeedTemplate[]>([])
   const [programs, setPrograms] = useState<ChecklistProgram[]>([])
@@ -83,7 +83,7 @@ function ChecklistsListContent() {
     setBusy(true)
     try {
       const created = await checklistsService.create({
-        name: form.name.trim(), code: form.code.trim(), version: form.version.trim() || '01', areaId: form.areaId || null,
+        name: form.name.trim(), code: form.code.trim(), version: form.version.trim() || '01',
       })
       toast.push('success', 'Lista creada')
       navigate(`/app/listas-chequeo/${created.id}/constructor`)
@@ -427,15 +427,6 @@ function ChecklistsListContent() {
                     </Field>
                   </div>
                   <div className="w-[110px]"><Field label="Versión"><Input value={form.version} onChange={event => setForm({ ...form, version: event.target.value })} /></Field></div>
-                  <div className="w-[200px]">
-                    <Field label="Área / servicio">
-                      <Select
-                        value={form.areaId || 'NONE'}
-                        onChange={value => setForm({ ...form, areaId: value === 'NONE' ? '' : value })}
-                        options={[{ value: 'NONE', label: 'Sin asignar' }, ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
-                      />
-                    </Field>
-                  </div>
                   <Button identity={identity} onClick={() => void createTemplate()} disabled={busy}><Plus size={16} /> Crear lista</Button>
                 </div>
               </Card>
