@@ -60,7 +60,9 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   // --m-huella (verde, tono 155)
   'carbon-footprint': { key: 'carbon-footprint', color: '#008b45', gradientFrom: '#008b45', gradientTo: '#3fb171' },
   // --m-listas (azul, tono 230) — Listas de Chequeo
-  checklists: { key: 'checklists', color: '#007fbc', gradientFrom: '#007fbc', gradientTo: '#00a7dd' },
+  // Violeta/indigo por decision del usuario sobre la maqueta aprobada. Se separa de
+  // --m-matrices (magenta, tono 300) lo suficiente para no confundirse en el sidebar.
+  checklists: { key: 'checklists', color: '#6366f1', gradientFrom: '#6366f1', gradientTo: '#8b5cf6' },
   // --m-usuarios (rosa-fucsia, tono 350)
   admin: { key: 'admin', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
   users: { key: 'users', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },

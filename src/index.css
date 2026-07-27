@@ -104,10 +104,13 @@
   --m-huella-soft:      oklch(0.95 0.03 155);
   --m-planes:           oklch(0.55 0.16 130);   /* verde-lima — libre, sin modulo asignado aun */
   --m-planes-soft:      oklch(0.95 0.03 130);
-  --m-listas:           oklch(0.55 0.16 230);   /* azul — Listas de Chequeo */
-  --m-listas-soft:      oklch(0.95 0.03 230);
-  --m-listas-light:     oklch(0.68 0.14 230);
-  --m-listas-deep:      oklch(0.30 0.09 230);
+  /* Listas de Chequeo — violeta/indigo, segun la maqueta aprobada. Los hex son literales
+     porque tokens.ts los replica y hay codigo que les concatena alpha. */
+  --m-listas:           #6366f1;
+  --m-listas-soft:      #eef2ff;
+  --m-listas-light:     #8b5cf6;
+  --m-listas-deep:      #3730a3;
+  --m-listas-accent:    #22d3ee;   /* cian del degradado de progreso */
   --m-seguridad:        oklch(0.55 0.16 40);    /* naranja — libre, sin modulo asignado aun */
   --m-seguridad-soft:   oklch(0.95 0.03 40);
   --m-riesgos:          oklch(0.55 0.16 70);    /* ambar-dorado — libre, sin modulo asignado aun */
@@ -3842,3 +3845,224 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   border: 1px solid color-mix(in oklch, var(--m-listas) 26%, transparent);
   color: var(--m-listas-deep); font-size: 11px; font-weight: 700; white-space: nowrap;
 }
+
+/* ================================================================
+   LISTAS DE CHEQUEO — aspecto v3 (maqueta aprobada)
+   Sustituye el tratamiento de vidrio sobre malla azul. Ese fondo saturado era el
+   problema: obligaba a que TODO fuera translucido para que se notara, y con
+   texto pequeño y tablas densas eso se lee mal y cansa.
+   Aqui la superficie manda: lienzo casi blanco, tarjeta blanca de verdad, borde
+   fino, sombra corta. El color se reserva para lo que significa algo — la
+   identidad del modulo y el semaforo.
+   ================================================================ */
+
+.checklists-page-bg {
+  /* Lienzo plano con un tinte lila apenas perceptible. Sin radiales: el fondo no
+     tiene que competir con el contenido. */
+  background: #f7f8fc;
+  padding: 4px 0 8px;
+}
+.checklists-page-bg::after { display: none; }   /* fuera el grano: ya no hay degradado que bandear */
+
+/* --- Superficies: tarjeta blanca, no vidrio --- */
+.checklists-page-bg .ds-card,
+.checklists-page-bg .surface-panel,
+.checklists-page-bg > .surface-panel {
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid #ecedf5;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .05);
+}
+.checklists-page-bg .ds-card::after,
+.checklists-page-bg .surface-panel::after { display: none; }   /* fuera el borde de degradado */
+.checklists-page-bg .ds-card:not(.ds-card-accent)::before { display: none; }
+.checklists-page-bg .ds-card:hover { transform: none; box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 10px 28px rgba(16, 24, 40, .07); }
+
+/* La franja de acento superior de las tarjetas desaparece: en la maqueta las
+   tarjetas son limpias y el color va en los elementos, no en el borde. */
+.checklists-page-bg .ds-card-accent::before,
+.checklists-page-bg .surface-panel.is-header::before { display: none; }
+
+.checklists-page-bg .ds-input,
+.checklists-page-bg .ds-select-trigger,
+.checklists-page-bg .ds-datepicker-trigger,
+.checklists-page-bg .ds-textarea {
+  background: #ffffff;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  border: 1px solid #e5e7f0;
+  border-radius: 10px;
+}
+.checklists-page-bg .ds-input:focus,
+.checklists-page-bg .ds-select-trigger:focus-visible,
+.checklists-page-bg .ds-textarea:focus {
+  border-color: var(--m-listas);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-listas) 14%, transparent);
+}
+
+.checklists-page-bg .ds-button-secondary {
+  background: #ffffff; border: 1px solid #e5e7f0; color: var(--ink);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.checklists-page-bg .ds-button-primary { box-shadow: 0 6px 18px color-mix(in srgb, var(--m-listas) 34%, transparent); }
+
+/* --- Cabecera del sujeto: una banda de celdas separadas por linea fina --- */
+.eval-context {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  background: #ffffff; border: 1px solid #ecedf5; border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .05);
+  overflow: hidden;
+}
+.eval-context-cell {
+  display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px;
+  border-right: 1px solid #f0f1f7;
+}
+.eval-context-cell:last-child { border-right: 0; }
+.eval-context-icon {
+  display: grid; place-items: center; width: 30px; height: 30px; flex: none;
+  border-radius: 9px; background: var(--m-listas-soft); color: var(--m-listas);
+}
+.eval-context-cell dt { font-size: 10px; color: var(--muted); font-weight: 600; margin: 0 0 3px; }
+.eval-context-cell dd { margin: 0; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.eval-context-cell dd small { display: block; font-size: 10.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+
+/* Fila inferior: clasificacion del riesgo, avance y cronometro. */
+.eval-strip {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: center;
+  padding: 14px 16px; border-top: 1px solid #f0f1f7; grid-column: 1 / -1;
+}
+.eval-risk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.eval-risk-chip {
+  padding: 5px 13px; border-radius: 8px; font-size: 11px; font-weight: 800;
+  letter-spacing: .03em; color: #fff;
+}
+/* Colores SEMANTICOS, no de identidad: C verde, NC rojo, NA gris. Son los mismos que las
+   celdas de la grilla — si la leyenda usara otros, dejaria de ser una leyenda. */
+.eval-risk-chip.is-c  { background: #16a34a; }
+.eval-risk-chip.is-nc { background: #ef4444; }
+.eval-risk-chip.is-na { background: #94a3b8; }
+.eval-strip-label { font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 6px; display: block; }
+
+/* --- Progreso: degradado de la identidad al cian --- */
+.checklist-progress-bar { background: #eceef6; height: 9px; }
+.checklist-progress-bar i {
+  background: linear-gradient(90deg, var(--m-listas), var(--m-listas-accent)) !important;
+}
+
+/* --- Dominios: tarjeta blanca, numero en circulo, estado a la derecha --- */
+.eval-domain {
+  background: #ffffff; border: 1px solid #ecedf5; border-radius: 16px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 18px rgba(16, 24, 40, .04);
+}
+.eval-domain-head { padding: 16px 20px; color: var(--ink); }
+.eval-domain-head:hover { background: #fafbff; }
+.eval-domain-num {
+  width: 30px; height: 30px; font-size: 13px;
+  background: linear-gradient(135deg, var(--m-listas), var(--m-listas-light)) !important;
+}
+.eval-domain-name { font-size: 14.5px; font-weight: 700; }
+.eval-domain-state { gap: 7px; }
+.eval-domain-pct { font-size: 13px; font-weight: 700; color: var(--ink-soft) !important; }
+.eval-domain-pct::before { content: 'Cumplimiento '; font-weight: 600; color: var(--muted); }
+.eval-domain-body { border-top: 1px solid #f0f1f7; }
+
+/* --- Criterios: numero en pastilla, texto + guia, controles, observacion --- */
+.checklist-fill-wrap { background: transparent; border: 0; }
+.checklist-fill-grid thead { display: none; }        /* la cabecera de sujetos no aplica con uno solo */
+.checklist-fill-grid.has-many thead { display: table-header-group; }
+.checklist-fill-grid td { border-bottom: 1px solid #f2f3f8; background: transparent; }
+.checklist-fill-grid tr:last-child td { border-bottom: 0; }
+.checklist-fill-grid td.fill-criterion { background: transparent; min-width: 320px; }
+.fill-num {
+  display: inline-grid; place-items: center; min-width: 34px; height: 24px; padding: 0 7px;
+  border-radius: 7px; background: var(--m-listas-soft); color: var(--m-listas);
+  font-size: 11.5px; font-weight: 800; margin-right: 10px;
+}
+.fill-criterion-text { align-items: flex-start; gap: 0; }
+.fill-criterion-text > span:last-child { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.45; }
+.fill-guidance-text { margin: 4px 0 0 44px; font-size: 11.5px; color: var(--muted); }
+.checklist-fill-grid td.is-unanswered { background: transparent; }
+
+/* Segmentos C / NC / NA */
+.fill-value {
+  min-width: 54px; height: 40px; border-radius: 9px;
+  border: 1px solid #e5e7f0; background: #ffffff; color: #6b7280;
+  font-size: 12.5px; font-weight: 800; backdrop-filter: none;
+}
+.fill-value:hover:not(:disabled) { border-color: #cdd2e4; color: var(--ink); }
+.fill-value.is-active { border-color: transparent; color: #fff; box-shadow: none; transform: none; }
+.fill-value--c.is-active  { background: #16a34a; color: #fff; }
+.fill-value--nc.is-active { background: #ef4444; color: #fff; }
+.fill-value--na.is-active { background: #94a3b8; color: #fff; }
+
+/* Observacion y adjunto por criterio */
+.fill-extra { display: flex; align-items: center; gap: 8px; }
+.fill-icon-btn {
+  display: grid; place-items: center; width: 38px; height: 38px; flex: none;
+  border-radius: 9px; border: 1px solid #e5e7f0; background: #fff; color: #8b93a7; cursor: pointer;
+}
+.fill-icon-btn:hover { color: var(--m-listas); border-color: var(--m-listas); }
+.fill-note {
+  flex: 1; min-width: 150px; height: 38px; padding: 0 12px;
+  border: 1px solid #e5e7f0; border-radius: 9px; background: #fff;
+  font-size: 12.5px; color: var(--ink);
+}
+.fill-note::placeholder { color: #a9b0c2; }
+.fill-note:focus { outline: none; border-color: var(--m-listas); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-listas) 14%, transparent); }
+
+/* --- Panel de resumen --- */
+.eval-summary-inner {
+  background: #ffffff; border: 1px solid #ecedf5; border-radius: 16px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .05);
+}
+.eval-summary-title { color: var(--ink); font-size: 12.5px; text-transform: none; letter-spacing: 0; }
+.eval-ring-center strong { font-size: 34px; }
+.eval-ring-center span { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.eval-counters { border-top: 1px solid #f0f1f7; border-bottom: 1px solid #f0f1f7; padding: 14px 0; }
+.eval-counters span { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.eval-domain-bar { grid-template-columns: 1fr auto; gap: 5px 10px; align-items: baseline; }
+.eval-domain-bar .pv { grid-column: 2; grid-row: 1; }
+.eval-domain-bar .nm { font-size: 12px; color: var(--ink-soft); }
+.eval-domain-bar .pv { font-size: 12px; }
+.eval-domain-bar .tk { grid-column: 1 / -1; height: 6px; background: #eceef6; }
+.eval-findings { border-radius: 12px; }
+.eval-legend { border-top: 1px solid #f0f1f7; padding-top: 12px; }
+
+/* Aviso de evidencias cargadas, en el mismo tono que el de hallazgos. */
+.eval-uploads {
+  display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 12px;
+  background: var(--m-listas-soft); border: 1px solid color-mix(in srgb, var(--m-listas) 22%, transparent);
+  color: var(--m-listas-deep);
+}
+.eval-uploads strong { display: block; font-size: 13px; }
+.eval-uploads small { display: block; font-size: 10.5px; color: var(--muted); }
+
+/* --- Evidencias y observaciones --- */
+.eval-drop { border: 2px dashed #d9dcec; background: #fafbff; color: var(--m-listas); }
+.eval-drop.is-over { background: var(--m-listas-soft); border-color: var(--m-listas); }
+.eval-evidences li { background: #fff; border: 1px solid #ecedf5; backdrop-filter: none; }
+.eval-evidence-icon { background: var(--m-listas-soft); color: var(--m-listas); }
+.eval-toolbar { background: #fff; border: 1px solid #ecedf5; backdrop-filter: none; }
+
+/* Leyenda de la escala, al pie. */
+.eval-scale-note {
+  display: flex; align-items: center; gap: 9px; padding: 12px 16px;
+  background: #fff; border: 1px solid #ecedf5; border-radius: 12px;
+  font-size: 12px; color: var(--muted);
+}
+.eval-scale-note strong { color: var(--ink); font-weight: 700; }
+
+/* --- Otras superficies del modulo que arrastraban vidrio --- */
+.checklist-criterion, .checklist-assign-row, .checklist-seed-row, .signature-item,
+.checklist-subject-chip, .dc-kpi, .program-tab {
+  background: #ffffff; backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-color: #ecedf5;
+}
+.dc-kpi { box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .05); }
+.checklist-fill-grid thead th { background: #fafbff; backdrop-filter: none; box-shadow: none; }
+.checklist-fill-grid td.fill-criterion,
+.checklist-sim-grid td.sim-criterion { box-shadow: none; }
+.checklists-table .ds-table tbody tr:hover td { background: #fafbff; }

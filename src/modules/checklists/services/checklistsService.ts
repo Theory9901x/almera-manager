@@ -100,7 +100,7 @@ export const checklistsService = {
   removeSubject: (auditId: string, subjectRowId: string) =>
     call<{ ok: true }>(`/audits/${auditId}/subjects/${subjectRowId}`, { method: 'DELETE' }),
 
-  saveAnswers: (auditId: string, answers: { auditSubjectId: string; criterionId: string; value: ChecklistValue | null }[]) =>
+  saveAnswers: (auditId: string, answers: { auditSubjectId: string; criterionId: string; value: ChecklistValue | null; observation?: string }[]) =>
     call<AuditDetail>(`/audits/${auditId}/answers`, { method: 'PUT', body: JSON.stringify({ answers }) }),
 
   closeAudit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}/close`, { method: 'POST' }),

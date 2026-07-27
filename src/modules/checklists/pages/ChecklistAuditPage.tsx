@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, CircleDashed, Clock,
+  AlertTriangle, ArrowLeft, Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronUp,
+  CircleDashed, Clock, CreditCard, User, UserCheck,
   Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
 } from 'lucide-react'
 import {
@@ -51,6 +52,7 @@ function ChecklistAuditContent() {
   const startedAt = useRef(Date.now())
   const [elapsed, setElapsed] = useState(0)
   const [notes, setNotes] = useState('')
+  const [notesByAnswer, setNotesByAnswer] = useState<Record<string, string>>({})
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -59,6 +61,11 @@ function ChecklistAuditContent() {
     setMarks(next)
     setHeader(detail.header_values || {})
     setNotes(detail.notes || '')
+    const observations: Record<string, string> = {}
+    for (const answer of detail.answers) {
+      if (answer.observation) observations[answerKey(answer.audit_subject_id, answer.criterion_id)] = answer.observation
+    }
+    setNotesByAnswer(observations)
     setDirty(false)
     headerDirty.current = false
   }
@@ -145,13 +152,15 @@ function ChecklistAuditContent() {
       if ((audit.notes || '') !== notes) await checklistsService.saveNotes(audit.id, notes)
       // Se manda tambien lo desmarcado (value null) para que el servidor borre esas filas: sin
       // esto, deshacer una marca no se persistiria nunca.
-      const payload: { auditSubjectId: string; criterionId: string; value: ChecklistValue | null }[] = []
+      const payload: { auditSubjectId: string; criterionId: string; value: ChecklistValue | null; observation: string }[] = []
       for (const subject of audit.subjects) {
         for (const criterion of criteria) {
           const key = answerKey(subject.id, criterion.id)
           const previous = audit.answers.find(answer => answerKey(answer.audit_subject_id, answer.criterion_id) === key)
           const now = marks[key] ?? null
-          if ((previous?.value ?? null) !== now) payload.push({ auditSubjectId: subject.id, criterionId: criterion.id, value: now })
+          const observation = notesByAnswer[key] ?? ''
+          const cambio = (previous?.value ?? null) !== now || (previous?.observation ?? '') !== observation
+          if (cambio) payload.push({ auditSubjectId: subject.id, criterionId: criterion.id, value: now, observation })
         }
       }
       const detail = payload.length
@@ -323,6 +332,71 @@ function ChecklistAuditContent() {
         </div>
       </ModuleHero>
 
+      <div className="eval-context">
+        <div className="eval-context-cell">
+          <span className="eval-context-icon"><CalendarDays size={16} /></span>
+          <div>
+            <dt>Fecha</dt>
+            <dd>{new Date(`${audit.audit_date}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              {audit.shift ? <small>Turno {audit.shift.toLowerCase()}</small> : null}
+            </dd>
+          </div>
+        </div>
+        <div className="eval-context-cell">
+          <span className="eval-context-icon"><Building2 size={16} /></span>
+          <div><dt>Servicio o área</dt><dd>{audit.area_name || 'Sin servicio'}</dd></div>
+        </div>
+        {/* Los atributos del primer sujeto: cambian por lista (cama y documento en una de
+            pacientes, cargo y servicio en una de colaboradores). */}
+        {audit.subjects[0] && (
+          <div className="eval-context-cell">
+            <span className="eval-context-icon"><User size={16} /></span>
+            <div>
+              <dt>{audit.subject_label}</dt>
+              <dd>
+                {audit.subjects[0].display_name}
+                {audit.subjects.length > 1 ? <small>y {audit.subjects.length - 1} más</small> : null}
+              </dd>
+            </div>
+          </div>
+        )}
+        {Object.entries(audit.subjects[0]?.attributes_snapshot || {})
+          .filter(([, value]) => value)
+          .slice(0, 2)
+          .map(([label, value]) => (
+            <div className="eval-context-cell" key={label}>
+              <span className="eval-context-icon"><CreditCard size={16} /></span>
+              <div><dt>{label}</dt><dd>{value}</dd></div>
+            </div>
+          ))}
+        <div className="eval-context-cell">
+          <span className="eval-context-icon"><UserCheck size={16} /></span>
+          <div><dt>Responsable</dt><dd>{audit.auditor_name}</dd></div>
+        </div>
+
+        <div className="eval-strip">
+          <div>
+            <span className="eval-strip-label">Escala de calificación</span>
+            <div className="eval-risk">
+              <span className="eval-risk-chip is-c">C</span>
+              <span className="eval-risk-chip is-nc">NC</span>
+              <span className="eval-risk-chip is-na">NA</span>
+            </div>
+          </div>
+          <div>
+            <span className="eval-strip-label">Avance de la evaluación</span>
+            <div className="checklist-progress">
+              <div className="checklist-progress-bar"><i style={{ width: `${progress}%` }} /></div>
+              <span className="checklist-progress-label"><strong>{progress}%</strong></span>
+            </div>
+          </div>
+          <div>
+            <span className="eval-strip-label">Tiempo transcurrido</span>
+            <span className="eval-clock"><Clock size={14} /> {clock}</span>
+          </div>
+        </div>
+      </div>
+
       {audit.headerFields.length > 0 && (
         <Card accent={identity.color} className="p-5">
           <p className="ds-eyebrow">Datos generales</p>
@@ -470,6 +544,23 @@ function ChecklistAuditContent() {
                                         >{value}</button>
                                       ))}
                                     </div>
+                                    {/* Observacion por criterio. Solo con un sujeto: con varios
+                                        columnas de texto libre la fila se vuelve ilegible, y la
+                                        observacion general del pie cubre ese caso. */}
+                                    {audit.subjects.length === 1 && (
+                                      <div className="fill-extra mt-2">
+                                        <input
+                                          className="fill-note"
+                                          disabled={closed}
+                                          placeholder="Observación (opcional)…"
+                                          value={notesByAnswer[answerKey(subject.id, criterion.id)] ?? ''}
+                                          onChange={event => {
+                                            setNotesByAnswer(current => ({ ...current, [answerKey(subject.id, criterion.id)]: event.target.value }))
+                                            setDirty(true)
+                                          }}
+                                        />
+                                      </div>
+                                    )}
                                   </td>
                                 )
                               })}

@@ -236,6 +236,7 @@ export interface SignerSuggestion {
 
 export interface AuditDetail {
   id: string
+  shift: string | null
   template_id: string
   template_name: string
   code: string
