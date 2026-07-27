@@ -4320,3 +4320,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .eval-staff-add button:disabled { opacity: .5; cursor: default; }
 .eval-subject > b svg { display: block; }
+/* El codigo del formato: se identifica por el, asi que se muestra como distintivo y no como
+   texto suelto que se pierde entre lo demas. */
+.code-pill {
+  display: inline-block; padding: 3px 9px; border-radius: 7px;
+  background: var(--m-listas-soft); color: var(--m-listas-deep);
+  font-size: 11px; font-weight: 800; letter-spacing: .02em;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.code-pill.is-lg { font-size: 11.5px; padding: 4px 11px; margin-bottom: 6px; }

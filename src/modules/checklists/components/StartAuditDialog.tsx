@@ -31,7 +31,7 @@ export function StartAuditDialog({ open, templateName, templateId, templates, ar
   templateName: string
   templateId?: string
   /** Si se pasan, el diálogo deja elegir el formato aquí mismo en vez de volver atrás. */
-  templates?: { id: string; name: string }[]
+  templates?: { id: string; name: string; code?: string }[]
   areas: ChecklistArea[]
   busy?: boolean
   onCancel(): void
@@ -76,7 +76,7 @@ export function StartAuditDialog({ open, templateName, templateId, templates, ar
               <Select
                 value={context.templateId || ''}
                 onChange={value => setContext({ ...context, templateId: value })}
-                options={templates.map(item => ({ value: item.id, label: item.name }))}
+                options={templates.map(item => ({ value: item.id, label: item.code ? `${item.code} · ${item.name}` : item.name }))}
               />
             </Field>
           )}

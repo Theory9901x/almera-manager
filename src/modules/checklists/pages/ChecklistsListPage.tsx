@@ -178,7 +178,7 @@ function ChecklistsListContent() {
         open={starting !== null}
         templateName={starting?.name || ''}
         templateId={starting?.id}
-        templates={visibleTemplates.map(item => ({ id: item.id, name: item.name }))}
+        templates={visibleTemplates.map(item => ({ id: item.id, name: item.name, code: item.code }))}
         areas={areas}
         busy={busy}
         onCancel={() => setStarting(null)}
@@ -257,7 +257,7 @@ function ChecklistsListContent() {
                             onChange={value => setNewAudit({ ...newAudit, templateId: value === 'NONE' ? '' : value })}
                             options={[
                               { value: 'NONE', label: 'Selecciona una lista' },
-                              ...assigned.map(template => ({ value: template.id, label: `${template.name}${template.area_name ? ` — ${template.area_name}` : ''}${template.status && template.status !== 'PUBLICADA' ? ' (borrador)' : ''}` })),
+                              ...assigned.map(template => ({ value: template.id, label: `${template.code ? `${template.code} · ` : ''}${template.name}${template.status && template.status !== 'PUBLICADA' ? ' (borrador)' : ''}` })),
                             ]}
                           />
                         </Field>
@@ -504,8 +504,11 @@ function ChecklistsListContent() {
                       <tbody>
                         {visibleTemplates.map(template => (
                           <tr key={template.id}>
-                            <td><strong>{template.name}</strong></td>
-                            <td className="tabular-col">{template.code || '—'}{template.code ? ` v${template.version}` : ''}</td>
+                            <td>
+                              <strong>{template.name}</strong>
+                              {template.code ? <small className="repo-code">{template.code} v{template.version}</small> : null}
+                            </td>
+                            <td className="tabular-col"><span className="code-pill">{template.code || '—'}</span></td>
                             <td>
                               {template.program_name
                                 ? <span className="program-pill">{template.program_name}</span>

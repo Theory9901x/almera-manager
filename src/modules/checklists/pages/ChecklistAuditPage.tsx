@@ -337,16 +337,20 @@ function ChecklistAuditContent() {
       <div className="crumbs">
         <ArrowLeft size={13} />
         <button onClick={() => navigate('/app/listas-chequeo')}>Listas de Chequeo</button>
-        <span>›</span><b>{audit.template_name}</b>
+        <span>›</span><b>{audit.template_code || audit.code || ''} {audit.template_name}</b>
       </div>
 
       <div className="topbar">
         <div className="title-wrap">
           <div className="title-ic"><ClipboardCheck size={22} /></div>
           <div>
+            {/* El codigo va DELANTE del nombre: es como se identifica el formato en el papel y
+                en la acreditacion, y en el subtitulo se perdia. */}
+            {audit.template_code || audit.code ? (
+              <span className="code-pill is-lg">{audit.template_code || audit.code} · v{audit.template_version || audit.version}</span>
+            ) : null}
             <h1>{audit.template_name}</h1>
             <div className="subtitle">
-              {audit.code ? `${audit.code} · v${audit.version} · ` : ''}
               {audit.area_name || 'Sin servicio'}
               {audit.shift ? ` · turno ${audit.shift.toLowerCase()}` : ''}
             </div>

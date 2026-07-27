@@ -362,7 +362,10 @@ export function DataCenterPanel() {
                 <tbody>
                   {data.byAudit.slice(0, 30).map(row => (
                     <tr key={row.id}>
-                      <td><strong>{row.template_name}</strong></td>
+                      <td>
+                        <strong>{row.template_name}</strong>
+                        {row.template_code ? <small className="repo-code">{row.template_code}</small> : null}
+                      </td>
                       <td>{row.area_name || '—'}</td>
                       <td className="tabular-col">{String(row.audit_date).slice(0, 10)}</td>
                       <td>{row.shift || '—'}</td>

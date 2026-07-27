@@ -238,6 +238,10 @@ export interface AuditDetail {
   id: string
   shift: string | null
   template_id: string
+  /** Código y versión CONGELADOS el día de la ronda: identifican el formato aunque la lista
+   *  cambie de versión después. */
+  template_code?: string
+  template_version?: string
   template_name: string
   code: string
   version: string
