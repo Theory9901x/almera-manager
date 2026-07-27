@@ -11,7 +11,8 @@ import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
 import {
   CHECKLIST_VALUE_LABELS, type AdherenceResult, type ChecklistArea, type ChecklistDomain,
-  type ChecklistField, type ChecklistFieldType, type ChecklistTemplateDetail, type ChecklistValue,
+  type ChecklistField, type ChecklistFieldType, type ChecklistMembership,
+  type ChecklistTemplateDetail, type ChecklistValue,
 } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -52,7 +53,7 @@ function ChecklistBuilderContent() {
   const [loading, setLoading] = useState(true)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [dirty, setDirty] = useState(false)
-  const [section, setSection] = useState<'criterios' | 'cabecera' | 'prueba'>('criterios')
+  const [section, setSection] = useState<'criterios' | 'cabecera' | 'asignacion' | 'prueba'>('criterios')
 
   const [meta, setMeta] = useState({ name: '', code: '', version: '01', description: '', subjectLabel: '', numberedItems: false, areaId: '' })
   const [headerFields, setHeaderFields] = useState<ChecklistField[]>([])
@@ -180,7 +181,10 @@ function ChecklistBuilderContent() {
 
       <div className="surface-panel is-header" style={{ ['--ds-accent' as string]: identity.color }}>
         <nav className="ds-tabs" aria-label="Secciones del constructor">
-          {([['criterios', 'Dominios y criterios'], ['cabecera', 'Cabecera y sujeto'], ['prueba', 'Prueba de cálculo']] as const).map(([key, label]) => (
+          {(canManage
+            ? [['criterios', 'Dominios y criterios'], ['cabecera', 'Cabecera y sujeto'], ['asignacion', 'Asignación'], ['prueba', 'Prueba de cálculo']] as const
+            : [['criterios', 'Dominios y criterios'], ['cabecera', 'Cabecera y sujeto'], ['prueba', 'Prueba de cálculo']] as const
+          ).map(([key, label]) => (
             <button
               key={key}
               className={`ds-tabs-item ${section === key ? 'is-active' : ''}`}
@@ -242,6 +246,8 @@ function ChecklistBuilderContent() {
               />
             </>
           )}
+
+          {section === 'asignacion' && canManage && <AssignmentPanel templateId={template.id} published={template.status === 'PUBLICADA'} />}
 
           {section === 'prueba' && <SimulationPanel templateId={template.id} domains={domains} dirty={dirty} />}
         </div>
@@ -408,6 +414,76 @@ function FieldsEditor({ title, eyebrow, hint, fields, readOnly, onChange }: {
           <Plus size={13} /> Campo
         </button>
       )}
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Asignacion: quien puede diligenciar esta lista. Guarda solo (no forma parte del buffer del
+// constructor) porque es una decision administrativa independiente de la estructura.
+
+function AssignmentPanel({ templateId, published }: { templateId: string; published: boolean }) {
+  const toast = useToast()
+  const [memberships, setMemberships] = useState<ChecklistMembership[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    Promise.all([checklistsService.memberships(), checklistsService.assignments(templateId)])
+      .then(([people, assigned]) => { setMemberships(people); setSelected(new Set(assigned.map(String))) })
+      .catch(cause => toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar las asignaciones'))
+      .finally(() => setLoading(false))
+  }, [templateId])
+
+  async function save() {
+    setBusy(true)
+    try {
+      await checklistsService.saveAssignments(templateId, [...selected])
+      toast.push('success', 'Asignaciones guardadas')
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar') }
+    finally { setBusy(false) }
+  }
+
+  if (loading) return <Card accent={identity.color} className="p-5"><div className="flex justify-center"><Loader2 className="animate-spin" size={20} /></div></Card>
+
+  return (
+    <Card accent={identity.color} className="p-5">
+      <p className="ds-eyebrow">Quién audita</p>
+      <h2 className="mt-1 text-xl font-black">Profesionales asignados</h2>
+      <p className="survey-config-hint mt-2">
+        Solo quienes marques aquí verán esta lista en «Nueva auditoría».
+        {!published && <> La lista está en <strong>borrador</strong>: publícala para que puedan usarla.</>}
+      </p>
+
+      <div className="checklist-assign-grid mt-4">
+        {memberships.map(person => {
+          const checked = selected.has(String(person.id))
+          return (
+            <label key={person.id} className={`checklist-assign-row ${checked ? 'is-selected' : ''}`}>
+              <input
+                type="checkbox" checked={checked}
+                onChange={() => setSelected(current => {
+                  const next = new Set(current)
+                  if (next.has(String(person.id))) next.delete(String(person.id))
+                  else next.add(String(person.id))
+                  return next
+                })}
+              />
+              <div className="min-w-0">
+                <strong>{person.full_name}</strong>
+                <small>{person.role_name} · {person.email}</small>
+              </div>
+            </label>
+          )
+        })}
+        {!memberships.length && <p className="survey-config-empty">No hay usuarios activos en la entidad.</p>}
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <Button identity={identity} onClick={() => void save()} disabled={busy}><Save size={15} /> Guardar asignaciones</Button>
+        <span className="survey-config-hint">{selected.size} seleccionado{selected.size === 1 ? '' : 's'}</span>
+      </div>
     </Card>
   )
 }

@@ -1,8 +1,9 @@
 # Módulo "Listas de Chequeo" — Auditoría por Adherencia
 
-Estado: **Fase 1 entregada** (modelo, constructor y motor de adherencia); fases 2 a 5
-pendientes. Este documento es el plan completo — ver §8 para las fases y §10 para lo ya
-construido. Leer primero `CLAUDE.md` (arquitectura, sistema de diseño y reglas de trabajo).
+Estado: **Fases 1 y 2 entregadas** (modelo, constructor, motor de adherencia y entorno de
+diligenciamiento); fases 3 a 5 pendientes. Este documento es el plan completo — ver §8
+para las fases, §10 y §11 para lo ya construido. Leer primero `CLAUDE.md` (arquitectura,
+sistema de diseño y reglas de trabajo).
 
 ---
 
@@ -277,7 +278,7 @@ no como parche aislado). **No avanzar sin verificar la anterior.**
 | Fase | Alcance | Entregable verificable |
 |---|---|---|
 | **1** ✅ | Modelo de datos, constructor de listas por área, motor de adherencia dinámico con exclusión de NA, semaforización. Sin firmas ni analítica. | **Entregada.** Ver §10. |
-| **2** | Entorno de diligenciamiento: asignación, cabecera → sujetos → evaluación → guardado con cálculo. Directorio reutilizable de sujetos. | Un profesional asignado completa una auditoría de principio a fin y ve su adherencia semaforizada. |
+| **2** ✅ | Entorno de diligenciamiento: asignación, cabecera → sujetos → evaluación → guardado con cálculo. Directorio reutilizable de sujetos. | Un profesional asignado completa una auditoría de principio a fin y ve su adherencia semaforizada. |
 | **3** | Firmas digitales en canvas (tablet), asociación al registro, directorio reutilizable de firmantes. | Firmar una auditoría desde pantalla táctil y ver la firma en el registro. |
 | **4** | Analítica: tableros por dominio/criterio/servicio/evolución, informe PDF individual y consolidado. | PDF institucional generado y tablero con datos reales. |
 | **5** | Migración de las listas reales de seguridad del paciente. | FO-24 y FO-26 cargadas **solo con configuración, sin código nuevo por lista**. |
@@ -378,3 +379,70 @@ tablas de esas fases (`checklist_audits`, `checklist_audit_subjects`,
 después, pero no tienen interfaz. La pestaña "Prueba de cálculo" del constructor es una
 **simulación** que corre contra el motor real del servidor: sirve para validar la
 estructura antes de publicar, no guarda nada.
+
+---
+
+## 11. Fase 2 — entregada
+
+Entorno de diligenciamiento completo: un profesional asignado abre su lista, registra los
+sujetos, califica criterio por criterio y cierra con la adherencia calculada.
+
+### Archivos nuevos o tocados
+
+| Archivo | Rol |
+|---|---|
+| `server/routes/checklists.mjs` | 15 endpoints nuevos: asignaciones, auditorías, sujetos, respuestas, cierre |
+| `src/modules/checklists/pages/ChecklistAuditPage.tsx` | Pantalla de diligenciamiento (nueva) |
+| `src/modules/checklists/pages/ChecklistsListPage.tsx` | Reestructurada: pestañas Auditorías / Listas |
+| `src/modules/checklists/pages/ChecklistBuilderPage.tsx` | Pestaña «Asignación» |
+| `src/modules/checklists/types.ts`, `services/checklistsService.ts` | Tipos y cliente de la fase |
+| `src/index.css` | Grilla de calificación táctil, chips de sujeto, panel de asignación |
+| `src/App.tsx` | Ruta `/app/listas-chequeo/auditorias/:auditId` |
+
+### Flujo implementado
+
+1. El equipo de calidad **asigna** la lista a profesionales (pestaña «Asignación» del
+   constructor). Solo listas **publicadas** aparecen para diligenciar.
+2. El auditor ve en «Nueva auditoría» únicamente **sus** listas asignadas e inicia la ronda
+   con fecha.
+3. Diligencia la **cabecera** (los campos que definió el constructor).
+4. Agrega **sujetos**: nuevos, o traídos del **directorio reutilizable** — quien ya se
+   registró en una ronda anterior se selecciona sin volver a teclearlo.
+5. Califica en una grilla criterio × sujeto con botones **C / NC / NA**; el instructivo del
+   criterio se muestra bajo el enunciado.
+6. **Cierra** la auditoría: el resultado queda congelado con su porcentaje y concepto.
+
+### Decisiones de implementación
+
+- **Orden de rutas.** Las rutas estáticas (`/memberships`, `/audits/list`,
+  `/subjects/directory`, `/assigned/mine`) se registran **antes** de `/:id`, o Express las
+  captura como si el nombre fuera un id y la consulta revienta con un `NaN`.
+- **Marcas en buffer local.** Tocar C/NC/NA no llama al servidor; se guarda al pulsar
+  «Guardar». En una ronda con tablet y red inestable, una petición por toque es justo lo
+  que no se quiere. El pendiente se recalcula en el cliente para que el avance se vea al
+  instante.
+- **Se envía también lo desmarcado** (`value: null`) para que el servidor borre esa fila.
+  Sin eso, deshacer una marca no se persistiría nunca. Y se borra la fila en vez de
+  guardar `NA`: sin responder y no aplica son estados distintos.
+- **Solo se manda el diff** contra lo ya guardado, no la grilla entera.
+- **El cierre valida `pending > 0`** y responde 409 con cuántas faltan. NA no bloquea,
+  porque NA ya es una respuesta.
+- **Una auditoría cerrada es un registro firmado**: `assertAudit({ requireOpen: true })`
+  bloquea toda escritura (respuestas, sujetos, cabecera) hasta reabrirla.
+- **Aislamiento por permiso**: quien no tiene `checklists.manage` ve solo sus propias
+  auditorías y solo puede iniciar listas que le asignaron — validado en el servidor, no
+  solo escondido en la interfaz.
+- **Snapshot de atributos** al agregar el sujeto a la auditoría: si luego cambia de cama o
+  cargo, la ronda vieja sigue mostrando lo que había ese día.
+
+### Verificación
+
+Interfaz verificada con el flujo de Puppeteer de `CLAUDE.md` §6: grilla con encabezado y
+primera columna pegajosos, celdas **sin marcar resaltadas en ámbar**, botones de 42×38 px
+para uso con el dedo, instructivo bajo el criterio, y el resultado cuadrando con el motor
+(6 C sobre 8 aplicables = 75.0 %, con los 2 NA fuera del denominador).
+
+### Pendiente de las fases siguientes
+
+Firmas digitales (fase 3), analítica e informes PDF (fase 4) y la carga de las 13 listas
+reales (fase 5). La tabla `checklist_signatures` ya existe pero aún no tiene interfaz.

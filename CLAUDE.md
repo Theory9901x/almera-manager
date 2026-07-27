@@ -278,7 +278,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
-| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fase 1**: constructor + motor de adherencia |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-2**: constructor, motor y diligenciamiento |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -333,21 +333,19 @@ página y visor propio de PDF.
 ## 11. Trabajo pendiente
 
 **Módulo "Listas de Chequeo" (auditoría por adherencia)** — plan de 5 fases.
-**Fase 1 entregada** (modelo de datos completo, constructor genérico y motor de
-adherencia); **faltan las fases 2 a 5**:
+**Fases 1 y 2 entregadas**; **faltan las fases 3 a 5**:
 
 | Fase | Alcance | Estado |
 |---|---|---|
 | 1 | Modelo, constructor, motor de adherencia, semaforización | **Hecha** |
-| 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | Pendiente |
+| 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | **Hecha** |
 | 3 | Firmas digitales en canvas + directorio de firmantes | Pendiente |
 | 4 | Analítica, gráficas e informes PDF | Pendiente |
 | 5 | Migración de las 13 listas reales de seguridad del paciente | Pendiente |
 
-Piezas ya disponibles para las siguientes fases: `server/checklistScoring.mjs` (motor
-puro, ya cubre los cuatro niveles de agregación y el conteo de pendientes) y las tablas
-`checklist_audits` / `checklist_audit_subjects` / `checklist_answers` /
-`checklist_signatures`, creadas desde la Fase 1 aunque todavía sin interfaz.
+Pieza clave ya disponible: `server/checklistScoring.mjs` (motor puro; cubre los cuatro
+niveles de agregación y el conteo de pendientes). La tabla `checklist_signatures` existe
+desde la Fase 1 pero aún no tiene interfaz — es el punto de partida de la Fase 3.
 
 → **`docs/MODULO-LISTAS-DE-CHEQUEO.md`** tiene el plan completo, el modelo, la decisión
 de escala fija C/NC/NA y el análisis real de los dos formatos institucionales. Léelo

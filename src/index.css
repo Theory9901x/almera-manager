@@ -2742,3 +2742,90 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .checklist-field-row > div { width: 100%; }
   .checklist-sim-grid td.sim-criterion, .checklist-sim-grid th.sim-criterion { min-width: 200px; }
 }
+
+/* --- Fase 2: diligenciamiento (tablet-first) --- */
+
+/* Sujetos de la ronda: chips compactos, no una tabla — son pocos y se consultan de un vistazo. */
+.checklist-subject-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.checklist-subject-chip {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border: 1px solid var(--border-hairline); border-radius: 999px; background: #fff;
+  box-shadow: var(--shadow-card-sm);
+}
+.checklist-subject-chip .idx {
+  display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 999px;
+  background: var(--m-seguridad-soft); color: var(--m-seguridad); font-size: 11px; font-weight: 800;
+}
+.checklist-subject-chip strong { display: block; font-size: 12.5px; color: var(--ink); }
+.checklist-subject-chip small { display: block; font-size: 10.5px; color: var(--muted); }
+
+.checklist-subject-form {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px;
+  border: 1px dashed color-mix(in srgb, var(--m-seguridad) 40%, transparent);
+  border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--m-seguridad) 4%, #fff);
+}
+
+/* Grilla de calificacion. Misma densidad que Matrices de Adherencia, pero con objetivos
+   tactiles mas grandes: se usa con el dedo, en tablet, durante la ronda. */
+.checklist-fill-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); }
+.checklist-fill-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
+.checklist-fill-grid th, .checklist-fill-grid td { border-bottom: 1px solid var(--border-hairline); padding: 10px 12px; text-align: center; vertical-align: top; }
+.checklist-fill-grid thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--color-surface-soft, #f7f8fb);
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 800;
+}
+.checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion {
+  position: sticky; left: 0; z-index: 1; background: #fff; text-align: left;
+  min-width: 320px; max-width: 460px; white-space: normal; line-height: 1.45;
+}
+.checklist-fill-grid thead th.fill-criterion { z-index: 3; background: var(--color-surface-soft, #f7f8fb); }
+.checklist-fill-grid tbody tr:hover td { background: color-mix(in srgb, var(--m-seguridad) 4%, #fff); }
+.checklist-fill-grid tbody tr:hover td.fill-criterion { background: color-mix(in srgb, var(--m-seguridad) 4%, #fff); }
+.checklist-fill-grid tr.fill-domain-row td {
+  background: var(--m-seguridad-soft); color: var(--m-seguridad); text-align: left;
+  font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+  border-left: 3px solid var(--m-seguridad); position: sticky; left: 0;
+}
+.fill-subject-head { display: inline-block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.fill-criterion-text { display: flex; align-items: flex-start; gap: 6px; }
+.fill-num { font-weight: 800; color: var(--m-seguridad); flex: none; }
+.fill-guidance { color: var(--muted); flex: none; margin-top: 1px; }
+.fill-guidance-text { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+
+/* Celda sin responder: se marca en el fondo para que salte a la vista que falta, sin gritar. */
+.checklist-fill-grid td.is-unanswered { background: color-mix(in srgb, #f59e0b 7%, #fff); }
+.checklist-fill-grid tbody tr:hover td.is-unanswered { background: color-mix(in srgb, #f59e0b 12%, #fff); }
+
+.fill-value-group { display: inline-flex; gap: 5px; }
+.fill-value {
+  min-width: 42px; height: 38px; border-radius: 10px; border: 1px dashed #d8dde5;
+  background: transparent; color: #b9c0c9; font-size: 12px; font-weight: 800; cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+.fill-value:hover:not(:disabled) { border-color: #9aa3ad; color: #6b7480; }
+.fill-value:active:not(:disabled) { transform: scale(.94); }
+.fill-value:disabled { cursor: default; opacity: .55; }
+.fill-value.is-active { border-style: solid; border-color: transparent; }
+.fill-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 20%, white); color: oklch(0.45 0.15 150); }
+.fill-value--nc.is-active { background: color-mix(in srgb, var(--danger) 16%, white); color: var(--danger); }
+.fill-value--na.is-active { background: #eef0f3; color: var(--ink-soft); }
+
+/* --- Asignacion --- */
+.checklist-assign-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.checklist-assign-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); background: #fff;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.checklist-assign-row:hover { border-color: color-mix(in srgb, var(--m-seguridad) 45%, transparent); }
+.checklist-assign-row.is-selected { border-color: var(--m-seguridad); background: color-mix(in srgb, var(--m-seguridad) 5%, #fff); }
+.checklist-assign-row input { width: 18px; height: 18px; flex: none; accent-color: var(--m-seguridad); }
+.checklist-assign-row strong { display: block; font-size: 12.5px; color: var(--ink); }
+.checklist-assign-row small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+@media (max-width: 900px) {
+  .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion { min-width: 220px; }
+  .fill-value { min-width: 38px; height: 40px; }
+}

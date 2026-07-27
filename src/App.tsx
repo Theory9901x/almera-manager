@@ -22,6 +22,7 @@ import CarbonCapturePage from '@/modules/carbon/pages/CarbonCapturePage'
 import CarbonConfigPage from '@/modules/carbon/pages/CarbonConfigPage'
 import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
 import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
+import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -105,6 +106,14 @@ function ChecklistBuilderRoute() {
   return <ChecklistBuilderPage />
 }
 
+function ChecklistAuditRoute() {
+  const { session } = useAuth()
+  // Con .view se puede consultar una auditoria (incluidas las cerradas); marcar y cerrar exige
+  // .fill, y eso lo valida el servidor en cada endpoint de escritura.
+  if (!session?.permissions.includes('checklists.view')) return <Navigate to="/app" replace />
+  return <ChecklistAuditPage />
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -127,6 +136,7 @@ function AppRoutes() {
         <Route path="encuestas/:surveyId/resultados" element={<SurveyResultsRoute />} />
         <Route path="encuestas/:surveyId/respuestas" element={<SurveyResponsesRoute />} />
         <Route path="listas-chequeo" element={<ChecklistsRoute />} />
+        <Route path="listas-chequeo/auditorias/:auditId" element={<ChecklistAuditRoute />} />
         <Route path="listas-chequeo/:templateId/constructor" element={<ChecklistBuilderRoute />} />
         <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />
         <Route path="huella-carbono/captura" element={<CarbonRoute><CarbonCapturePage /></CarbonRoute>} />

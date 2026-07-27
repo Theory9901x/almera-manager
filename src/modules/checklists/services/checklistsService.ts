@@ -1,5 +1,6 @@
 import type {
-  AdherenceResult, ChecklistArea, ChecklistTemplate, ChecklistTemplateDetail, ChecklistValue,
+  AdherenceResult, AssignedTemplate, AuditDetail, AuditSummary, ChecklistArea, ChecklistMembership,
+  ChecklistTemplate, ChecklistTemplateDetail, ChecklistValue, DirectorySubject,
 } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -38,4 +39,33 @@ export const checklistsService = {
 
   simulate: (id: string, subjects: { id: string }[], answers: { subject_id: string; criterion_id: string; value: ChecklistValue }[]) =>
     call<AdherenceResult>(`/${id}/simulate`, { method: 'POST', body: JSON.stringify({ subjects, answers }) }),
+
+  // ---- Fase 2: diligenciamiento ----
+
+  memberships: () => call<ChecklistMembership[]>('/memberships'),
+  assignments: (id: string) => call<string[]>(`/${id}/assignments`),
+  saveAssignments: (id: string, membershipIds: string[]) =>
+    call<{ ok: true; count: number }>(`/${id}/assignments`, { method: 'PUT', body: JSON.stringify({ membershipIds }) }),
+
+  assignedToMe: () => call<AssignedTemplate[]>('/assigned/mine'),
+  directory: (templateId?: string) => call<DirectorySubject[]>(`/subjects/directory${templateId ? `?templateId=${templateId}` : ''}`),
+
+  audits: () => call<AuditSummary[]>('/audits/list'),
+  audit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}`),
+  createAudit: (data: { templateId: string; auditDate?: string; headerValues?: Record<string, string> }) =>
+    call<{ id: string }>('/audits', { method: 'POST', body: JSON.stringify(data) }),
+  updateAudit: (auditId: string, data: { auditDate?: string; headerValues?: Record<string, string> }) =>
+    call<AuditDetail>(`/audits/${auditId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  removeAudit: (auditId: string) => call<{ ok: true }>(`/audits/${auditId}`, { method: 'DELETE' }),
+
+  addSubject: (auditId: string, data: { displayName: string; attributes?: Record<string, string>; subjectId?: string | null }) =>
+    call<{ id: string }>(`/audits/${auditId}/subjects`, { method: 'POST', body: JSON.stringify(data) }),
+  removeSubject: (auditId: string, subjectRowId: string) =>
+    call<{ ok: true }>(`/audits/${auditId}/subjects/${subjectRowId}`, { method: 'DELETE' }),
+
+  saveAnswers: (auditId: string, answers: { auditSubjectId: string; criterionId: string; value: ChecklistValue | null }[]) =>
+    call<AuditDetail>(`/audits/${auditId}/answers`, { method: 'PUT', body: JSON.stringify({ answers }) }),
+
+  closeAudit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}/close`, { method: 'POST' }),
+  reopenAudit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}/reopen`, { method: 'POST' }),
 }
