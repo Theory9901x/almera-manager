@@ -285,7 +285,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
-| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-4**; faltan 11 listas reales por cargar |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | Operativo, **5 fases entregadas**; 13 listas cargadas |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -339,8 +339,7 @@ página y visor propio de PDF.
 
 ## 11. Trabajo pendiente
 
-**Módulo "Listas de Chequeo" (auditoría por adherencia)** — plan de 5 fases.
-**Fases 1 a 4 entregadas**, fase 5 a medias:
+**Módulo "Listas de Chequeo" (auditoría por adherencia) — las 5 fases están entregadas.**
 
 | Fase | Alcance | Estado |
 |---|---|---|
@@ -348,12 +347,47 @@ página y visor propio de PDF.
 | 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | **Hecha** |
 | 3 | Firmas digitales en canvas + directorio de firmantes | **Hecha** |
 | 4 | Analítica, gráficas e informes PDF | **Hecha** |
-| 5 | Migración de las 13 listas reales | **Parcial**: FO-24 y FO-26 cargadas; faltan 11 |
+| 5 | Migración de las 13 listas reales | **Hecha**: 13 listas, 137 criterios |
 
-Pieza clave ya disponible: `server/checklistScoring.mjs` (motor puro; cubre los cuatro
-niveles de agregación y el conteo de pendientes). La tabla `checklist_signatures` existe
-desde la Fase 1 pero aún no tiene interfaz — es el punto de partida de la Fase 3.
+Piezas clave: `server/checklistScoring.mjs` (motor puro de adherencia, cubre los cuatro
+niveles de agregación y el conteo de pendientes) y `server/checklistSeed.mjs` (las 13
+listas como datos, generadas desde los `.xlsx` originales).
+
+Las 13 entraron **solo con configuración, sin una línea de código por lista** — el papel
+trae cuatro maquetados distintos y los cuatro caben en el mismo modelo
+`lista → dominios → criterios`. Los textos conservan las erratas del formato y la
+numeración no correlativa (FO-26 salta el 12, FO-40 reinicia en 7) a propósito: el
+auditor tiene el papel al lado.
+
+Lo único abierto es una **decisión del usuario, no trabajo pendiente**: el instructivo de
+FO-24 (`guidance`) está vacío porque sus criterios no calzan 1:1 con los de la grilla, y
+rellenarlos a ojo sería inventar contenido clínico.
 
 → **`docs/MODULO-LISTAS-DE-CHEQUEO.md`** tiene el plan completo, el modelo, la decisión
-de escala fija C/NC/NA y el análisis real de los dos formatos institucionales. Léelo
-antes de continuar.
+de escala fija C/NC/NA, el inventario de los 13 formatos con sus maquetados y el registro
+de cada fase.
+
+---
+
+## 12. Vidrio del módulo de Listas de Chequeo
+
+Es el único módulo con tratamiento de vidrio en las superficies base (el resto lo reserva
+para overlays). Cuatro cosas que costó descubrir y conviene no deshacer:
+
+- **El vidrio necesita color detrás.** Sobre un fondo casi blanco, una tarjeta translúcida
+  y una opaca se ven igual. Por eso la malla del fondo lleva radiales saturados y separados
+  en tono, no un degradado pálido.
+- **El panel de pestañas envuelve toda la página**, así que si tiene relleno de vidrio
+  normal tapa esa malla y las tarjetas de dentro refractan blanco sobre blanco. Se deja
+  casi transparente: ahí es un marco, no una superficie.
+- **El borde de degradado va con máscara compuesta**, y el orden importa: el shorthand
+  `-webkit-mask` reinicia `mask-composite`. Cada shorthand antes de su propio composite.
+  Todo el bloque va dentro de `@supports`: sin soporte, el degradado no se queda en el
+  borde, **tapa la tarjeta** y el contenido desaparece.
+- **`animation-timeline: view()` está descartado aquí.** Una tarjeta que no se ha
+  desplazado a la vista se queda en `opacity: 0`; al imprimir o capturar la página entera,
+  medio módulo sale en blanco. Se usa una animación normal, que siempre termina.
+
+Al verificar con Puppeteer: **Chrome headless reporta `prefers-reduced-motion: reduce`**,
+así que apaga las animaciones del propio módulo. Hay que forzar `no-preference` con
+`page.emulateMediaFeatures` o se fotografía algo que ningún usuario ve.
