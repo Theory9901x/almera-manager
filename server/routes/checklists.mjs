@@ -955,6 +955,20 @@ async function logPlan(request, { planId, label, action, detail = '' }, client =
   )
 }
 
+/** Codigo visible del plan: es el id de la fila, unico por construccion, dicho como se busca. */
+const planCode = id => `PM-${id}`
+
+/** Notificacion interna a una persona (no a una membresia): al responsable cuando le asignan o
+ *  devuelven, al auditor cuando el responsable subsana. Nunca a quien ejecuta la accion. */
+async function notifyUser(request, { userId, planId, message }, client = null) {
+  if (!userId || String(userId) === String(uid(request))) return
+  const run = client ? client.query.bind(client) : query
+  await run(
+    'INSERT INTO checklist_notifications (organization_id, user_id, plan_id, message) VALUES ($1,$2,$3,$4)',
+    [oid(request), userId, planId, message],
+  )
+}
+
 /**
  * Carga el plan y aplica el aislamiento. Lo pueden ver: calidad (manage), el responsable
  * asignado (su membresia) y el auditor autor de la ronda. Nadie mas — el mismo criterio de
@@ -987,6 +1001,35 @@ async function assertPlan(request) {
   if (!canManage && !isAssignee && !isAuthor) fail(403, 'Este plan de mejora no es tuyo')
   return { ...plan, _canManage: canManage, _isAssignee: isAssignee }
 }
+
+// ---- Notificaciones del circuito ----
+// Bandeja simple por usuario: las no leidas primero. Se registran ANTES de /plans/:planId
+// para que Express no tome "notifications" como un id.
+
+checklistsRouter.get('/plans/notifications', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT id, plan_id, message, read, created_at FROM checklist_notifications
+        WHERE organization_id = $1 AND user_id = $2
+        ORDER BY read, created_at DESC LIMIT 30`,
+      [oid(request), uid(request)],
+    )
+    response.json({
+      rows: result.rows.map(row => ({ ...row, id: String(row.id), plan_id: row.plan_id ? String(row.plan_id) : null })),
+      unread: result.rows.filter(row => !row.read).length,
+    })
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.post('/plans/notifications/read', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    await query(
+      'UPDATE checklist_notifications SET read = TRUE WHERE organization_id = $1 AND user_id = $2 AND NOT read',
+      [oid(request), uid(request)],
+    )
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
 
 // Posibles responsables. No se reusa GET /memberships porque es solo de manage y el AUDITOR
 // tambien asigna planes desde la ronda. Solo expone nombre y correo de companeros de la misma
@@ -1026,8 +1069,28 @@ checklistsRouter.get('/plans', checklistsModule, plansAccess, async (request, re
 
     if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
     if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
+    // Sede: todos los servicios del centro elegido.
+    if (q.center) add(String(q.center), 'EXISTS (SELECT 1 FROM checklist_areas ca WHERE ca.id = a.area_id AND ca.center = $$)')
     if (q.auditId) add(Number(q.auditId), 'p.audit_id = $$')
     if (q.assignedId) add(Number(q.assignedId), 'p.assigned_membership_id = $$')
+    // Persona auditada: el sujeto del hallazgo, por texto.
+    if (q.subject) add(`%${String(q.subject).toLowerCase()}%`, 'lower(p.subject_name) LIKE $$')
+    // Fecha DEL PLAN: la que se le puso al crearlo; si no tiene, el dia en que se creo.
+    if (q.dateFrom) add(String(q.dateFrom), 'COALESCE(p.due_date, p.created_at::date) >= $$')
+    if (q.dateTo) add(String(q.dateTo), 'COALESCE(p.due_date, p.created_at::date) <= $$')
+    // Busqueda libre: "PM-12" (o solo el numero) va directo al id unico; cualquier otra cosa
+    // busca en nombre, criterio y responsable.
+    if (q.q) {
+      const raw = String(q.q).trim()
+      const byId = raw.match(/^pm-?\s*(\d+)$/i) || raw.match(/^(\d+)$/)
+      if (byId) add(Number(byId[1]), 'p.id = $$')
+      else {
+        params.push(`%${raw.toLowerCase()}%`)
+        const i = params.length
+        where.push(`(lower(p.title) LIKE $${i} OR lower(p.criterion_text) LIKE $${i}
+                     OR lower(p.subject_name) LIKE $${i} OR lower(p.assigned_name) LIKE $${i})`)
+      }
+    }
     // El estado va DE ULTIMO a proposito: los contadores de las pestañas usan los mismos
     // filtros menos este, y al ser el ultimo basta recortar la ultima clausula y el ultimo
     // parametro sin descuadrar la numeracion de los demas.
@@ -1120,19 +1183,36 @@ checklistsRouter.post('/audits/:auditId/plans', checklistsModule, requireAnyPerm
       assignedName = String(body.assignedName).trim()
     }
 
+    // Nombre y fecha del plan (decision del usuario): el nombre lo identifica ademas del codigo
+    // PM-<id>; la fecha es el compromiso de subsanacion y es opcional.
+    const title = String(body.title || '').trim().slice(0, 300)
+    const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.dueDate || '')) ? body.dueDate : null
+
     const meta = answer.rows[0]
     await client.query('BEGIN')
     const inserted = await client.query(
       `INSERT INTO checklist_action_plans
          (organization_id, audit_id, criterion_id, audit_subject_id, criterion_text, domain_name,
-          item_number, subject_name, finding, assigned_membership_id, assigned_name, created_by_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+          item_number, subject_name, finding, assigned_membership_id, assigned_name, created_by_id,
+          title, due_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [oid(request), audit.id, criterionId, subjectRowId, meta.criterion_text, meta.domain_name,
         meta.item_number || '', meta.subject_name,
         String(body.finding || meta.observation || '').trim().slice(0, 4000),
-        assignedMembershipId, assignedName, uid(request)],
+        assignedMembershipId, assignedName, uid(request), title, dueDate],
     )
     const plan = inserted.rows[0]
+
+    // Notificacion al responsable: se entera al entrar, sin que nadie tenga que avisarle aparte.
+    if (assignedMembershipId) {
+      const member = await client.query('SELECT user_id FROM memberships WHERE id = $1', [assignedMembershipId])
+      if (member.rows[0]) {
+        await notifyUser(request, {
+          userId: member.rows[0].user_id, planId: plan.id,
+          message: `Te asignaron el plan de mejora ${planCode(plan.id)}${title ? ` «${title}»` : ''}${dueDate ? ` con fecha ${dueDate}` : ''}. Sube tu evidencia de subsanación.`,
+        }, client)
+      }
+    }
 
     // Enlace sujeto -> usuario (§15.1 punto 1): si el auditor pide recordarlo, la proxima ronda
     // sobre el mismo colaborador preseleccionara a su responsable.
@@ -1296,14 +1376,27 @@ checklistsRouter.post('/plans/:planId/resolve', checklistsModule, plansAccess, a
       [String(request.body?.note || '').trim().slice(0, 2000), uid(request), plan.id],
     )
     await logPlan(request, { planId: plan.id, label: planLabel(plan), action: 'SUBSANADO', detail: String(request.body?.note || '').trim().slice(0, 300) })
+    // El AUDITOR es quien cierra: se le notifica que ya hay evidencia por verificar.
+    await notifyUser(request, {
+      userId: plan.auditor_id, planId: plan.id,
+      message: `${planCode(plan.id)}${plan.title ? ` «${plan.title}»` : ''} fue marcado como subsanado por ${request.auth.user.fullName || 'el responsable'}. Revísalo para cerrarlo.`,
+    })
     response.json({ ok: true })
   } catch (error) { next(error) }
 })
 
-// Calidad no acepta la subsanacion: el plan vuelve a EN_PROCESO con el motivo.
-checklistsRouter.post('/plans/:planId/return', checklistsModule, manage, async (request, response, next) => {
+/** Quien verifica: el AUDITOR que hallo el NC (decision del usuario) o calidad. */
+function assertVerifier(request, plan) {
+  const isAuditor = String(plan.auditor_id) === String(uid(request))
+  if (!plan._canManage && !isAuditor) fail(403, 'Solo el auditor de la ronda o calidad puede verificar este plan')
+}
+
+// El verificador no acepta la subsanacion: el plan vuelve a EN_PROCESO con el motivo,
+// y el responsable se entera por notificacion.
+checklistsRouter.post('/plans/:planId/return', checklistsModule, plansAccess, async (request, response, next) => {
   try {
     const plan = await assertPlan(request)
+    assertVerifier(request, plan)
     if (plan.status !== 'SUBSANADO') fail(409, 'Solo un plan subsanado se puede devolver')
     const note = String(request.body?.note || '').trim()
     if (!note) fail(400, 'Explica por qué se devuelve: el responsable tiene que saber qué corregir')
@@ -1313,15 +1406,20 @@ checklistsRouter.post('/plans/:planId/return', checklistsModule, manage, async (
       [plan.id],
     )
     await logPlan(request, { planId: plan.id, label: planLabel(plan), action: 'DEVUELTO', detail: note.slice(0, 500) })
+    await notifyUser(request, {
+      userId: plan.assigned_user_id, planId: plan.id,
+      message: `${planCode(plan.id)}${plan.title ? ` «${plan.title}»` : ''} fue devuelto: ${note.slice(0, 300)}`,
+    })
     response.json({ ok: true })
   } catch (error) { next(error) }
 })
 
-// Cierre: SOLO calidad, y NUNCA la misma persona que subsano. Si quien sube tambien cierra,
-// el circuito no vale como verificacion (§15.1).
-checklistsRouter.post('/plans/:planId/close', checklistsModule, manage, async (request, response, next) => {
+// Cierre: el AUDITOR de la ronda (o calidad), y NUNCA la misma persona que subsano. Si quien
+// sube tambien cierra, el circuito no vale como verificacion (§15.1).
+checklistsRouter.post('/plans/:planId/close', checklistsModule, plansAccess, async (request, response, next) => {
   try {
     const plan = await assertPlan(request)
+    assertVerifier(request, plan)
     if (plan.status !== 'SUBSANADO') fail(409, 'Solo se cierra un plan ya subsanado por su responsable')
     if (String(plan.resolved_by_id) === String(uid(request))) {
       fail(409, 'Quien subsanó no puede cerrar el plan: el cierre debe verificarlo otra persona')
@@ -1332,6 +1430,10 @@ checklistsRouter.post('/plans/:planId/close', checklistsModule, manage, async (r
       [String(request.body?.note || '').trim().slice(0, 2000), uid(request), plan.id],
     )
     await logPlan(request, { planId: plan.id, label: planLabel(plan), action: 'CERRADO', detail: String(request.body?.note || '').trim().slice(0, 300) })
+    await notifyUser(request, {
+      userId: plan.assigned_user_id, planId: plan.id,
+      message: `${planCode(plan.id)}${plan.title ? ` «${plan.title}»` : ''} fue verificado y cerrado por ${request.auth.user.fullName || 'el auditor'}.`,
+    })
     response.json({ ok: true })
   } catch (error) { next(error) }
 })

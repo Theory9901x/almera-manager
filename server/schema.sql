@@ -1264,3 +1264,30 @@ CREATE INDEX IF NOT EXISTS checklist_action_log_idx
   ON checklist_action_log(organization_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS checklist_action_log_plan_idx
   ON checklist_action_log(plan_id, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Planes de mejora v2 (decision del usuario, 27/07/2026):
+-- al marcar NC se pregunta "¿Requiere plan de mejora?"; si la respuesta es si,
+-- el plan se crea con NOMBRE, FECHA, descripcion y responsable, se notifica al
+-- responsable, queda PENDIENTE hasta que suba su evidencia, y el CIERRE lo hace
+-- el auditor (o calidad) — nunca quien subsano. Cada plan se identifica por su
+-- codigo PM-<id> y el modulo permite buscarlo por fecha, persona auditada,
+-- servicio, sede y lista.
+-- ---------------------------------------------------------------------------
+ALTER TABLE checklist_action_plans ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';
+ALTER TABLE checklist_action_plans ADD COLUMN IF NOT EXISTS due_date DATE;
+
+-- Notificaciones internas del circuito: al responsable cuando le asignan o le
+-- devuelven un plan, y al auditor cuando el responsable lo marca subsanado.
+-- Van por USUARIO (no por membresia): es la persona la que debe enterarse.
+CREATE TABLE IF NOT EXISTS checklist_notifications (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_id BIGINT,
+  message TEXT NOT NULL,
+  read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_notifications_idx
+  ON checklist_notifications(user_id, read, created_at DESC);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ClipboardList, X } from 'lucide-react'
-import { Button, Field, Select, Textarea, moduleIdentity } from '@/design-system'
+import { Button, DatePicker, Field, Input, Select, Textarea, moduleIdentity } from '@/design-system'
 import type { PlanAssignee } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -29,17 +29,23 @@ export function PlanCreateDialog({ draft, assignees, busy, onCancel, onCreate }:
   assignees: PlanAssignee[]
   busy: boolean
   onCancel(): void
-  onCreate(data: { finding: string; assignedMembershipId: string | null; rememberAssignee: boolean }): void
+  onCreate(data: { title: string; dueDate: string | null; finding: string; assignedMembershipId: string | null; rememberAssignee: boolean }): void
 }) {
+  const [title, setTitle] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [finding, setFinding] = useState('')
   const [assigned, setAssigned] = useState('')
   const [remember, setRemember] = useState(false)
+  const [touched, setTouched] = useState(false)
 
   useEffect(() => {
     if (draft) {
+      setTitle('')
+      setDueDate('')
       setFinding(draft.observation || '')
       setAssigned(draft.linkedMembershipId || '')
       setRemember(false)
+      setTouched(false)
     }
   }, [draft])
 
@@ -63,11 +69,18 @@ export function PlanCreateDialog({ draft, assignees, busy, onCancel, onCreate }:
         <p className="ds-confirm-body">
           <strong>{draft.criterionText}</strong>
           {draft.subjectName ? <> — evaluado: <strong>{draft.subjectName}</strong></> : null}.
-          {' '}El hallazgo queda con responsable y seguimiento hasta que calidad verifique la subsanación.
+          {' '}El hallazgo queda <strong>pendiente</strong> con responsable y seguimiento hasta que tú (el auditor) verifiques la subsanación y lo cierres.
         </p>
 
         <div className="start-audit-form">
-          <Field label="Hallazgo / acción de mejora" hint="Qué se encontró y qué debe corregirse">
+          <Field label="Nombre del plan de mejora *" hint={touched && !title.trim() ? 'Escribe el nombre' : `Además del nombre, el plan recibe un código único (PM-…) buscable`}>
+            <Input maxLength={300} value={title} onChange={event => setTitle(event.target.value)}
+              placeholder="Ej. Rotular y separar medicamentos LASA" />
+          </Field>
+          <Field label="Fecha para el plan de mejora" hint="Compromiso de subsanación (opcional)">
+            <DatePicker value={dueDate} onChange={setDueDate} />
+          </Field>
+          <Field label="Descripción del plan de mejora" hint="Qué se encontró y qué debe corregirse">
             <Textarea rows={3} maxLength={4000} value={finding} onChange={event => setFinding(event.target.value)} />
           </Field>
           <Field label="Responsable de subsanar" hint="Debe tener cuenta para subir su evidencia; si aún no la tiene, calidad gestiona por él">
@@ -91,7 +104,14 @@ export function PlanCreateDialog({ draft, assignees, busy, onCancel, onCreate }:
           <Button
             identity={identity}
             disabled={busy}
-            onClick={() => onCreate({ finding: finding.trim(), assignedMembershipId: assigned || null, rememberAssignee: remember })}
+            onClick={() => {
+              setTouched(true)
+              if (!title.trim()) return
+              onCreate({
+                title: title.trim(), dueDate: dueDate || null,
+                finding: finding.trim(), assignedMembershipId: assigned || null, rememberAssignee: remember,
+              })
+            }}
           >
             <ClipboardList size={15} /> {busy ? 'Creando…' : 'Crear plan'}
           </Button>

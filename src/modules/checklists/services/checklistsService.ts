@@ -1,6 +1,6 @@
 import type {
   ActionPlan, ActionPlanDetail, AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
-  DataCenter, DataCenterFilters, DataCenterOptions, PlanAssignee, RepositoryFilters, RepositoryPage,
+  DataCenter, DataCenterFilters, DataCenterOptions, PlanAssignee, PlanNotification, RepositoryFilters, RepositoryPage,
   ChecklistArea, ChecklistMembership, ChecklistProgram, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
@@ -196,12 +196,17 @@ export const checklistsService = {
 
   // ---- Planes de mejora ----
 
-  plans: (filters: { status?: string; templateId?: string; areaId?: string; auditId?: string; assignedId?: string } = {}) =>
+  plans: (filters: {
+    status?: string; templateId?: string; areaId?: string; center?: string; auditId?: string
+    assignedId?: string; subject?: string; dateFrom?: string; dateTo?: string; q?: string
+  } = {}) =>
     call<{ rows: ActionPlan[]; counts: Record<string, number> }>(`/plans${toQueryString(filters)}`),
   plan: (planId: string) => call<ActionPlanDetail>(`/plans/${planId}`),
   planAssignees: () => call<PlanAssignee[]>('/plans/assignees'),
+  planNotifications: () => call<{ rows: PlanNotification[]; unread: number }>('/plans/notifications'),
+  markNotificationsRead: () => call<{ ok: true }>('/plans/notifications/read', { method: 'POST' }),
   createPlan: (auditId: string, data: {
-    criterionId: string; auditSubjectId: string; finding?: string
+    criterionId: string; auditSubjectId: string; finding?: string; title?: string; dueDate?: string | null
     assignedMembershipId?: string | null; assignedName?: string; rememberAssignee?: boolean
   }) => call<ActionPlan>(`/audits/${auditId}/plans`, { method: 'POST', body: JSON.stringify(data) }),
   updatePlan: (planId: string, data: { finding?: string; assignedMembershipId?: string | null; assignedName?: string }) =>

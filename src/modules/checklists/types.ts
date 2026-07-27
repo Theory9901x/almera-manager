@@ -408,15 +408,30 @@ export interface RepositoryPage {
 export type ActionPlanStatus = 'ABIERTO' | 'EN_PROCESO' | 'SUBSANADO' | 'CERRADO'
 
 export const PLAN_STATUS_LABELS: Record<ActionPlanStatus, string> = {
-  ABIERTO: 'Abierto',
+  // "Pendiente", no "Abierto": es como lo nombra el flujo acordado — el plan queda pendiente
+  // hasta que el responsable entra y carga lo suyo.
+  ABIERTO: 'Pendiente',
   EN_PROCESO: 'En proceso',
   SUBSANADO: 'Subsanado',
   CERRADO: 'Cerrado',
 }
 
+/** Notificación interna del circuito de planes. */
+export interface PlanNotification {
+  id: string
+  plan_id: string | null
+  message: string
+  read: boolean
+  created_at: string
+}
+
 /** Plan resumido, como aparece en el listado y en la ronda. */
 export interface ActionPlan {
   id: string
+  /** Nombre del plan (además del código PM-<id>). */
+  title: string
+  /** Fecha comprometida para el plan; nula si no se fijó. */
+  due_date: string | null
   audit_id: string
   criterion_id: string | null
   audit_subject_id: string | null
@@ -464,6 +479,8 @@ export interface ActionPlanDetail extends ActionPlan {
   resolved_by_name: string | null
   closed_by_name: string | null
   created_by_name: string
+  /** Auditor de la ronda: es quien verifica y cierra el plan (además de calidad). */
+  auditor_id?: string
   /** Nombre actual del usuario de la membresía asignada (puede diferir del snapshot). */
   assigned_user_name?: string | null
   evidences: ActionEvidence[]

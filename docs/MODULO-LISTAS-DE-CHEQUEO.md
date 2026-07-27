@@ -777,3 +777,19 @@ y **por servicio** — el topbar dice el alcance con palabras.
 - CSS en `index.css` sección `.dcx-*`, con overrides `:root[data-theme="dark"]`.
 - Verificado con Puppeteer en los tres alcances, cambiando el filtro por interacción real
   (Radix Select). El PDF/Excel exportan el recorte actual como antes.
+
+### 16 bis. Planes de mejora v2 (flujo acordado el 27/07/2026)
+
+- Al marcar **NC** en la ronda se pregunta **«¿Requiere plan de mejora?»**. «No» = no pasa
+  nada más. «Sí» = formulario con **nombre** (obligatorio), **fecha para el plan**,
+  descripción y **responsable**; al crear se **notifica al responsable**.
+- El plan queda **PENDIENTE** (etiqueta de `ABIERTO`) hasta que el responsable entra, sube
+  su evidencia y lo marca subsanado — eso **notifica al auditor**, que es quien **verifica y
+  cierra** (o devuelve con motivo, notificando al responsable). Calidad también puede.
+  Sigue vigente: quien subsana no cierra (409).
+- Cada plan tiene **código único `PM-<id>`**, visible en la ronda, el listado y el detalle,
+  y **buscable** desde el módulo junto con: fecha del plan, persona auditada, servicio,
+  **sede** y lista.
+- Notificaciones: tabla `checklist_notifications` (por usuario), bandeja en la página de
+  planes con «marcar leídas». **Es notificación interna del sistema** — no hay correo; si se
+  quiere email hay que montar SMTP aparte.

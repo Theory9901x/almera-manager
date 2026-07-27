@@ -4906,3 +4906,44 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   box-shadow: 0 10px 34px rgba(2, 6, 18, .6), inset 0 1px 0 rgba(148, 163, 255, .08);
 }
 :root[data-theme="dark"] .ds-select-item { color: var(--ink); }
+
+/* --- Planes de mejora: bandeja de notificaciones y busqueda del modulo --- */
+.plan-inbox {
+  border: 1px solid var(--border-hairline); border-radius: 14px; padding: 12px 14px;
+  background: var(--color-surface-soft); margin-bottom: 14px;
+}
+.plan-inbox.has-unread { border-color: color-mix(in srgb, var(--m-listas) 45%, transparent); }
+.plan-inbox-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px;
+}
+.plan-inbox-head > span {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 800; color: var(--m-listas);
+}
+.plan-inbox ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.plan-inbox li button {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
+  padding: 7px 9px; border-radius: 9px; font: inherit; font-size: 12.5px; color: var(--muted); line-height: 1.4;
+}
+.plan-inbox li.is-unread button { color: var(--ink); font-weight: 600; background: color-mix(in srgb, var(--m-listas) 7%, transparent); }
+.plan-inbox li button:hover { background: color-mix(in srgb, var(--m-listas) 12%, transparent); }
+.plan-inbox li button small { display: block; font-size: 10px; color: var(--muted); font-weight: 500; margin-top: 1px; }
+
+.plan-search {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 14px;
+}
+.plan-search .ds-field { min-width: 150px; flex: 1; }
+.plan-search-q {
+  flex: 2 1 100%; display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border-hairline); border-radius: 12px; padding: 0 13px;
+  background: var(--color-surface-card); color: var(--muted);
+}
+.plan-search-q input {
+  flex: 1; min-width: 0; height: 42px; border: 0; background: transparent; outline: 0;
+  font: inherit; font-size: 13px; color: var(--ink);
+}
+:root[data-theme="dark"] .plan-search-q {
+  background: var(--neo-input, rgba(10, 15, 30, .6));
+  border-color: var(--neo-line, #24314b);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .35);
+}

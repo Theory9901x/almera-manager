@@ -7,7 +7,7 @@ import {
   Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
 } from 'lucide-react'
 import {
-  Badge, Button, Card, EmptyState, Field, Input, ModuleHero, ProgressRing, SaveStatusIndicator,
+  Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, ProgressRing, SaveStatusIndicator,
   Select, ToastProvider, moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
@@ -74,6 +74,9 @@ function ChecklistAuditContent() {
   // Hallazgo NC para el que se esta creando un plan de mejora. Null = dialogo cerrado.
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null)
   const [assignees, setAssignees] = useState<PlanAssignee[]>([])
+  // Celda recien marcada NC a la que se le pregunta "¿Requiere plan de mejora?". Si la
+  // respuesta es no, no pasa nada mas; si es si, se abre la creacion del plan.
+  const [askPlan, setAskPlan] = useState<{ subjectRowId: string; criterionId: string } | null>(null)
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -132,6 +135,14 @@ function ChecklistAuditContent() {
   const criteria = useMemo(() => audit ? audit.domains.flatMap(domain => domain.criteria) : [], [audit])
   const closed = audit?.status === 'CERRADA'
 
+  // Planes de mejora ya creados en esta ronda, por celda (sujeto x criterio). Va aqui arriba
+  // porque toggle() lo consulta para no volver a preguntar sobre un hallazgo que ya tiene plan.
+  const plansByKey = useMemo(() => new Map(
+    (audit?.plans || [])
+      .filter(plan => plan.audit_subject_id && plan.criterion_id)
+      .map(plan => [answerKey(String(plan.audit_subject_id), String(plan.criterion_id)), plan]),
+  ), [audit])
+
   // Avance en vivo, con la misma regla del servidor: NA cuenta como respondido.
   const localPending = useMemo(() => {
     if (!audit) return 0
@@ -140,8 +151,9 @@ function ChecklistAuditContent() {
 
   function toggle(subjectRowId: string, criterionId: string, value: ChecklistValue) {
     if (closed) return
+    const key = answerKey(subjectRowId, criterionId)
+    const wasMarked = marks[key] === value
     setMarks(current => {
-      const key = answerKey(subjectRowId, criterionId)
       const next = { ...current }
       if (next[key] === value) delete next[key]
       else next[key] = value
@@ -149,6 +161,11 @@ function ChecklistAuditContent() {
     })
     setDirty(true)
     setSaveState('idle')
+    // Al MARCAR un NC (no al deshacerlo) se pregunta si el hallazgo requiere plan de mejora.
+    // Solo si la celda no tiene ya uno: repetir la pregunta sobre un hallazgo con plan es ruido.
+    if (value === 'NC' && !wasMarked && !plansByKey.has(key)) {
+      setAskPlan({ subjectRowId, criterionId })
+    }
   }
 
   async function addStaff() {
@@ -301,20 +318,23 @@ function ChecklistAuditContent() {
     })
   }
 
-  async function createPlan(data: { finding: string; assignedMembershipId: string | null; rememberAssignee: boolean }) {
+  async function createPlan(data: { title: string; dueDate: string | null; finding: string; assignedMembershipId: string | null; rememberAssignee: boolean }) {
     if (!audit || !planDraft) return
     setBusy(true)
     try {
-      await checklistsService.createPlan(audit.id, {
+      const created = await checklistsService.createPlan(audit.id, {
         criterionId: planDraft.criterionId,
         auditSubjectId: planDraft.auditSubjectId,
+        title: data.title,
+        dueDate: data.dueDate,
         finding: data.finding,
         assignedMembershipId: data.assignedMembershipId,
         rememberAssignee: data.rememberAssignee,
       })
       setPlanDraft(null)
       await load()
-      toast.push('success', 'Plan de mejora creado')
+      // El codigo unico se dice aqui mismo: es con el que se busca despues en el modulo.
+      toast.push('success', `Plan de mejora PM-${created.id} creado${data.assignedMembershipId ? '. Se notificó al responsable.' : ''}`)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible crear el plan') }
     finally { setBusy(false) }
   }
@@ -358,12 +378,6 @@ function ChecklistAuditContent() {
   // Hallazgos: los NC marcados en pantalla. Son los que exigen accion, y el auditor tiene que
   // verlos crecer mientras marca, no al final.
   const findings = Object.values(marks).filter(value => value === 'NC').length
-  // Planes de mejora ya creados en esta ronda, por celda (sujeto x criterio).
-  const plansByKey = new Map(
-    (audit.plans || [])
-      .filter(plan => plan.audit_subject_id && plan.criterion_id)
-      .map(plan => [answerKey(String(plan.audit_subject_id), String(plan.criterion_id)), plan]),
-  )
   const liveOverall = (() => {
     let c = 0, nc = 0
     for (const value of Object.values(marks)) { if (value === 'C') c++; else if (value === 'NC') nc++ }
@@ -388,6 +402,22 @@ function ChecklistAuditContent() {
         <button onClick={() => navigate('/app/listas-chequeo')}>Listas de Chequeo</button>
         <span>›</span><b>{audit.template_code || audit.code || ''} {audit.template_name}</b>
       </div>
+
+      {/* La pregunta del flujo acordado: NC recien marcado -> "¿Requiere plan de mejora?".
+          Si = se abre la creacion; No = no pasa nada mas, la marca queda tal cual. */}
+      <ConfirmDialog
+        open={askPlan !== null}
+        title="¿Requiere plan de mejora?"
+        confirmLabel="Sí, crear plan"
+        cancelLabel="No"
+        onCancel={() => setAskPlan(null)}
+        onConfirm={() => {
+          const target = askPlan
+          setAskPlan(null)
+          if (target) void openPlanDialog(target.subjectRowId, target.criterionId)
+        }}
+        description={<p>El hallazgo quedó marcado como <strong>NC</strong>. Si requiere plan, se crea con nombre, fecha y responsable, y este será notificado para subir su evidencia.</p>}
+      />
 
       <PlanCreateDialog
         draft={planDraft}
