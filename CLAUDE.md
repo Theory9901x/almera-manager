@@ -285,7 +285,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
-| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | Operativo, **5 fases entregadas**; 13 listas cargadas |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | Operativo en produccion; 13 listas publicadas y en uso |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -339,35 +339,43 @@ página y visor propio de PDF.
 
 ## 11. Trabajo pendiente
 
-**Módulo "Listas de Chequeo" (auditoría por adherencia) — las 5 fases están entregadas.**
+**Listas de Chequeo esta en produccion y en uso.** Lo entregado y desplegado:
 
-| Fase | Alcance | Estado |
-|---|---|---|
-| 1 | Modelo, constructor, motor de adherencia, semaforización | **Hecha** |
-| 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | **Hecha** |
-| 3 | Firmas digitales en canvas + directorio de firmantes | **Hecha** |
-| 4 | Analítica, gráficas e informes PDF | **Hecha** |
-| 5 | Migración de las 13 listas reales | **Hecha**: 13 listas, 137 criterios |
+- 13 listas institucionales cargadas, publicadas y asignadas; agrupadas por **programa**
+  (`checklist_programs`) — hoy solo "Seguridad del Paciente".
+- **Servicios por centro** (`checklist_areas.center`): 47 sembrados en HOCY, Juan Luis
+  Londoño, Comuna VI y Cre Ser con Amor. Una lista NO pertenece a un servicio: el auditor
+  elige centro y servicio al abrir la ronda.
+- **Evaluacion en una sola hoja**, con la maqueta aprobada por el usuario: banda de contexto,
+  dominios en acordeon, controles C/NC/NA, observacion por criterio, evidencias con camara,
+  firma en la misma pagina y panel de resumen fijo con anillo.
+- **Repositorio** de auditorias con aislamiento por autor, **Centro de datos** con filtros
+  combinables y exportacion, **tema claro/oscuro** con conmutador, y bitacora de accesos.
+- Usuario auditor de prueba en produccion: `auditor.seguridad@sgimr.cloud`.
 
-Piezas clave: `server/checklistScoring.mjs` (motor puro de adherencia, cubre los cuatro
-niveles de agregación y el conteo de pendientes) y `server/checklistSeed.mjs` (las 13
-listas como datos, generadas desde los `.xlsx` originales).
+**Lo que falta, con el plan ya escrito en `docs/MODULO-LISTAS-DE-CHEQUEO.md` §15:**
 
-Las 13 entraron **solo con configuración, sin una línea de código por lista** — el papel
-trae cuatro maquetados distintos y los cuatro caben en el mismo modelo
-`lista → dominios → criterios`. Los textos conservan las erratas del formato y la
-numeración no correlativa (FO-26 salta el 12, FO-40 reinicia en 7) a propósito: el
-auditor tiene el papel al lado.
-
-Lo único abierto es una **decisión del usuario, no trabajo pendiente**: el instructivo de
-FO-24 (`guidance`) está vacío porque sus criterios no calzan 1:1 con los de la grilla, y
-rellenarlos a ojo sería inventar contenido clínico.
-
-→ **`docs/MODULO-LISTAS-DE-CHEQUEO.md`** tiene el plan completo, el modelo, la decisión
-de escala fija C/NC/NA, el inventario de los 13 formatos con sus maquetados y el registro
-de cada fase.
+1. **Modulo de planes de mejora** (decidido, no empezado). Es la pieza grande y el dashboard
+   depende de ella para dos paneles. Ojo a los tres puntos no evidentes anotados alli: los
+   sujetos auditados hoy son TEXTO y no usuarios, hace falta un permiso propio para que el
+   colaborador vea solo lo suyo, y quien subsana no puede ser quien cierra.
+2. **Dashboard** (maqueta oscura aprobada). Consume `dataCenterData()`, no duplica calculo.
+3. Formulario para crear programas y mover listas — hoy solo por API.
+4. Escala C/NC sin NA por lista, si el usuario lo confirma.
+5. Repasar el tema oscuro en los **demas modulos**: heredan los tokens, pero pueden tener
+   blancos escritos a mano sin detectar.
 
 ---
+
+## 11 bis. Identidad del modulo: violeta, no azul
+
+`--m-listas` y `MODULE_IDENTITIES.checklists` son **#5B4BE8 -> #8B5CF6** por decision expresa
+del usuario sobre su maqueta, no por la paleta OKLCH de §5.2. Se le advirtio del conflicto con
+el sistema y lo confirmo. No "corregirlo" de vuelta al azul.
+
+El fondo del sistema tambien cambio: los tokens tenian un sesgo calido (`--canvas: #eef1ea`)
+que el usuario describio como "verdoso feo". Ahora es neutro (#F4F6FB). Afecta a TODOS los
+modulos, que era el punto.
 
 ## 12. Vidrio del módulo de Listas de Chequeo
 
