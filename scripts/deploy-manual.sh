@@ -32,9 +32,20 @@ SHA="$(git rev-parse --short HEAD)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+# Lo que viaja al VPS. UNA sola lista para que empaquetar y comprimir no se desincronicen.
+#
+# `shared/` esta aqui porque el servidor importa de ahi el motor de adherencia que comparte con
+# el cliente. Olvidarlo dejo el arranque en ERR_MODULE_NOT_FOUND y la app en 502: el build local
+# no lo detecta porque Vite mete ese import dentro de dist/. Si se añade otra carpeta que el
+# servidor importe EN RUNTIME, hay que sumarla aqui.
+#
+# Ojo con el nombre: este `shared/` del repo se extrae dentro del release y no tiene nada que ver
+# con `/opt/sgimr/shared/` del VPS, que es la carpeta persistente (.env y uploads).
+PAYLOAD="dist server shared package.json package-lock.json ecosystem.config.cjs"
+
 echo "==> Empaquetando release ($SHA)"
-cp -R dist server package.json package-lock.json ecosystem.config.cjs "$TMP_DIR/"
-tar -czf "$TMP_DIR/release.tgz" -C "$TMP_DIR" dist server package.json package-lock.json ecosystem.config.cjs
+cp -R $PAYLOAD "$TMP_DIR/"
+tar -czf "$TMP_DIR/release.tgz" -C "$TMP_DIR" $PAYLOAD
 
 echo "==> Subiendo al VPS"
 scp -i "$KEY" "$TMP_DIR/release.tgz" "$HOST:/tmp/sgimr-release.tgz"
@@ -53,6 +64,9 @@ ssh -i "$KEY" "$HOST" "
   rm -f /tmp/sgimr-release.tgz
 "
 
+# El release anterior, ANTES de mover el symlink: es a donde se vuelve si el nuevo no arranca.
+PREVIOUS="$(ssh -i "$KEY" "$HOST" "readlink '$REMOTE_BASE/current' || true")"
+
 echo "==> Moviendo symlink 'current' y recargando PM2"
 ssh -i "$KEY" "$HOST" "
   set -eu
@@ -63,6 +77,26 @@ ssh -i "$KEY" "$HOST" "
 "
 
 echo "==> Verificando"
-curl --fail --retry 8 --retry-delay 3 -s -o /dev/null -w 'health HTTP:%{http_code}\n' https://sgimr.cloud/api/health
+# Si el release nuevo no responde, se VUELVE al anterior en el acto. Antes el script abortaba
+# aqui y dejaba produccion caida hasta que alguien lo notara: el fallo se descubre justo despues
+# de mover el symlink, que es el momento en que ya esta sirviendo.
+if ! curl --fail --retry 8 --retry-delay 3 -s -o /dev/null -w 'health HTTP:%{http_code}\n' https://sgimr.cloud/api/health; then
+  echo "!!! El release $RELEASE_NAME no responde."
+  if [ -n "$PREVIOUS" ]; then
+    echo "==> Revirtiendo a $PREVIOUS"
+    ssh -i "$KEY" "$HOST" "
+      ln -sfn '$PREVIOUS' '$REMOTE_BASE/current'
+      cd '$REMOTE_BASE/current'
+      pm2 reload sgimr --update-env
+    "
+    sleep 4
+    curl --fail --retry 5 --retry-delay 2 -s -o /dev/null -w 'health tras revertir HTTP:%{http_code}\n' https://sgimr.cloud/api/health \
+      || echo "!!! Tampoco responde el anterior: revisa 'pm2 logs sgimr --err' en el VPS."
+  else
+    echo "!!! No hay release anterior al que volver."
+  fi
+  echo "Mira el error con: ssh root@sgimr.cloud 'pm2 logs sgimr --nostream --err --lines 30'"
+  exit 1
+fi
 
 echo "==> Listo: $RELEASE_NAME"

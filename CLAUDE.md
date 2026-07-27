@@ -245,7 +245,8 @@ bash scripts/deploy-manual.sh    # SOLO con "despliega" explícito en el turno
 - Estructura: `releases/<timestamp>-<sha>/`, symlink `current`, `shared/.env`,
   `shared/uploads/`.
 - **Orden crítico (no lo cambies):** subir release → `npm ci --omit=dev` → *recién
-  entonces* mover el symlink `current` → recargar PM2. Si recargas PM2 antes de mover
+  entonces* mover el symlink `current` → recargar PM2. Si el health check final falla, el script
+  vuelve solo al release anterior (ver §10). Si recargas PM2 antes de mover
   el symlink, se re-aplica el `schema.sql` **viejo** en silencio (exit 0) y el deploy
   queda a medias.
 - Verificación final: `curl https://sgimr.cloud/api/health` → 200.
@@ -334,6 +335,12 @@ página y visor propio de PDF.
   elemento solo en una fila. Patrón `.ds-bento-split` + `.ds-bento-secondary-grid`.
 - **Caché del navegador** tras arreglar un header/asset: pide `Ctrl+Shift+R` antes de
   volver a diagnosticar.
+- **Carpeta nueva que el servidor importe en runtime = hay que sumarla a `PAYLOAD` en
+  `scripts/deploy-manual.sh`.** Añadí `shared/adherenceScoring.mjs`, el deploy no lo empaquetó y
+  el arranque murió en `ERR_MODULE_NOT_FOUND` con la app en **502**. `npm run check` y
+  `npm run build` pasan en verde igual, porque Vite resuelve ese import dentro de `dist/` y nunca
+  toca el arranque del servidor. Desde este incidente el script **revierte al release anterior**
+  solo si el health check falla, pero el 502 igual ocurre unos segundos.
 
 ---
 
