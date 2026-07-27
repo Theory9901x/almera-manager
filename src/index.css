@@ -4329,3 +4329,73 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .code-pill.is-lg { font-size: 11.5px; padding: 4px 11px; margin-bottom: 6px; }
+
+/* ============================================================================
+   Listas de Chequeo — Planes de mejora
+   Un NC deja de morir en el informe: chip en la ronda, listado con pestañas por
+   estado, detalle con evidencias de subsanacion y bitacora. Todo con los tokens
+   del modulo para que funcione en claro y oscuro sin blancos escritos a mano.
+   ============================================================================ */
+
+/* Chip junto al criterio: crea el plan (punteado) o lleva a su seguimiento (relleno). */
+.plan-chip {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--m-listas) 35%, transparent);
+  background: var(--m-listas-soft); color: var(--m-listas-deep);
+  font-size: 11px; font-weight: 800; letter-spacing: .01em; white-space: nowrap;
+}
+.plan-chip:hover { border-color: var(--m-listas); }
+.plan-chip.is-new {
+  border-style: dashed; background: transparent; color: var(--m-listas);
+}
+
+/* Listado de planes: filas-boton, no tabla — el texto del criterio es largo y manda. */
+.plan-list { display: grid; gap: 10px; }
+.plan-row {
+  display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
+  padding: 13px 16px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--border-hairline);
+  background: var(--color-surface-card);
+}
+.plan-row:hover { border-color: color-mix(in srgb, var(--m-listas) 45%, transparent); }
+.plan-row-icon {
+  flex: none; display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 11px; background: var(--m-listas-soft); color: var(--m-listas-deep);
+}
+.plan-row-body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.plan-row-body strong { font-size: 13.5px; line-height: 1.35; color: var(--ink); }
+.plan-row-body small { font-size: 11.5px; color: var(--muted); }
+.plan-row-body small b { color: var(--ink); font-weight: 700; }
+
+/* Datos del plan en el detalle. */
+.plan-facts { display: flex; flex-wrap: wrap; gap: 18px 34px; }
+.plan-facts dt, .plan-finding dt {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: 2px;
+}
+.plan-facts dd { font-size: 13px; font-weight: 600; color: var(--ink); }
+.plan-finding {
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--color-surface-soft); border: 1px solid var(--border-hairline);
+}
+.plan-finding dd { font-size: 13px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; }
+
+/* Bitacora vertical con punto por evento. */
+.plan-log { display: grid; gap: 12px; }
+.plan-log li { display: flex; gap: 11px; align-items: flex-start; }
+.plan-log-dot {
+  flex: none; width: 9px; height: 9px; border-radius: 999px; margin-top: 5px;
+  background: var(--m-listas);
+  box-shadow: 0 0 0 3px var(--m-listas-soft);
+}
+.plan-log li div { display: grid; gap: 1px; font-size: 12.5px; color: var(--ink); }
+.plan-log li small { font-size: 11px; color: var(--muted); }
+
+/* "Recordar responsable" del dialogo de creacion. */
+.plan-remember {
+  display: flex; align-items: flex-start; gap: 8px; cursor: pointer;
+  font-size: 12px; color: var(--muted); line-height: 1.45;
+}
+.plan-remember input { margin-top: 2px; accent-color: var(--m-listas); }
+.plan-remember strong { color: var(--ink); }

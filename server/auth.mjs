@@ -20,11 +20,16 @@ const USUARIO_MODULE_PERMISSIONS = {
   // fuera de este mapa a proposito: solo admin-tier lo recibe (bypassa este mapa por completo),
   // nunca un USUARIO comun aunque se le habilite el modulo.
   'carbon-footprint': ['carbon.view', 'carbon.capture', 'carbon.export'],
-  // Listas de Chequeo: un USUARIO al que se le habilite el modulo es un AUDITOR — consulta y
-  // diligencia las listas que le asignen. checklists.manage (construir y editar las listas
-  // institucionales) se deja fuera a proposito, como carbon.manage: eso es del equipo de calidad,
-  // no de quien sale a hacer la ronda.
-  checklists: ['checklists.view', 'checklists.fill', 'checklists.export'],
+}
+
+// Listas de Chequeo depende de la FUNCION elegida al habilitar el modulo, igual que
+// adherence-matrix: un AUDITOR sale a hacer la ronda; un COLABORADOR solo entra a subsanar los
+// planes de mejora que le asignaron (checklists.improve), sin fill ni acceso a rondas ajenas.
+// checklists.manage queda fuera de ambos a proposito, como carbon.manage: es del equipo de
+// calidad, que es admin-tier.
+const CHECKLIST_FUNCTION_PERMISSIONS = {
+  AUDITOR: ['checklists.view', 'checklists.fill', 'checklists.export'],
+  COLABORADOR: ['checklists.improve'],
 }
 
 // adherence-matrix es un caso especial: el permiso depende de la funcion elegida al habilitar
@@ -83,6 +88,11 @@ export async function getSessionContext(request) {
     modules = modulesResult.rows
     permissions = [...new Set(modules.flatMap(module => {
       if (module.key === 'adherence-matrix') return ADHERENCE_FUNCTION_PERMISSIONS[module.function_key] || []
+      // function_key nula = auditor: los usuarios habilitados antes de que existiera la funcion
+      // de colaborador eran todos auditores y deben seguir funcionando sin backfill.
+      if (module.key === 'checklists') {
+        return CHECKLIST_FUNCTION_PERMISSIONS[module.function_key] || CHECKLIST_FUNCTION_PERMISSIONS.AUDITOR
+      }
       return USUARIO_MODULE_PERMISSIONS[module.key] || []
     }))]
   }

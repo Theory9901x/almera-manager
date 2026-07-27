@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronUp,
-  CircleDashed, ClipboardCheck, Clock, CreditCard, MessageSquare, Paperclip, Settings2,
+  CircleDashed, ClipboardCheck, ClipboardList, Clock, CreditCard, MessageSquare, Paperclip, Settings2,
   User, UserCheck,
   Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
 } from 'lucide-react'
@@ -13,9 +13,10 @@ import {
 import { checklistsService } from '../services/checklistsService'
 import { SignaturePad } from '../components/SignaturePad'
 import { EvidencesCard } from '../components/EvidencesCard'
+import { PlanCreateDialog, type PlanDraft } from '../components/PlanCreateDialog'
 import {
-  CHECKLIST_VALUE_LABELS, type AuditDetail, type ChecklistField, type ChecklistValue,
-  type DirectorySubject, type SignerSuggestion,
+  CHECKLIST_VALUE_LABELS, PLAN_STATUS_LABELS, type AuditDetail, type ChecklistField, type ChecklistValue,
+  type DirectorySubject, type PlanAssignee, type SignerSuggestion,
 } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -70,6 +71,9 @@ function ChecklistAuditContent() {
   const [notes, setNotes] = useState('')
   const [notesByAnswer, setNotesByAnswer] = useState<Record<string, string>>({})
   const [staffDraft, setStaffDraft] = useState({ name: '', role: '' })
+  // Hallazgo NC para el que se esta creando un plan de mejora. Null = dialogo cerrado.
+  const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null)
+  const [assignees, setAssignees] = useState<PlanAssignee[]>([])
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -98,6 +102,9 @@ function ChecklistAuditContent() {
       ])
       setDirectory(subjectDirectory)
       setSigners(signerDirectory)
+      // Posibles responsables de un plan de mejora. Si falla (p. ej. sin permiso), el dialogo
+      // simplemente ofrece "sin asignar".
+      void checklistsService.planAssignees().then(setAssignees).catch(() => {})
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar la auditoría') }
     finally { setLoading(false) }
   }
@@ -276,6 +283,42 @@ function ChecklistAuditContent() {
     finally { setBusy(false) }
   }
 
+  // Abrir el dialogo de plan de mejora sobre un NC. Si hay marcas sin guardar se guardan antes:
+  // el servidor exige que el NC exista como respuesta, no como marca local.
+  async function openPlanDialog(subjectRowId: string, criterionId: string) {
+    if (!audit) return
+    if (dirty) await saveAll()
+    const subject = audit.subjects.find(item => String(item.id) === String(subjectRowId))
+    const criterion = criteria.find(item => String(item.id) === String(criterionId))
+    if (!subject || !criterion) return
+    setPlanDraft({
+      criterionId: String(criterion.id),
+      auditSubjectId: String(subject.id),
+      criterionText: criterion.text,
+      subjectName: subject.display_name,
+      observation: notesByAnswer[answerKey(subjectRowId, criterionId)] || '',
+      linkedMembershipId: subject.linked_membership_id ? String(subject.linked_membership_id) : null,
+    })
+  }
+
+  async function createPlan(data: { finding: string; assignedMembershipId: string | null; rememberAssignee: boolean }) {
+    if (!audit || !planDraft) return
+    setBusy(true)
+    try {
+      await checklistsService.createPlan(audit.id, {
+        criterionId: planDraft.criterionId,
+        auditSubjectId: planDraft.auditSubjectId,
+        finding: data.finding,
+        assignedMembershipId: data.assignedMembershipId,
+        rememberAssignee: data.rememberAssignee,
+      })
+      setPlanDraft(null)
+      await load()
+      toast.push('success', 'Plan de mejora creado')
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible crear el plan') }
+    finally { setBusy(false) }
+  }
+
   async function removeSubject(subjectRowId: string) {
     if (!audit) return
     setBusy(true)
@@ -315,6 +358,12 @@ function ChecklistAuditContent() {
   // Hallazgos: los NC marcados en pantalla. Son los que exigen accion, y el auditor tiene que
   // verlos crecer mientras marca, no al final.
   const findings = Object.values(marks).filter(value => value === 'NC').length
+  // Planes de mejora ya creados en esta ronda, por celda (sujeto x criterio).
+  const plansByKey = new Map(
+    (audit.plans || [])
+      .filter(plan => plan.audit_subject_id && plan.criterion_id)
+      .map(plan => [answerKey(String(plan.audit_subject_id), String(plan.criterion_id)), plan]),
+  )
   const liveOverall = (() => {
     let c = 0, nc = 0
     for (const value of Object.values(marks)) { if (value === 'C') c++; else if (value === 'NC') nc++ }
@@ -339,6 +388,14 @@ function ChecklistAuditContent() {
         <button onClick={() => navigate('/app/listas-chequeo')}>Listas de Chequeo</button>
         <span>›</span><b>{audit.template_code || audit.code || ''} {audit.template_name}</b>
       </div>
+
+      <PlanCreateDialog
+        draft={planDraft}
+        assignees={assignees}
+        busy={busy}
+        onCancel={() => setPlanDraft(null)}
+        onCreate={data => void createPlan(data)}
+      />
 
       <div className="topbar">
         <div className="title-wrap">
@@ -594,6 +651,26 @@ function ChecklistAuditContent() {
                               <div className="ctext">
                                 <b>{criterion.text}</b>
                                 {criterion.guidance ? <span>{criterion.guidance}</span> : null}
+                                {/* Un NC es un hallazgo: desde aqui mismo se le asigna plan de
+                                    mejora, sin salir de la ronda. Si ya lo tiene, el chip lleva
+                                    a su seguimiento. */}
+                                {plansByKey.has(key) ? (
+                                  <button
+                                    type="button" className="plan-chip"
+                                    title="Ver el plan de mejora de este hallazgo"
+                                    onClick={() => navigate(`/app/listas-chequeo/planes/${plansByKey.get(key)!.id}`)}
+                                  >
+                                    <ClipboardList size={12} /> Plan · {PLAN_STATUS_LABELS[plansByKey.get(key)!.status]}
+                                  </button>
+                                ) : current === 'NC' ? (
+                                  <button
+                                    type="button" className="plan-chip is-new"
+                                    title="Crear un plan de mejora para este hallazgo"
+                                    onClick={() => void openPlanDialog(subject.id, criterion.id)}
+                                  >
+                                    <ClipboardList size={12} /> Asignar plan de mejora
+                                  </button>
+                                ) : null}
                               </div>
                               <div className="segs">
                                 {VALUES.map(value => (
@@ -669,6 +746,23 @@ function ChecklistAuditContent() {
                                         >{value}</button>
                                       ))}
                                     </div>
+                                    {plansByKey.has(key) ? (
+                                      <button
+                                        type="button" className="plan-chip"
+                                        title="Ver el plan de mejora de este hallazgo"
+                                        onClick={() => navigate(`/app/listas-chequeo/planes/${plansByKey.get(key)!.id}`)}
+                                      >
+                                        <ClipboardList size={11} /> {PLAN_STATUS_LABELS[plansByKey.get(key)!.status]}
+                                      </button>
+                                    ) : current === 'NC' ? (
+                                      <button
+                                        type="button" className="plan-chip is-new"
+                                        title="Crear un plan de mejora para este hallazgo"
+                                        onClick={() => void openPlanDialog(subject.id, criterion.id)}
+                                      >
+                                        <ClipboardList size={11} /> Plan
+                                      </button>
+                                    ) : null}
                                   </td>
                                 )
                               })}
@@ -786,10 +880,24 @@ function ChecklistAuditContent() {
                 <div className="ic"><AlertTriangle size={16} /></div>
                 <div className="tx">
                   <b>Hallazgos críticos</b>
-                  <span>Ítems marcados como NC que requieren acción inmediata.</span>
+                  <span>
+                    Ítems marcados como NC que requieren acción inmediata.
+                    {(audit.plans || []).length > 0 && <> <b>{(audit.plans || []).length}</b> ya con plan de mejora.</>}
+                  </span>
                 </div>
                 <div className="big">{findings}</div>
               </div>
+
+              {(audit.plans || []).length > 0 && (
+                <button className="alert ev" style={{ cursor: 'pointer', textAlign: 'left' }} onClick={() => navigate('/app/listas-chequeo/planes')}>
+                  <div className="ic"><ClipboardList size={16} /></div>
+                  <div className="tx">
+                    <b>Planes de mejora</b>
+                    <span>Seguimiento de los hallazgos de esta ronda.</span>
+                  </div>
+                  <div className="big">{(audit.plans || []).length}</div>
+                </button>
+              )}
 
               <div className="alert ev">
                 <div className="ic"><Paperclip size={16} /></div>

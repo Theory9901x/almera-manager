@@ -177,6 +177,17 @@ adminRouter.put('/users/:membershipId/modules/:moduleKey', requireAnyPermission(
           )
         }
       }
+    } else if (moduleKey === 'checklists') {
+      // Igual que adherence-matrix: la funcion decide los permisos del USUARIO. AUDITOR sale a
+      // hacer rondas; COLABORADOR solo subsana los planes de mejora que le asignen. Sin funcion
+      // explicita se asume AUDITOR, que es lo que eran todos antes de existir los planes.
+      const functionKey = String(request.body?.function || 'AUDITOR').trim().toUpperCase()
+      if (!['AUDITOR', 'COLABORADOR'].includes(functionKey)) fail(400, 'Elige la función: Auditor o Colaborador')
+      await client.query(
+        `INSERT INTO membership_modules (membership_id, module_id, function_key) VALUES ($1,$2,$3)
+         ON CONFLICT (membership_id, module_id) DO UPDATE SET function_key=EXCLUDED.function_key`,
+        [membershipId, module.rows[0].id, functionKey],
+      )
     } else {
       await client.query(
         'INSERT INTO membership_modules (membership_id, module_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',

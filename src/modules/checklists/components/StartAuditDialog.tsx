@@ -39,9 +39,12 @@ export function StartAuditDialog({ open, templateName, templateId, templates, ar
 }) {
   const [context, setContext] = useState<StartContext>({ auditDate: '', areaId: '', shift: '', templateId: '' })
   const [touched, setTouched] = useState(false)
+  // Centro elegido. Es un campo APARTE del servicio, no un selector combinado "centro · servicio":
+  // el auditor primero se ubica en su sede y luego elige el servicio de esa sede.
+  const [center, setCenter] = useState('')
 
   useEffect(() => {
-    if (open) { setContext({ auditDate: '', areaId: '', shift: '', templateId: templateId || '' }); setTouched(false) }
+    if (open) { setContext({ auditDate: '', areaId: '', shift: '', templateId: templateId || '' }); setCenter(''); setTouched(false) }
   }, [open, templateId])
 
   useEffect(() => {
@@ -52,6 +55,12 @@ export function StartAuditDialog({ open, templateName, templateId, templates, ar
   }, [open, onCancel])
 
   if (!open) return null
+
+  // Los centros salen de las areas ya sembradas, en el orden que trae el servidor (HOCY primero).
+  // Un area sin centro se agrupa bajo el sentinela 'SIN': Radix no distingue el valor vacio de
+  // "sin seleccionar".
+  const centers = [...new Set(areas.map(area => area.center || 'SIN'))]
+  const centerAreas = areas.filter(area => (area.center || 'SIN') === center)
 
   const missingDate = !context.auditDate
   const missingArea = !context.areaId
@@ -83,14 +92,29 @@ export function StartAuditDialog({ open, templateName, templateId, templates, ar
           <Field label="Fecha de la ronda *" hint={touched && missingDate ? 'Elige la fecha' : 'No se asume hoy: confírmala'}>
             <DatePicker value={context.auditDate} onChange={value => setContext({ ...context, auditDate: value })} />
           </Field>
-          <Field label="Centro y servicio *" hint={touched && missingArea ? 'Elige el servicio' : undefined}>
+          {/* Dos campos separados, en orden: primero el centro de atencion, luego el servicio de
+              ese centro. Un selector combinado mezclaba las dos preguntas y con 47 filas era
+              inmanejable en tablet. */}
+          <Field label="Centro de atención *" hint={touched && !center ? 'Elige el centro' : undefined}>
+            <Select
+              value={center || 'NONE'}
+              onChange={value => {
+                const next = value === 'NONE' ? '' : value
+                setCenter(next)
+                // Al cambiar de centro, el servicio elegido deja de valer: era de otra sede.
+                setContext(current => ({ ...current, areaId: '' }))
+              }}
+              options={[{ value: 'NONE', label: 'Selecciona el centro' },
+                ...centers.map(item => ({ value: item, label: item === 'SIN' ? 'Sin centro' : item }))]}
+            />
+          </Field>
+          <Field label="Servicio *" hint={touched && missingArea ? 'Elige el servicio' : !center ? 'Primero elige el centro' : undefined}>
             <Select
               value={context.areaId || 'NONE'}
+              disabled={!center}
               onChange={value => setContext({ ...context, areaId: value === 'NONE' ? '' : value })}
-              // "Centro · Servicio": "Urgencias" existe en varias sedes y sin el centro no se
-              // sabe cual se esta eligiendo.
-              options={[{ value: 'NONE', label: 'Selecciona el servicio' },
-                ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
+              options={[{ value: 'NONE', label: center ? 'Selecciona el servicio' : 'Elige primero el centro' },
+                ...centerAreas.map(area => ({ value: area.id, label: area.name }))]}
             />
           </Field>
           <Field label="Turno" hint="Opcional: solo si la ronda es de un turno concreto">

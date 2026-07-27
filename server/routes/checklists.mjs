@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, unlink } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { pool, query } from '../db.mjs'
-import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
+import { requireAnyModuleAccess, requireAnyPermission, requirePermission } from '../auth.mjs'
 import { computeAdherence, conceptFromPercent, isChecklistValue } from '../checklistScoring.mjs'
 import { renderPdf } from '../pdf.mjs'
 import { renderChecklistAuditReportHtml, renderChecklistBlankFormatHtml, renderChecklistConsolidatedHtml, renderDataCenterHtml } from '../templates/checklistReport.mjs'
@@ -18,6 +18,9 @@ const checklistsModule = requireAnyModuleAccess(['checklists'])
 const view = requirePermission('checklists.view')
 const manage = requirePermission('checklists.manage')
 const fill = requirePermission('checklists.fill')
+// Planes de mejora: ahi conviven dos publicos con permisos distintos — quien audita/administra
+// (view) y el colaborador que solo subsana (improve). El recorte fino va dentro de cada endpoint.
+const plansAccess = requireAnyPermission(['checklists.view', 'checklists.improve'])
 
 const FIELD_TYPES = new Set(['TEXT', 'LONG_TEXT', 'DATE', 'NUMBER', 'SELECT'])
 
@@ -353,8 +356,15 @@ async function persistResults(client, auditId, result) {
 
 async function auditPayload(audit) {
   const structure = await loadStructure(audit.template_id)
-  const [subjects, answers, headerFields, signatures, evidences, staff] = await Promise.all([
-    query('SELECT * FROM checklist_audit_subjects WHERE audit_id = $1 ORDER BY order_index, id', [audit.id]),
+  const [subjects, answers, headerFields, signatures, evidences, staff, plans] = await Promise.all([
+    // linked_membership_id: si el sujeto del directorio esta enlazado a un usuario, la pantalla
+    // de la ronda puede preseleccionar al responsable del plan de mejora.
+    query(
+      `SELECT s.*, cs.membership_id AS linked_membership_id
+         FROM checklist_audit_subjects s
+         LEFT JOIN checklist_subjects cs ON cs.id = s.subject_id
+        WHERE s.audit_id = $1 ORDER BY s.order_index, s.id`,
+      [audit.id]),
     query('SELECT * FROM checklist_answers WHERE audit_id = $1', [audit.id]),
     query('SELECT * FROM checklist_header_fields WHERE template_id = $1 ORDER BY order_index, id', [audit.template_id]),
     query('SELECT * FROM checklist_signatures WHERE audit_id = $1 ORDER BY signed_at', [audit.id]),
@@ -362,6 +372,11 @@ async function auditPayload(audit) {
              LEFT JOIN users u ON u.id = e.uploaded_by_id
             WHERE e.audit_id = $1 ORDER BY e.created_at`, [audit.id]),
     query('SELECT * FROM checklist_audit_staff WHERE audit_id = $1 ORDER BY order_index, id', [audit.id]),
+    query(
+      `SELECT p.id, p.criterion_id, p.audit_subject_id, p.status, p.assigned_name, p.finding,
+              p.subject_name, p.criterion_text, p.created_at
+         FROM checklist_action_plans p WHERE p.audit_id = $1 ORDER BY p.created_at, p.id`,
+      [audit.id]),
   ])
   const result = computeAdherence({
     domains: structure.domains,
@@ -381,6 +396,7 @@ async function auditPayload(audit) {
     signatures: signatures.rows,
     evidences: evidences.rows.map(row => ({ ...row, id: String(row.id) })),
     staff: staff.rows.map(row => ({ ...row, id: String(row.id) })),
+    plans: plans.rows.map(row => ({ ...row, id: String(row.id) })),
     adherence: { ...result, concept: conceptFromPercent(result.overall.percent) },
   }
 }
@@ -912,6 +928,429 @@ checklistsRouter.post('/audits/:auditId/reopen', checklistsModule, fill, async (
   } finally { client.release() }
 })
 
+
+// ===========================================================================
+// PLANES DE MEJORA
+// ===========================================================================
+// Un NC deja de morir en el informe: se vuelve un plan con responsable, evidencia de
+// subsanacion y cierre verificado. El circuito es ABIERTO -> EN_PROCESO (primera evidencia)
+// -> SUBSANADO (lo marca el colaborador) -> CERRADO (lo marca calidad). La regla que hace
+// que el circuito valga como verificacion: QUIEN SUBSANA NO PUEDE SER QUIEN CIERRA, y eso
+// se valida aqui, no en la interfaz.
+
+const PLAN_STATUSES = ['ABIERTO', 'EN_PROCESO', 'SUBSANADO', 'CERRADO']
+
+/** Etiqueta legible del plan para la bitacora: debe seguir diciendo algo si el plan se borra. */
+function planLabel(plan) {
+  return [plan.item_number ? `Ítem ${plan.item_number}` : '', plan.criterion_text, plan.subject_name]
+    .filter(Boolean).join(' · ').slice(0, 300)
+}
+
+async function logPlan(request, { planId, label, action, detail = '' }, client = null) {
+  const run = client ? client.query.bind(client) : query
+  await run(
+    `INSERT INTO checklist_action_log (organization_id, plan_id, plan_label, action, detail, actor_id, actor_name)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [oid(request), planId, label, action, detail, uid(request), request.auth.user.fullName || ''],
+  )
+}
+
+/**
+ * Carga el plan y aplica el aislamiento. Lo pueden ver: calidad (manage), el responsable
+ * asignado (su membresia) y el auditor autor de la ronda. Nadie mas — el mismo criterio de
+ * assertAudit: esconderlo en la interfaz no protege nada.
+ */
+async function assertPlan(request) {
+  const result = await query(
+    `SELECT p.*, a.auditor_id, a.audit_date, a.template_id, a.area_id,
+            t.name AS template_name, a.template_code, ar.name AS area_name, ar.center AS area_center,
+            au.full_name AS auditor_name, m.user_id AS assigned_user_id, mu.full_name AS assigned_user_name,
+            cb.full_name AS created_by_name, rb.full_name AS resolved_by_name, xb.full_name AS closed_by_name
+     FROM checklist_action_plans p
+     JOIN checklist_audits a ON a.id = p.audit_id
+     JOIN checklist_templates t ON t.id = a.template_id
+     LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+     JOIN users au ON au.id = a.auditor_id
+     LEFT JOIN memberships m ON m.id = p.assigned_membership_id
+     LEFT JOIN users mu ON mu.id = m.user_id
+     JOIN users cb ON cb.id = p.created_by_id
+     LEFT JOIN users rb ON rb.id = p.resolved_by_id
+     LEFT JOIN users xb ON xb.id = p.closed_by_id
+     WHERE p.id = $1 AND p.organization_id = $2`,
+    [Number(request.params.planId), oid(request)],
+  )
+  const plan = result.rows[0]
+  if (!plan) fail(404, 'Plan de mejora no encontrado')
+  const canManage = request.auth.permissions.includes('checklists.manage')
+  const isAssignee = String(plan.assigned_membership_id || '') === String(request.auth.membershipId)
+  const isAuthor = String(plan.auditor_id) === String(uid(request))
+  if (!canManage && !isAssignee && !isAuthor) fail(403, 'Este plan de mejora no es tuyo')
+  return { ...plan, _canManage: canManage, _isAssignee: isAssignee }
+}
+
+// Posibles responsables. No se reusa GET /memberships porque es solo de manage y el AUDITOR
+// tambien asigna planes desde la ronda. Solo expone nombre y correo de companeros de la misma
+// entidad, lo mismo que ya expone el directorio de firmantes.
+checklistsRouter.get('/plans/assignees', checklistsModule, requireAnyPermission(['checklists.fill', 'checklists.manage']), async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT m.id, u.full_name, u.email
+       FROM memberships m JOIN users u ON u.id = m.user_id
+       WHERE m.organization_id = $1 AND m.active AND u.active
+       ORDER BY u.full_name`,
+      [oid(request)],
+    )
+    response.json(result.rows.map(row => ({ ...row, id: String(row.id) })))
+  } catch (error) { next(error) }
+})
+
+// Listado con aislamiento por rol: calidad ve todo; el colaborador SOLO lo asignado a el; un
+// auditor sin manage, lo suyo (lo que asigno en sus rondas o le asignaron a el).
+checklistsRouter.get('/plans', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    const q = request.query || {}
+    const params = [oid(request)]
+    const where = ['p.organization_id = $1']
+    const add = (value, sql) => { params.push(value); where.push(sql.replace('$$', `$${params.length}`)) }
+
+    const canManage = request.auth.permissions.includes('checklists.manage')
+    const canView = request.auth.permissions.includes('checklists.view')
+    if (!canManage) {
+      if (canView) {
+        params.push(request.auth.membershipId, uid(request))
+        where.push(`(p.assigned_membership_id = $${params.length - 1} OR a.auditor_id = $${params.length})`)
+      } else {
+        add(request.auth.membershipId, 'p.assigned_membership_id = $$')
+      }
+    }
+
+    if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
+    if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
+    if (q.auditId) add(Number(q.auditId), 'p.audit_id = $$')
+    if (q.assignedId) add(Number(q.assignedId), 'p.assigned_membership_id = $$')
+    // El estado va DE ULTIMO a proposito: los contadores de las pestañas usan los mismos
+    // filtros menos este, y al ser el ultimo basta recortar la ultima clausula y el ultimo
+    // parametro sin descuadrar la numeracion de los demas.
+    const hasStatus = Boolean(q.status && PLAN_STATUSES.includes(String(q.status)))
+    if (hasStatus) add(String(q.status), 'p.status = $$')
+
+    const filter = where.join(' AND ')
+    const [rows, counts] = await Promise.all([
+      query(
+        `SELECT p.*, a.audit_date, a.template_code, t.name AS template_name,
+                COALESCE(ar.name, 'Sin servicio') AS area_name, ar.center AS area_center,
+                au.full_name AS auditor_name, mu.full_name AS assigned_user_name,
+                (SELECT COUNT(*)::int FROM checklist_action_evidences e WHERE e.plan_id = p.id) AS evidence_count
+         FROM checklist_action_plans p
+         JOIN checklist_audits a ON a.id = p.audit_id
+         JOIN checklist_templates t ON t.id = a.template_id
+         LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+         JOIN users au ON au.id = a.auditor_id
+         LEFT JOIN memberships m ON m.id = p.assigned_membership_id
+         LEFT JOIN users mu ON mu.id = m.user_id
+         WHERE ${filter}
+         ORDER BY CASE p.status WHEN 'SUBSANADO' THEN 0 WHEN 'ABIERTO' THEN 1 WHEN 'EN_PROCESO' THEN 2 ELSE 3 END,
+                  p.created_at DESC, p.id DESC
+         LIMIT 300`,
+        params,
+      ),
+      // Los contadores ignoran el filtro por estado a proposito: son las pestañas, y una pestaña
+      // que solo se contara a si misma siempre diria lo mismo.
+      query(
+        `SELECT p.status, COUNT(*)::int AS n
+         FROM checklist_action_plans p JOIN checklist_audits a ON a.id = p.audit_id
+         WHERE ${(hasStatus ? where.slice(0, -1) : where).join(' AND ')}
+         GROUP BY p.status`,
+        hasStatus ? params.slice(0, -1) : params,
+      ),
+    ])
+    response.json({
+      rows: rows.rows.map(row => ({ ...row, id: String(row.id) })),
+      counts: Object.fromEntries(counts.rows.map(row => [row.status, row.n])),
+    })
+  } catch (error) { next(error) }
+})
+
+// El plan se crea DESDE LA RONDA, sobre un criterio ya marcado NC. Lo puede hacer quien
+// diligencia (su propia ronda: assertAudit ya aisla) o calidad.
+checklistsRouter.post('/audits/:auditId/plans', checklistsModule, requireAnyPermission(['checklists.fill', 'checklists.manage']), async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    const audit = await assertAudit(request)
+    const body = request.body || {}
+    const criterionId = Number(body.criterionId)
+    const subjectRowId = Number(body.auditSubjectId)
+    if (!criterionId || !subjectRowId) fail(400, 'Indica el criterio y el sujeto del hallazgo')
+
+    // El hallazgo tiene que existir: sin un NC guardado no hay nada que subsanar. Tambien frena
+    // ids inventados de otra auditoria, porque la respuesta se busca dentro de ESTA.
+    const answer = await query(
+      `SELECT ans.value, ans.observation, c.text AS criterion_text, c.item_number, d.name AS domain_name,
+              s.display_name AS subject_name, s.subject_id AS directory_subject_id
+       FROM checklist_answers ans
+       JOIN checklist_criteria c ON c.id = ans.criterion_id
+       JOIN checklist_domains d ON d.id = c.domain_id
+       JOIN checklist_audit_subjects s ON s.id = ans.audit_subject_id
+       WHERE ans.audit_id = $1 AND ans.criterion_id = $2 AND ans.audit_subject_id = $3`,
+      [audit.id, criterionId, subjectRowId],
+    )
+    if (!answer.rows[0]) fail(409, 'Ese criterio no está calificado en esta auditoría. Guarda la ronda primero.')
+    if (answer.rows[0].value !== 'NC') fail(409, 'Solo un criterio marcado NC genera plan de mejora')
+
+    const duplicate = await query(
+      `SELECT id FROM checklist_action_plans
+       WHERE audit_id = $1 AND criterion_id = $2 AND audit_subject_id = $3 AND status <> 'CERRADO'`,
+      [audit.id, criterionId, subjectRowId],
+    )
+    if (duplicate.rows[0]) fail(409, 'Ese hallazgo ya tiene un plan de mejora en curso')
+
+    // Responsable: membresia de la MISMA entidad. Se guarda tambien el nombre como snapshot.
+    let assignedMembershipId = body.assignedMembershipId ? Number(body.assignedMembershipId) : null
+    let assignedName = ''
+    if (assignedMembershipId) {
+      const member = await query(
+        `SELECT m.id, u.full_name FROM memberships m JOIN users u ON u.id = m.user_id
+         WHERE m.id = $1 AND m.organization_id = $2 AND m.active`,
+        [assignedMembershipId, oid(request)],
+      )
+      if (!member.rows[0]) fail(400, 'El responsable no pertenece a esta entidad')
+      assignedName = member.rows[0].full_name
+    } else if (String(body.assignedName || '').trim()) {
+      // Responsable sin cuenta todavia: queda el nombre y calidad gestiona por el.
+      assignedName = String(body.assignedName).trim()
+    }
+
+    const meta = answer.rows[0]
+    await client.query('BEGIN')
+    const inserted = await client.query(
+      `INSERT INTO checklist_action_plans
+         (organization_id, audit_id, criterion_id, audit_subject_id, criterion_text, domain_name,
+          item_number, subject_name, finding, assigned_membership_id, assigned_name, created_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [oid(request), audit.id, criterionId, subjectRowId, meta.criterion_text, meta.domain_name,
+        meta.item_number || '', meta.subject_name,
+        String(body.finding || meta.observation || '').trim().slice(0, 4000),
+        assignedMembershipId, assignedName, uid(request)],
+    )
+    const plan = inserted.rows[0]
+
+    // Enlace sujeto -> usuario (§15.1 punto 1): si el auditor pide recordarlo, la proxima ronda
+    // sobre el mismo colaborador preseleccionara a su responsable.
+    if (assignedMembershipId && body.rememberAssignee && meta.directory_subject_id) {
+      await client.query(
+        'UPDATE checklist_subjects SET membership_id = $1 WHERE id = $2 AND organization_id = $3',
+        [assignedMembershipId, meta.directory_subject_id, oid(request)],
+      )
+    }
+
+    await logPlan(request, {
+      planId: plan.id, label: planLabel(plan), action: 'CREADO',
+      detail: assignedName ? `Responsable: ${assignedName}` : 'Sin responsable asignado',
+    }, client)
+    await client.query('COMMIT')
+    response.status(201).json({ ...plan, id: String(plan.id) })
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {})
+    next(error)
+  } finally { client.release() }
+})
+
+checklistsRouter.get('/plans/:planId', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    const [evidences, log] = await Promise.all([
+      query(
+        `SELECT e.*, u.full_name AS uploaded_by_name FROM checklist_action_evidences e
+         LEFT JOIN users u ON u.id = e.uploaded_by_id
+         WHERE e.plan_id = $1 ORDER BY e.created_at`,
+        [plan.id],
+      ),
+      query(
+        `SELECT id, action, detail, actor_name, created_at FROM checklist_action_log
+         WHERE plan_id = $1 ORDER BY created_at, id`,
+        [plan.id],
+      ),
+    ])
+    const { _canManage, _isAssignee, ...clean } = plan
+    response.json({
+      ...clean,
+      id: String(plan.id),
+      evidences: evidences.rows.map(row => ({ ...row, id: String(row.id) })),
+      log: log.rows.map(row => ({ ...row, id: String(row.id) })),
+    })
+  } catch (error) { next(error) }
+})
+
+// Editar descripcion o reasignar responsable. Solo calidad o el auditor que lo creo, y nunca
+// sobre un plan cerrado: cerrado es un registro verificado.
+checklistsRouter.patch('/plans/:planId', checklistsModule, requireAnyPermission(['checklists.fill', 'checklists.manage']), async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    if (!plan._canManage && String(plan.created_by_id) !== String(uid(request))) fail(403, 'Solo calidad o quien creó el plan puede editarlo')
+    if (plan.status === 'CERRADO') fail(409, 'El plan ya está cerrado')
+    const body = request.body || {}
+    const sets = []
+    const params = []
+    const set = (column, value) => { params.push(value); sets.push(`${column} = $${params.length}`) }
+    const changed = []
+    if (body.finding !== undefined) { set('finding', String(body.finding).trim().slice(0, 4000)); changed.push('hallazgo') }
+    if (body.assignedMembershipId !== undefined) {
+      const membershipId = body.assignedMembershipId ? Number(body.assignedMembershipId) : null
+      let name = String(body.assignedName || '').trim()
+      if (membershipId) {
+        const member = await query(
+          `SELECT u.full_name FROM memberships m JOIN users u ON u.id = m.user_id
+           WHERE m.id = $1 AND m.organization_id = $2 AND m.active`,
+          [membershipId, oid(request)],
+        )
+        if (!member.rows[0]) fail(400, 'El responsable no pertenece a esta entidad')
+        name = member.rows[0].full_name
+      }
+      set('assigned_membership_id', membershipId)
+      set('assigned_name', name)
+      changed.push(`responsable → ${name || 'sin asignar'}`)
+    }
+    if (!sets.length) return response.json({ ok: true })
+    params.push(plan.id)
+    await query(`UPDATE checklist_action_plans SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${params.length}`, params)
+    await logPlan(request, {
+      planId: plan.id, label: planLabel(plan),
+      action: changed.some(item => item.startsWith('responsable')) ? 'REASIGNADO' : 'EDITADO',
+      detail: `Cambió ${changed.join(', ')}`,
+    })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+// Evidencia de subsanacion: la sube el responsable (o calidad). Primera evidencia sobre un plan
+// ABIERTO lo pasa a EN_PROCESO — subir algo ya es estar trabajando en ello.
+checklistsRouter.post('/plans/:planId/evidences', checklistsModule, plansAccess, evidenceUpload.single('file'), async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    if (!plan._canManage && !plan._isAssignee) fail(403, 'Solo el responsable asignado puede subir evidencia')
+    if (plan.status === 'CERRADO') fail(409, 'El plan ya está cerrado')
+    if (!request.file) fail(400, 'No llegó ningún archivo')
+    const inserted = await query(
+      `INSERT INTO checklist_action_evidences (plan_id, stored_name, original_name, mime_type, size_bytes, note, uploaded_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [plan.id, request.file.filename, request.file.originalname, request.file.mimetype, request.file.size,
+        String(request.body?.note || '').trim().slice(0, 1000), uid(request)],
+    )
+    if (plan.status === 'ABIERTO') {
+      await query("UPDATE checklist_action_plans SET status = 'EN_PROCESO', updated_at = NOW() WHERE id = $1", [plan.id])
+    }
+    await logPlan(request, {
+      planId: plan.id, label: planLabel(plan), action: 'EVIDENCIA',
+      detail: `Adjuntó "${request.file.originalname}"`,
+    })
+    response.status(201).json({ ...inserted.rows[0], id: String(inserted.rows[0].id) })
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.get('/plans/:planId/evidences/:evidenceId', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    const result = await query(
+      'SELECT * FROM checklist_action_evidences WHERE id = $1 AND plan_id = $2',
+      [Number(request.params.evidenceId), plan.id],
+    )
+    const evidence = result.rows[0]
+    if (!evidence) fail(404, 'Evidencia no encontrada')
+    response.setHeader('Content-Type', evidence.mime_type || 'application/octet-stream')
+    response.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(evidence.original_name)}"`)
+    response.sendFile(join(evidenceRoot, evidence.stored_name))
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.delete('/plans/:planId/evidences/:evidenceId', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    if (plan.status === 'CERRADO') fail(409, 'El plan ya está cerrado')
+    const result = await query(
+      'DELETE FROM checklist_action_evidences WHERE id = $1 AND plan_id = $2 AND (uploaded_by_id = $3 OR $4) RETURNING *',
+      [Number(request.params.evidenceId), plan.id, uid(request), plan._canManage],
+    )
+    const evidence = result.rows[0]
+    if (!evidence) fail(404, 'Evidencia no encontrada (solo quien la subió, o calidad, puede quitarla)')
+    await unlink(join(evidenceRoot, evidence.stored_name)).catch(() => {})
+    await logPlan(request, {
+      planId: plan.id, label: planLabel(plan), action: 'EVIDENCIA',
+      detail: `Quitó "${evidence.original_name}"`,
+    })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+// El responsable declara el hallazgo subsanado. Exige al menos una evidencia: "ya lo arregle"
+// sin nada que lo pruebe es justo lo que el circuito viene a evitar.
+checklistsRouter.post('/plans/:planId/resolve', checklistsModule, plansAccess, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    if (!plan._canManage && !plan._isAssignee) fail(403, 'Solo el responsable asignado puede marcarlo como subsanado')
+    if (!['ABIERTO', 'EN_PROCESO'].includes(plan.status)) fail(409, 'El plan no está en un estado que se pueda subsanar')
+    const evidences = await query('SELECT COUNT(*)::int AS n FROM checklist_action_evidences WHERE plan_id = $1', [plan.id])
+    if (!evidences.rows[0].n) fail(409, 'Sube al menos una evidencia antes de marcarlo como subsanado')
+    await query(
+      `UPDATE checklist_action_plans SET status = 'SUBSANADO', resolution_note = $1,
+              resolved_by_id = $2, resolved_at = NOW(), updated_at = NOW() WHERE id = $3`,
+      [String(request.body?.note || '').trim().slice(0, 2000), uid(request), plan.id],
+    )
+    await logPlan(request, { planId: plan.id, label: planLabel(plan), action: 'SUBSANADO', detail: String(request.body?.note || '').trim().slice(0, 300) })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+// Calidad no acepta la subsanacion: el plan vuelve a EN_PROCESO con el motivo.
+checklistsRouter.post('/plans/:planId/return', checklistsModule, manage, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    if (plan.status !== 'SUBSANADO') fail(409, 'Solo un plan subsanado se puede devolver')
+    const note = String(request.body?.note || '').trim()
+    if (!note) fail(400, 'Explica por qué se devuelve: el responsable tiene que saber qué corregir')
+    await query(
+      `UPDATE checklist_action_plans SET status = 'EN_PROCESO', resolved_by_id = NULL, resolved_at = NULL,
+              resolution_note = '', updated_at = NOW() WHERE id = $1`,
+      [plan.id],
+    )
+    await logPlan(request, { planId: plan.id, label: planLabel(plan), action: 'DEVUELTO', detail: note.slice(0, 500) })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+// Cierre: SOLO calidad, y NUNCA la misma persona que subsano. Si quien sube tambien cierra,
+// el circuito no vale como verificacion (§15.1).
+checklistsRouter.post('/plans/:planId/close', checklistsModule, manage, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    if (plan.status !== 'SUBSANADO') fail(409, 'Solo se cierra un plan ya subsanado por su responsable')
+    if (String(plan.resolved_by_id) === String(uid(request))) {
+      fail(409, 'Quien subsanó no puede cerrar el plan: el cierre debe verificarlo otra persona')
+    }
+    await query(
+      `UPDATE checklist_action_plans SET status = 'CERRADO', closing_note = $1,
+              closed_by_id = $2, closed_at = NOW(), updated_at = NOW() WHERE id = $3`,
+      [String(request.body?.note || '').trim().slice(0, 2000), uid(request), plan.id],
+    )
+    await logPlan(request, { planId: plan.id, label: planLabel(plan), action: 'CERRADO', detail: String(request.body?.note || '').trim().slice(0, 300) })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+// Borrar es decision de calidad. La constancia se escribe ANTES y sobrevive al plan; los
+// archivos se limpian del disco despues de la fila, como en las evidencias de ronda.
+checklistsRouter.delete('/plans/:planId', checklistsModule, manage, async (request, response, next) => {
+  try {
+    const plan = await assertPlan(request)
+    const files = await query('SELECT stored_name FROM checklist_action_evidences WHERE plan_id = $1', [plan.id])
+    await logPlan(request, {
+      planId: plan.id, label: planLabel(plan), action: 'ELIMINADO',
+      detail: `Estaba ${plan.status.toLowerCase().replace('_', ' ')}`,
+    })
+    await query('DELETE FROM checklist_action_plans WHERE id = $1 AND organization_id = $2', [plan.id, oid(request)])
+    for (const row of files.rows) await unlink(join(evidenceRoot, row.stored_name)).catch(() => {})
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
 
 // ===========================================================================
 // REPOSITORIO DE AUDITORIAS

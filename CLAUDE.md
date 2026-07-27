@@ -353,16 +353,23 @@ página y visor propio de PDF.
   combinables y exportacion, **tema claro/oscuro** con conmutador, y bitacora de accesos.
 - Usuario auditor de prueba en produccion: `auditor.seguridad@sgimr.cloud`.
 
+**Planes de mejora: ENTREGADO** (ver `docs/MODULO-LISTAS-DE-CHEQUEO.md` §16). Circuito
+NC -> plan con responsable -> colaborador sube evidencia y marca SUBSANADO -> calidad
+devuelve o cierra. Los tres puntos no evidentes quedaron resueltos: sujeto TEXTO se enlaza
+a membresia via `checklist_subjects.membership_id`; permiso propio `checklists.improve`
+con funcion AUDITOR/COLABORADOR por membresia (nula = auditor, sin backfill); y quien
+subsana no puede cerrar (409 del servidor). Ruta `/app/listas-chequeo/planes`. La
+migracion nueva NO se ha probado contra la BD de produccion todavia: vigilar el primer
+arranque tras el proximo deploy. Ademas, el dialogo de inicio de ronda pide ahora
+**centro y servicio como dos campos separados**, en ese orden.
+
 **Lo que falta, con el plan ya escrito en `docs/MODULO-LISTAS-DE-CHEQUEO.md` §15:**
 
-1. **Modulo de planes de mejora** (decidido, no empezado). Es la pieza grande y el dashboard
-   depende de ella para dos paneles. Ojo a los tres puntos no evidentes anotados alli: los
-   sujetos auditados hoy son TEXTO y no usuarios, hace falta un permiso propio para que el
-   colaborador vea solo lo suyo, y quien subsana no puede ser quien cierra.
-2. **Dashboard** (maqueta oscura aprobada). Consume `dataCenterData()`, no duplica calculo.
-3. Formulario para crear programas y mover listas — hoy solo por API.
-4. Escala C/NC sin NA por lista, si el usuario lo confirma.
-5. Repasar el tema oscuro en los **demas modulos**: heredan los tokens, pero pueden tener
+1. **Dashboard** (maqueta oscura aprobada). Consume `dataCenterData()`, no duplica calculo.
+   Ya puede alimentar «hallazgos sin plan» desde `checklist_action_plans`.
+2. Formulario para crear programas y mover listas — hoy solo por API.
+3. Escala C/NC sin NA por lista, si el usuario lo confirma.
+4. Repasar el tema oscuro en los **demas modulos**: heredan los tokens, pero pueden tener
    blancos escritos a mano sin detectar.
 
 ---

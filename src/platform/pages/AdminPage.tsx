@@ -261,6 +261,9 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
   const [positions, setPositions] = useState<Position[]>([])
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [matrixForm, setMatrixForm] = useState<{ function: 'AUDITOR' | 'PROFESIONAL' | ''; areaId: string; documentId: string; positionId: string }>({ function: '', areaId: '', documentId: '', positionId: '' })
+  // Listas de Chequeo tambien pide funcion al habilitar: auditor (hace rondas) o colaborador
+  // (solo subsana sus planes de mejora). Sin campos extra, asi que basta un select.
+  const [checklistFn, setChecklistFn] = useState<'AUDITOR' | 'COLABORADOR' | ''>('')
 
   const load = () => api.userModules(user.membership_id).then(setGrants).catch(cause => setError(cause instanceof Error ? cause.message : 'No fue posible cargar los modulos'))
   useEffect(() => { void load() }, [user.membership_id])
@@ -277,7 +280,7 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
         await api.revokeUserModule(user.membership_id, moduleKey)
         await load(); await reload()
         done('Modulo retirado')
-      } else if (moduleKey !== 'adherence-matrix') {
+      } else if (moduleKey !== 'adherence-matrix' && moduleKey !== 'checklists') {
         await api.grantUserModule(user.membership_id, moduleKey)
         await load(); await reload()
         done('Modulo habilitado')
@@ -303,7 +306,20 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
     finally { setBusyKey(null) }
   }
 
+  async function grantChecklists() {
+    if (!checklistFn) return
+    setBusyKey('checklists'); setError('')
+    try {
+      await api.grantUserModule(user.membership_id, 'checklists', { function: checklistFn })
+      setChecklistFn('')
+      await load(); await reload()
+      done('Listas de Chequeo habilitado')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible habilitar el modulo') }
+    finally { setBusyKey(null) }
+  }
+
   const matrixGrant = grants.find(item => item.module_key === 'adherence-matrix')
+  const checklistGrant = grants.find(item => item.module_key === 'checklists')
 
   return (
     <div className="space-y-4 p-5">
@@ -312,11 +328,12 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
         {enabledModules.map(module => {
           const granted = grantedKeys.has(module.key)
           const isMatrix = module.key === 'adherence-matrix'
+          const isChecklists = module.key === 'checklists'
           return (
             <div key={module.id} className="rounded-xl border border-[var(--border-hairline)] p-3">
               <button
                 type="button"
-                disabled={busyKey === module.key || (isMatrix && !granted)}
+                disabled={busyKey === module.key || ((isMatrix || isChecklists) && !granted)}
                 onClick={() => void toggle(module.key)}
                 className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-60"
               >
@@ -329,9 +346,36 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
                       {matrixGrant.function_key === 'AUDITOR' && matrixGrant.auditor_areas.length > 0 ? ` · ${matrixGrant.auditor_areas.map(a => a.name).join(', ')}` : ''}
                     </span>
                   )}
+                  {isChecklists && granted && (
+                    <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                      {/* Nulo = auditor: los habilitados antes de existir la funcion eran todos auditores. */}
+                      {checklistGrant?.function_key === 'COLABORADOR' ? 'Colaborador (subsana sus planes de mejora)' : 'Auditor (hace rondas)'}
+                    </span>
+                  )}
                 </span>
                 {granted ? <ToggleRight style={{ color: identity.color }} size={26} /> : <ToggleLeft className="text-[var(--muted)]" size={26} />}
               </button>
+              {isChecklists && !granted && (
+                <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
+                  <Select
+                    value={checklistFn}
+                    onChange={value => setChecklistFn(value as 'AUDITOR' | 'COLABORADOR' | '')}
+                    placeholder="Función..."
+                    options={[
+                      { value: 'AUDITOR', label: 'Auditor (diligencia las listas asignadas)' },
+                      { value: 'COLABORADOR', label: 'Colaborador (solo subsana sus planes de mejora)' },
+                    ]}
+                  />
+                  <Button
+                    identity={identity}
+                    className="w-full"
+                    disabled={busyKey === 'checklists' || !checklistFn}
+                    onClick={() => void grantChecklists()}
+                  >
+                    Habilitar
+                  </Button>
+                </div>
+              )}
               {isMatrix && !granted && (
                 <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
                   <Select

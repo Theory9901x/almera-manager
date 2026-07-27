@@ -632,7 +632,7 @@ Al ampliar de dos listas a trece aparecieron dos trampas del papel que valen la 
 Decisiones tomadas por el usuario el 27/07/2026, sobre la maqueta del dashboard
 (tema oscuro, 6 KPIs, gauge, donut, series y feed de actividad).
 
-### 15.1 Planes de mejora — módulo nuevo (SÍ se hace)
+### 15.1 Planes de mejora — módulo nuevo (ENTREGADO, ver §16)
 
 Es la pieza grande. Un hallazgo (criterio marcado **NC**) deja de morir en el informe
 y pasa a tener responsable, seguimiento y evidencia de subsanación.
@@ -685,3 +685,69 @@ resumen por **programa** (el "tipo de lista" del molde) con sparkline, actividad
 reciente desde `checklist_audit_log`, y exportación a PDF/Excel del filtro aplicado.
 Todo esto ya está resuelto en `dataCenterData()`; el dashboard consume lo mismo y no
 duplica el cálculo.
+
+---
+
+## 16. Planes de mejora — entregado
+
+El circuito completo del §15.1: un criterio marcado **NC** se convierte en un plan con
+responsable, el colaborador entra al sistema y sube su evidencia de subsanación, y calidad
+verifica y cierra.
+
+### Archivos
+
+| Archivo | Rol |
+|---|---|
+| `server/schema.sql` (sección final) | `checklist_action_plans` / `_evidences` / `_log`, permiso `checklists.improve`, `membership_id` en `checklist_subjects` |
+| `server/routes/checklists.mjs` | Sección «Planes de mejora»: listado con aislamiento, creación desde la ronda, evidencias autenticadas, resolve/return/close, bitácora |
+| `server/auth.mjs` | `CHECKLIST_FUNCTION_PERMISSIONS`: función AUDITOR / COLABORADOR por membresía |
+| `server/routes/admin.mjs` | Al habilitar `checklists` se elige la función |
+| `src/modules/checklists/pages/ChecklistPlansPage.tsx` | Listado por estado + detalle con evidencias, bitácora y acciones por rol (nuevo) |
+| `src/modules/checklists/components/PlanCreateDialog.tsx` | Crear plan desde la ronda (nuevo) |
+| `src/modules/checklists/pages/ChecklistAuditPage.tsx` | Chip por celda NC: «Asignar plan de mejora» / «Plan · estado» |
+| `src/App.tsx`, `ChecklistsListPage.tsx`, `AdminPage.tsx`, `index.css` | Rutas `/app/listas-chequeo/planes(/:planId)`, acceso, selector de función, estilos |
+
+### El circuito y sus reglas (validadas en el SERVIDOR, no en la interfaz)
+
+```
+ABIERTO → EN_PROCESO (primera evidencia) → SUBSANADO (responsable) → CERRADO (calidad)
+                              ↑—————— DEVUELTO (calidad, con motivo) ——|
+```
+
+- **Quien subsana no puede cerrar.** `close` compara `resolved_by_id` con quien cierra y
+  responde 409. Sin eso el circuito no vale como verificación.
+- **Subsanar exige al menos una evidencia.** «Ya lo arreglé» sin prueba es justo lo que el
+  circuito viene a evitar.
+- **El plan solo nace de un NC guardado** de esa auditoría (la pantalla guarda antes si hay
+  marcas locales) y no se duplica sobre un hallazgo con plan en curso.
+- **Snapshot de criterio, dominio, ítem y sujeto** en el plan: si la lista cambia de versión
+  o el criterio se desactiva, el plan sigue diciendo qué se incumplió.
+- **Aislamiento por rol**: calidad ve todo; el colaborador SOLO lo asignado a su membresía;
+  un auditor sin manage, lo suyo. Aplicado en el WHERE del listado y en `assertPlan`.
+- **Bitácora propia** (`checklist_action_log`) sin FK: el rastro sobrevive al borrado.
+
+### Los tres puntos no evidentes del §15.1, resueltos
+
+1. **Sujeto TEXTO → usuario**: `checklist_subjects.membership_id` (opcional). Al crear el
+   plan, «Recordar responsable» guarda el enlace; la siguiente ronda sobre el mismo
+   colaborador preselecciona su cuenta (`linked_membership_id` en el payload de la ronda).
+2. **Permiso propio**: `checklists.improve`. El módulo pasa a usar `function_key` como
+   adherence-matrix: AUDITOR (view/fill/export) o COLABORADOR (solo improve). Función nula
+   = auditor, para que los usuarios ya habilitados en producción sigan igual sin backfill.
+   Un colaborador que entra al módulo aterriza directo en `/app/listas-chequeo/planes`.
+3. **Quien subsana ≠ quien cierra**: ver arriba; es un 409 del servidor, no un botón oculto.
+
+### Verificación
+
+Interfaz verificada con el flujo Puppeteer de `CLAUDE.md` §6 en seis vistas: listado con
+pestañas por estado, detalle como calidad (Verificar y cerrar / Devolver), detalle como
+colaborador (subir evidencia / Marcar como subsanado), diálogo de creación desde la ronda,
+la ronda con chips de plan sobre los NC, y el diálogo de contexto con **centro y servicio
+como dos campos separados** (interacción real: elegir sede filtra sus servicios). De ahí
+salieron y se corrigieron dos defectos: fecha de ronda corrida un día por zona horaria y
+título del detalle pegado a su línea de contexto.
+
+**Pendiente de probar contra base de datos real** (no hay BD local): la migración es
+idempotente y sigue los patrones de las secciones anteriores, pero el primer arranque tras
+desplegar debe mirarse. El dashboard (§15.2–15.4) sigue pendiente y ya puede consumir
+`checklist_action_plans` para «hallazgos sin plan».

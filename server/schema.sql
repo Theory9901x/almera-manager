@@ -1175,3 +1175,92 @@ SELECT o.id, c.center, c.name
  WHERE EXISTS (SELECT 1 FROM organization_modules om JOIN modules m ON m.id = om.module_id
                 WHERE om.organization_id = o.id AND m.key = 'checklists')
 ON CONFLICT DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Planes de mejora (Listas de Chequeo).
+--
+-- Un criterio marcado NC deja de morir en el informe: se convierte en un plan con
+-- responsable, evidencia de subsanacion y cierre verificado por calidad. Tres reglas
+-- no negociables (docs/MODULO-LISTAS-DE-CHEQUEO.md §15.1):
+--   1. El sujeto auditado es TEXTO, no un usuario. Para que el colaborador entre al
+--      sistema se enlaza el sujeto del directorio con una membresia (opcional: un
+--      paciente nunca sera usuario, un colaborador si).
+--   2. Permiso propio (checklists.improve): el colaborador ve SOLO sus planes, sin
+--      recibir fill ni acceso a rondas ajenas.
+--   3. Quien subsana no puede ser quien cierra: el colaborador sube evidencia y marca
+--      SUBSANADO; calidad revisa y cierra. Lo valida el servidor, no la interfaz.
+-- ---------------------------------------------------------------------------
+INSERT INTO permissions (key, name, description) VALUES
+  ('checklists.improve', 'Subsanar planes de mejora', 'Ver los planes de mejora propios, subir evidencia de subsanacion y marcarlos como subsanados')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+-- Enlace sujeto del directorio -> usuario del sistema. Nulo = sujeto sin cuenta (pacientes).
+ALTER TABLE checklist_subjects ADD COLUMN IF NOT EXISTS membership_id BIGINT
+  REFERENCES memberships(id) ON DELETE SET NULL;
+
+-- El plan guarda SNAPSHOT del criterio, dominio y sujeto: si la lista cambia de version o el
+-- criterio se desactiva, el plan tiene que seguir diciendo que se incumplio y con quien.
+CREATE TABLE IF NOT EXISTS checklist_action_plans (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  criterion_id BIGINT REFERENCES checklist_criteria(id) ON DELETE SET NULL,
+  audit_subject_id BIGINT REFERENCES checklist_audit_subjects(id) ON DELETE SET NULL,
+  criterion_text TEXT NOT NULL DEFAULT '',
+  domain_name TEXT NOT NULL DEFAULT '',
+  item_number TEXT NOT NULL DEFAULT '',
+  subject_name TEXT NOT NULL DEFAULT '',
+  finding TEXT NOT NULL DEFAULT '',
+  assigned_membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL,
+  assigned_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'ABIERTO' CHECK (status IN ('ABIERTO', 'EN_PROCESO', 'SUBSANADO', 'CERRADO')),
+  resolution_note TEXT NOT NULL DEFAULT '',
+  resolved_by_id BIGINT REFERENCES users(id),
+  resolved_at TIMESTAMPTZ,
+  closing_note TEXT NOT NULL DEFAULT '',
+  closed_by_id BIGINT REFERENCES users(id),
+  closed_at TIMESTAMPTZ,
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_action_plans_org_idx
+  ON checklist_action_plans(organization_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS checklist_action_plans_assigned_idx
+  ON checklist_action_plans(assigned_membership_id, status);
+CREATE INDEX IF NOT EXISTS checklist_action_plans_audit_idx
+  ON checklist_action_plans(audit_id);
+
+-- Evidencias de subsanacion. Igual que las de ronda: NUNCA como estatico publico, solo por la
+-- ruta autenticada que revalida quien puede ver ese plan.
+CREATE TABLE IF NOT EXISTS checklist_action_evidences (
+  id BIGSERIAL PRIMARY KEY,
+  plan_id BIGINT NOT NULL REFERENCES checklist_action_plans(id) ON DELETE CASCADE,
+  stored_name TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL DEFAULT '',
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  note TEXT NOT NULL DEFAULT '',
+  uploaded_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_action_evidences_idx
+  ON checklist_action_evidences(plan_id, created_at);
+
+-- Bitacora del circuito: quien asigno, quien subio evidencia, quien devolvio y quien cerro.
+-- plan_id sin FK a proposito: el rastro sobrevive al borrado del plan.
+CREATE TABLE IF NOT EXISTS checklist_action_log (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  plan_id BIGINT,
+  plan_label TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL CHECK (action IN ('CREADO', 'EDITADO', 'REASIGNADO', 'EVIDENCIA', 'SUBSANADO', 'DEVUELTO', 'CERRADO', 'ELIMINADO')),
+  detail TEXT NOT NULL DEFAULT '',
+  actor_id BIGINT REFERENCES users(id),
+  actor_name TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_action_log_idx
+  ON checklist_action_log(organization_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS checklist_action_log_plan_idx
+  ON checklist_action_log(plan_id, created_at);

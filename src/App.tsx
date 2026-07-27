@@ -24,6 +24,7 @@ import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
 import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
 import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
 import ChecklistPreviewPage from '@/modules/checklists/pages/ChecklistPreviewPage'
+import ChecklistPlansPage from '@/modules/checklists/pages/ChecklistPlansPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -95,8 +96,18 @@ function CarbonConfigRoute() {
 
 function ChecklistsRoute() {
   const { session } = useAuth()
-  if (!session?.permissions.includes('checklists.view')) return <Navigate to="/app" replace />
-  return <ChecklistsListPage />
+  if (session?.permissions.includes('checklists.view')) return <ChecklistsListPage />
+  // Un colaborador (solo checklists.improve) entra directo a sus planes de mejora: no tiene
+  // nada que hacer en el resto del modulo y el servidor tampoco se lo permitiria.
+  if (session?.permissions.includes('checklists.improve')) return <Navigate to="/app/listas-chequeo/planes" replace />
+  return <Navigate to="/app" replace />
+}
+
+function ChecklistPlansRoute() {
+  const { session } = useAuth()
+  const allowed = Boolean(session?.permissions.some(item => ['checklists.view', 'checklists.improve'].includes(item)))
+  if (!allowed) return <Navigate to="/app" replace />
+  return <ChecklistPlansPage />
 }
 
 function ChecklistBuilderRoute() {
@@ -145,6 +156,8 @@ function AppRoutes() {
         <Route path="encuestas/:surveyId/resultados" element={<SurveyResultsRoute />} />
         <Route path="encuestas/:surveyId/respuestas" element={<SurveyResponsesRoute />} />
         <Route path="listas-chequeo" element={<ChecklistsRoute />} />
+        <Route path="listas-chequeo/planes" element={<ChecklistPlansRoute />} />
+        <Route path="listas-chequeo/planes/:planId" element={<ChecklistPlansRoute />} />
         <Route path="listas-chequeo/auditorias/:auditId" element={<ChecklistAuditRoute />} />
         <Route path="listas-chequeo/:templateId/constructor" element={<ChecklistBuilderRoute />} />
         <Route path="listas-chequeo/:templateId/vista-previa" element={<ChecklistPreviewRoute />} />

@@ -1,6 +1,6 @@
 import type {
-  AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
-  DataCenter, DataCenterFilters, DataCenterOptions, RepositoryFilters, RepositoryPage,
+  ActionPlan, ActionPlanDetail, AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
+  DataCenter, DataCenterFilters, DataCenterOptions, PlanAssignee, RepositoryFilters, RepositoryPage,
   ChecklistArea, ChecklistMembership, ChecklistProgram, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
@@ -193,6 +193,41 @@ export const checklistsService = {
     anchor.click()
     URL.revokeObjectURL(url)
   },
+
+  // ---- Planes de mejora ----
+
+  plans: (filters: { status?: string; templateId?: string; areaId?: string; auditId?: string; assignedId?: string } = {}) =>
+    call<{ rows: ActionPlan[]; counts: Record<string, number> }>(`/plans${toQueryString(filters)}`),
+  plan: (planId: string) => call<ActionPlanDetail>(`/plans/${planId}`),
+  planAssignees: () => call<PlanAssignee[]>('/plans/assignees'),
+  createPlan: (auditId: string, data: {
+    criterionId: string; auditSubjectId: string; finding?: string
+    assignedMembershipId?: string | null; assignedName?: string; rememberAssignee?: boolean
+  }) => call<ActionPlan>(`/audits/${auditId}/plans`, { method: 'POST', body: JSON.stringify(data) }),
+  updatePlan: (planId: string, data: { finding?: string; assignedMembershipId?: string | null; assignedName?: string }) =>
+    call<{ ok: true }>(`/plans/${planId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  addPlanEvidence: async (planId: string, file: File, note = '') => {
+    const form = new FormData()
+    form.append('file', file)
+    if (note) form.append('note', note)
+    const response = await fetch(`/api/checklists/plans/${planId}/evidences`, {
+      method: 'POST', credentials: 'same-origin', body: form,
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'No fue posible subir la evidencia')
+    return data
+  },
+  removePlanEvidence: (planId: string, evidenceId: string) =>
+    call<{ ok: true }>(`/plans/${planId}/evidences/${evidenceId}`, { method: 'DELETE' }),
+  planEvidenceUrl: (planId: string, evidenceId: string) =>
+    `/api/checklists/plans/${planId}/evidences/${evidenceId}`,
+  resolvePlan: (planId: string, note = '') =>
+    call<{ ok: true }>(`/plans/${planId}/resolve`, { method: 'POST', body: JSON.stringify({ note }) }),
+  returnPlan: (planId: string, note: string) =>
+    call<{ ok: true }>(`/plans/${planId}/return`, { method: 'POST', body: JSON.stringify({ note }) }),
+  closePlan: (planId: string, note = '') =>
+    call<{ ok: true }>(`/plans/${planId}/close`, { method: 'POST', body: JSON.stringify({ note }) }),
+  removePlan: (planId: string) => call<{ ok: true }>(`/plans/${planId}`, { method: 'DELETE' }),
 
   downloadConsolidated: (filters: AnalyticsFilters = {}) =>
     download(`/analytics/consolidated.pdf${toQueryString(filters as Record<string, string | undefined>)}`, 'consolidado-listas-chequeo.pdf'),

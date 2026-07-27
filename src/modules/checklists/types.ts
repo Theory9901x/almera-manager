@@ -142,6 +142,9 @@ export interface AuditSubject {
   display_name: string
   attributes_snapshot: Record<string, string>
   order_index: number
+  /** Usuario del sistema enlazado al sujeto del directorio; preselecciona al responsable del
+   *  plan de mejora. Nulo = sujeto sin cuenta (un paciente, o un colaborador aún no enlazado). */
+  linked_membership_id?: string | null
 }
 
 export interface ChecklistAnswer {
@@ -266,6 +269,8 @@ export interface AuditDetail {
   /** Personal de turno de la ronda. Lista, no campo de texto: pueden ser varios. */
   staff: { id: string; full_name: string; role: string; order_index: number }[]
   notes: string
+  /** Planes de mejora ya creados sobre hallazgos de esta ronda. */
+  plans: ActionPlan[]
   adherence: AdherenceResult
   /** Solo al reabrir: cuántas firmas se invalidaron por volver a editar la auditoría. */
   invalidatedSignatures?: number
@@ -379,6 +384,82 @@ export interface RepositoryPage {
   page: number
   size: number
   pages: number
+}
+
+// ---- Planes de mejora ----
+
+/** Circuito: ABIERTO → EN_PROCESO (primera evidencia) → SUBSANADO (colaborador) → CERRADO
+ *  (calidad, y nunca la misma persona que subsanó — lo valida el servidor). */
+export type ActionPlanStatus = 'ABIERTO' | 'EN_PROCESO' | 'SUBSANADO' | 'CERRADO'
+
+export const PLAN_STATUS_LABELS: Record<ActionPlanStatus, string> = {
+  ABIERTO: 'Abierto',
+  EN_PROCESO: 'En proceso',
+  SUBSANADO: 'Subsanado',
+  CERRADO: 'Cerrado',
+}
+
+/** Plan resumido, como aparece en el listado y en la ronda. */
+export interface ActionPlan {
+  id: string
+  audit_id: string
+  criterion_id: string | null
+  audit_subject_id: string | null
+  criterion_text: string
+  domain_name: string
+  item_number: string
+  subject_name: string
+  finding: string
+  assigned_membership_id: string | null
+  assigned_name: string
+  status: ActionPlanStatus
+  audit_date?: string
+  template_code?: string
+  template_name?: string
+  area_name?: string
+  area_center?: string | null
+  auditor_name?: string
+  evidence_count?: number
+  resolution_note: string
+  closing_note: string
+  resolved_at: string | null
+  closed_at: string | null
+  created_at: string
+}
+
+export interface ActionEvidence {
+  id: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  note: string
+  uploaded_by_name: string | null
+  created_at: string
+}
+
+export interface ActionLogEntry {
+  id: string
+  action: 'CREADO' | 'EDITADO' | 'REASIGNADO' | 'EVIDENCIA' | 'SUBSANADO' | 'DEVUELTO' | 'CERRADO' | 'ELIMINADO'
+  detail: string
+  actor_name: string
+  created_at: string
+}
+
+export interface ActionPlanDetail extends ActionPlan {
+  resolved_by_name: string | null
+  closed_by_name: string | null
+  created_by_name: string
+  /** Nombre actual del usuario de la membresía asignada (puede diferir del snapshot). */
+  assigned_user_name?: string | null
+  evidences: ActionEvidence[]
+  log: ActionLogEntry[]
+}
+
+/** Posible responsable de un plan (membresía activa de la entidad). */
+export interface PlanAssignee {
+  id: string
+  full_name: string
+  email: string
 }
 
 /** Evidencia adjunta a una auditoría (foto o PDF). Solo se descarga por ruta autenticada. */

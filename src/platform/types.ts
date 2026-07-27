@@ -46,7 +46,8 @@ export interface UserModuleGrant {
   module_id: string
   module_key: string
   module_name: string
-  function_key: 'AUDITOR' | 'PROFESIONAL' | null
+  /** Matrices: AUDITOR/PROFESIONAL. Listas de Chequeo: AUDITOR/COLABORADOR (nulo = auditor). */
+  function_key: 'AUDITOR' | 'PROFESIONAL' | 'COLABORADOR' | null
   area_id: string | null
   area_name: string | null
   auditor_areas: { id: string; name: string }[]

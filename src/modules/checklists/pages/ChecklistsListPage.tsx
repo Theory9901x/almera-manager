@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Archive, BarChart3, ClipboardCheck, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { Archive, BarChart3, ClipboardCheck, ClipboardList, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -232,6 +232,12 @@ function ChecklistsListContent() {
             style={section === 'analitica' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
             onClick={() => setSection('analitica')}
           ><BarChart3 size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Centro de datos</button>
+          {/* Es una pagina propia, no una pestaña interna: el colaborador entra a ella directo
+              y con enlace profundo por plan. Desde aqui solo se navega. */}
+          <button
+            className="ds-tabs-item"
+            onClick={() => navigate('/app/listas-chequeo/planes')}
+          ><ClipboardList size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Planes de mejora</button>
           {canManage && (
             <button
               className={`ds-tabs-item ${section === 'listas' ? 'is-active' : ''}`}
