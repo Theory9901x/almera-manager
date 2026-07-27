@@ -1,7 +1,7 @@
+import { CONCEPT_COLORS as conceptColors } from '../semaphore.mjs'
 // Misma escala de semaforo fija que el dashboard en vivo (src/modules/adherence/design/scopeColors.ts) —
 // un mismo porcentaje siempre se ve del mismo color, sin importar donde aparezca.
 const conceptLabels = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
-const conceptColors = { OPTIMO: '#059669', ACEPTABLE: '#65A30D', DEFICIENTE: '#D97706', MUY_DEFICIENTE: '#DC2626' }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])

@@ -135,9 +135,20 @@ y clases). **Ningún módulo define colores, sombras o radios sueltos.**
 | **Identidad de módulo** | "¿en qué módulo estoy?" | Hero, badge, tab activa, botón primario, iconos propios del módulo |
 | **Semáforo** | "¿qué tan bien va esto?" | Porcentajes, estados, badges de concepto |
 
-El semáforo es **universal**: un 85 % se ve igual en todos los módulos.
-`tokens.ts` → `semaphoreColor()`, `semaphoreLevel()`:
+El semáforo es **universal**: un 85 % se ve igual en todos los módulos, en pantalla y en PDF.
+Son **tres colores, siempre**: verde `#16A34A`, amarillo `#CA8A04`, rojo `#DC2626` (y gris
+`#94A3B8` solo para «sin dato»). Los cuatro conceptos institucionales se conservan porque están
+guardados en base, pero Óptimo y Aceptable comparten el verde: los dos son «cumple» y lo que los
+separa es la etiqueta.
 ≥90 Óptimo · ≥80 Aceptable · ≥70 Deficiente · <70 Muy deficiente.
+
+Dos fuentes únicas, una por lado: `src/design-system/tokens.ts` (cliente) y
+`server/semaphore.mjs` (servidor, del que importan las plantillas de PDF). **Mantenerlas en
+sincronía.** Antes esta tabla estaba copiada en siete archivos y bastaba tocar uno para que el
+informe dejara de coincidir con la pantalla.
+
+El amarillo va oscurecido a propósito: el amarillo puro sobre blanco es ilegible como texto, y
+estos colores se usan sobre todo para escribir porcentajes.
 
 Usar el color de identidad para un estado semántico (o al revés) es un bug.
 

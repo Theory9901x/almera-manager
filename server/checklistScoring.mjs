@@ -105,12 +105,6 @@ export function computeAdherence({ domains = [], subjects = [], answers = [] }) 
   }
 }
 
-// Semaforo del sistema — mismos cortes que src/design-system/tokens.ts, replicados aqui porque el
-// server no importa del bundle del cliente. Si cambian alla, cambian aca.
-export function conceptFromPercent(percent) {
-  if (percent === null || percent === undefined) return null
-  if (percent >= 90) return 'OPTIMO'
-  if (percent >= 80) return 'ACEPTABLE'
-  if (percent >= 70) return 'DEFICIENTE'
-  return 'MUY_DEFICIENTE'
-}
+// El semaforo vive en server/semaphore.mjs (fuente unica del servidor); se reexporta aqui para
+// no cambiar los imports que ya lo consumen desde el motor.
+export { conceptFromPercent } from './semaphore.mjs'

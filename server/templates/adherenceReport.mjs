@@ -1,9 +1,9 @@
+import { CONCEPT_COLORS as conceptColors } from '../semaphore.mjs'
 const FORMAT_CODE = 'FT-ADH-001'
 const FORMAT_VERSION = '1'
 
 const conceptLabels = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
 // Misma escala de semaforo fija que el dashboard en vivo — un mismo porcentaje siempre se ve del mismo color.
-const conceptColors = { OPTIMO: '#059669', ACEPTABLE: '#65A30D', DEFICIENTE: '#D97706', MUY_DEFICIENTE: '#DC2626' }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])

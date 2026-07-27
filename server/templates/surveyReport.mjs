@@ -1,9 +1,9 @@
+import { CONCEPT_COLORS as complianceColors } from '../semaphore.mjs'
 const FORMAT_CODE = 'FT-ENC-001'
 const FORMAT_VERSION = '1'
 
 const complianceLabels = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
 // Misma escala de semaforo fija que el resto de la plataforma (ver src/design-system/tokens.ts).
-const complianceColors = { OPTIMO: '#059669', ACEPTABLE: '#65A30D', DEFICIENTE: '#D97706', MUY_DEFICIENTE: '#DC2626' }
 
 function complianceLevel(percent) {
   if (percent == null) return null

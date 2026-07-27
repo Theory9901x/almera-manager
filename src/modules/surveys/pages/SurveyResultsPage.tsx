@@ -248,7 +248,7 @@ function SurveyResultsContent() {
 function QuestionResultCard({ stat, prompt }: { stat: QuestionStat; prompt: string }) {
   const info = QUESTION_TYPE_INFO[stat.type]
   const Icon = info.icon
-  const npsColor = stat.npsScore == null ? '#94A3B8' : stat.npsScore >= 50 ? '#059669' : stat.npsScore >= 0 ? '#D97706' : '#DC2626'
+  const npsColor = stat.npsScore == null ? '#94A3B8' : stat.npsScore >= 50 ? '#16A34A' : stat.npsScore >= 0 ? '#CA8A04' : '#DC2626'
 
   return (
     <Card accent={identity.color} className="p-5">

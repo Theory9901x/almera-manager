@@ -1,10 +1,11 @@
+import { CONCEPT_COLORS, SEMAPHORE_GREEN, SEMAPHORE_NO_DATA, conceptFromPercent } from '../semaphore.mjs'
 // Informes PDF de Listas de Chequeo: individual (una auditoria) y consolidado (varias).
 // Misma escala de semaforo fija que el resto del sistema — un mismo porcentaje siempre se ve del
 // mismo color, en pantalla y en papel.
 const CONCEPT_LABELS = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
-const CONCEPT_COLORS = { OPTIMO: '#059669', ACEPTABLE: '#65A30D', DEFICIENTE: '#D97706', MUY_DEFICIENTE: '#DC2626' }
-const NO_DATA_COLOR = '#94A3B8'
-const VALUE_COLORS = { C: '#059669', NC: '#DC2626', NA: '#64748B' }
+const NO_DATA_COLOR = SEMAPHORE_NO_DATA
+// C/NC comparten el vocabulario del semaforo: cumple = verde, no cumple = rojo.
+const VALUE_COLORS = { C: SEMAPHORE_GREEN, NC: '#DC2626', NA: '#64748B' }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
@@ -16,14 +17,6 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('es-CO', { dateStyle: 'long' }).format(date)
 }
 
-function conceptFrom(percent) {
-  if (percent === null || percent === undefined) return null
-  if (percent >= 90) return 'OPTIMO'
-  if (percent >= 80) return 'ACEPTABLE'
-  if (percent >= 70) return 'DEFICIENTE'
-  return 'MUY_DEFICIENTE'
-}
-
 // "Sin dato" y 0% son cosas distintas: null significa que nada aplicaba (todo NA), no que se
 // incumpliera todo. Se imprime como texto gris, nunca como 0% en rojo.
 function formatPercent(percent) {
@@ -31,7 +24,7 @@ function formatPercent(percent) {
 }
 
 function colorFor(percent) {
-  const concept = conceptFrom(percent)
+  const concept = conceptFromPercent(percent)
   return concept ? CONCEPT_COLORS[concept] : NO_DATA_COLOR
 }
 
@@ -91,7 +84,7 @@ export function renderChecklistAuditReportHtml({ organizationName, audit, domain
   const criterionById = new Map(adherence.byCriterion.map(row => [String(row.criterionId), row]))
   const subjectById = new Map(adherence.bySubject.map(row => [String(row.subjectId), row]))
   const percent = adherence.overall.percent
-  const concept = conceptFrom(percent)
+  const concept = conceptFromPercent(percent)
 
   const headerRows = (audit.headerFields || [])
     .map(field => `<div><dt>${escapeHtml(field.label)}</dt><dd>${escapeHtml((audit.header_values || {})[field.id] || '—')}</dd></div>`)

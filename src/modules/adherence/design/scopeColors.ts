@@ -20,15 +20,14 @@ export function scopeGradientCss(index: number, angle = 135) {
   return `linear-gradient(${angle}deg, ${from}, ${to})`
 }
 
+import { SEMAPHORE_COLORS } from '@/design-system'
+
 // Escala de semaforo de cumplimiento — fija, no editable, igual en toda la interfaz.
 export type Concept = 'OPTIMO' | 'ACEPTABLE' | 'DEFICIENTE' | 'MUY_DEFICIENTE'
 
-export const CONCEPT_COLORS: Record<Concept, string> = {
-  OPTIMO: '#059669',
-  ACEPTABLE: '#65A30D',
-  DEFICIENTE: '#D97706',
-  MUY_DEFICIENTE: '#DC2626',
-}
+// Sin copia propia: el semaforo es transversal y vive en el design system. Tener aqui otra
+// tabla de colores fue justo lo que dejo el PDF y la pantalla desalineados.
+export const CONCEPT_COLORS: Record<Concept, string> = SEMAPHORE_COLORS
 
 export const CONCEPT_LABELS: Record<Concept, string> = {
   OPTIMO: 'Óptimo',

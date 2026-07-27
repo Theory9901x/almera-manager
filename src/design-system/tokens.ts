@@ -5,10 +5,16 @@
 // se ve del mismo color, sin importar el modulo. No confundir con el color de identidad (seccion 3).
 export type SemaphoreLevel = 'OPTIMO' | 'ACEPTABLE' | 'DEFICIENTE' | 'MUY_DEFICIENTE'
 
+// El semaforo es de TRES colores, siempre: verde, amarillo y rojo. Se conservan los cuatro
+// conceptos institucionales porque estan guardados en base y salen en los informes, pero Optimo
+// y Aceptable comparten el verde: los dos son "cumple", y lo que los separa es la etiqueta.
+// El amarillo va oscurecido a proposito — el amarillo puro sobre blanco es ilegible como texto,
+// y estos colores se usan sobre todo para escribir porcentajes.
+// Equivalente en el servidor: server/semaphore.mjs (mantener ambos en sincronia).
 export const SEMAPHORE_COLORS: Record<SemaphoreLevel, string> = {
-  OPTIMO: '#059669',
-  ACEPTABLE: '#65A30D',
-  DEFICIENTE: '#D97706',
+  OPTIMO: '#16A34A',
+  ACEPTABLE: '#16A34A',
+  DEFICIENTE: '#CA8A04',
   MUY_DEFICIENTE: '#DC2626',
 }
 
