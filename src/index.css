@@ -2669,29 +2669,48 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* Sin `background-attachment: fixed` a proposito: en tablet (Safari iOS sobre todo) provoca
    saltos al hacer scroll y a veces deja de pintar — y este modulo se usa justamente en tablet.
    El degradado se dimensiona al bloque, que siempre cubre el alto de la vista. */
+/* El vidrio solo se lee si hay COLOR detras que refractar. Con un fondo casi blanco,
+   una tarjeta translucida y una tarjeta blanca se ven igual y todo el efecto se
+   pierde. Por eso la malla lleva radiales saturados y bien separados en tono
+   (cian, azul, indigo): al desenfocarse detras de la tarjeta se mezclan y dan el
+   tinte que delata que la superficie es transparente. */
 .checklists-page-bg {
   position: relative;
   min-height: 100%;
   background:
-    radial-gradient(1100px 620px at 12% 0%, color-mix(in oklch, var(--m-listas-light) 26%, transparent), transparent 62%),
-    radial-gradient(900px 520px at 92% 12%, color-mix(in oklch, var(--m-listas) 20%, transparent), transparent 58%),
-    radial-gradient(760px 620px at 78% 88%, color-mix(in oklch, var(--m-listas-light) 16%, transparent), transparent 60%),
-    linear-gradient(168deg, #f2f9ff 0%, #e8f4fd 46%, #eaf6ff 100%);
-  padding-bottom: 8px;
+    radial-gradient(1200px 680px at 6% -8%, color-mix(in oklch, oklch(0.66 0.18 212) 78%, transparent), transparent 58%),
+    radial-gradient(1000px 580px at 98% 4%, color-mix(in oklch, oklch(0.56 0.19 258) 62%, transparent), transparent 56%),
+    radial-gradient(880px 720px at 72% 96%, color-mix(in oklch, oklch(0.66 0.17 192) 58%, transparent), transparent 60%),
+    radial-gradient(720px 540px at 20% 70%, color-mix(in oklch, oklch(0.60 0.16 272) 46%, transparent), transparent 58%),
+    linear-gradient(168deg, #cfe6fa 0%, #bfd9f5 46%, #cde9fb 100%);
+  padding: 10px 10px 12px;
+}
+
+/* El panel de pestañas envuelve TODA la pagina: si conserva el relleno de vidrio
+   normal tapa la malla y las tarjetas de dentro acaban refractando blanco sobre
+   blanco. Aqui es un marco, no una superficie: se deja casi transparente para que
+   el color del fondo llegue hasta las tarjetas. */
+.checklists-page-bg > .surface-panel {
+  background: rgba(255, 255, 255, .30);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
 }
 
 /* Superficie de vidrio compartida. Se aplica sobre .ds-card, que ya trae radio y
    sombra; aqui solo se cambia el relleno por vidrio. */
+/* Opacidad baja + saturacion alta: la tarjeta deja pasar el tinte de la malla en
+   vez de taparlo, que es lo que separa el vidrio de un panel blanco. No baja mas
+   de .55 porque debajo hay tablas de texto pequeño y el contraste manda. */
 .checklists-page-bg .ds-card,
 .checklists-page-bg .surface-panel {
-  background: rgba(255, 255, 255, .68);
-  backdrop-filter: blur(18px) saturate(165%);
-  -webkit-backdrop-filter: blur(18px) saturate(165%);
+  background: rgba(255, 255, 255, .58);
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, .75);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, .85) inset,
-    0 10px 28px rgba(0, 62, 96, .10),
-    0 2px 6px rgba(0, 62, 96, .05);
+    0 1px 0 rgba(255, 255, 255, .9) inset,
+    0 14px 38px rgba(0, 52, 84, .14),
+    0 2px 6px rgba(0, 52, 84, .06);
 }
 
 /* Franja de acento de las tarjetas: degradado azul en vez de color plano. */
@@ -2974,3 +2993,309 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-seed-row.is-done { opacity: .7; }
 .checklist-seed-row strong { display: block; font-size: 12.5px; color: var(--ink); }
 .checklist-seed-row small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+/* ================================================================
+   LISTAS DE CHEQUEO — capa "vidrio v2"
+   Sube el modulo de "tarjeta blanca semitransparente" a vidrio con volumen.
+   Tres cosas hacen la diferencia y ninguna es el desenfoque:
+     1. Un BORDE de degradado, no un borde plano: el vidrio real refleja mas luz
+        arriba-izquierda que abajo-derecha. Se consigue con mascara compuesta,
+        porque border-image no respeta el radio de la esquina.
+     2. Un REFLEJO especular difuso encima del relleno.
+     3. GRANO. Sin ruido, un degradado grande se ve en bandas en pantallas de
+        8 bits — que son las de las tablets del hospital.
+   Todo cuelga de .checklists-page-bg para no filtrarse a los demas modulos.
+   ================================================================ */
+
+/* Angulo animable. Una custom property normal no se puede interpolar: el
+   navegador la trata como texto y salta de un valor a otro. @property le da tipo
+   y la vuelve animable, que es lo que permite girar el degradado del borde sin
+   una sola linea de JS. */
+@property --cl-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.checklists-page-bg {
+  /* El cursor y la seleccion tambien son identidad; por defecto salen azul Chrome. */
+  accent-color: var(--m-listas);
+  caret-color: var(--m-listas);
+  /* Las tablas del modulo scrollean solas: que la barra no rompa el azul. */
+  scrollbar-color: color-mix(in oklch, var(--m-listas) 42%, transparent) transparent;
+  scrollbar-width: thin;
+}
+.checklists-page-bg ::selection {
+  background: color-mix(in oklch, var(--m-listas) 26%, transparent);
+  color: var(--m-listas-deep);
+}
+
+/* Grano, sobre los radiales del fondo y debajo del contenido. `mix-blend-mode:
+   overlay` lo hace desaparecer en las zonas claras y marcarse en las oscuras,
+   que es como se comporta el ruido optico real. */
+.checklists-page-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+}
+/* El contenido, por encima del grano. */
+.checklists-page-bg > * { position: relative; z-index: 1; }
+
+/* --- Borde de degradado y reflejo especular en las superficies de vidrio --- */
+.checklists-page-bg .ds-card,
+.checklists-page-bg .surface-panel { isolation: isolate; }
+
+/* Se pinta un degradado en toda la caja y se recorta a la franja de 1px del
+   borde restando el relleno (content-box) de la caja completa. Es el unico modo
+   de tener un hairline degradado que siga el border-radius.
+   TODO EL BLOQUE va dentro de @supports y no solo por elegancia: si el navegador
+   no sabe restar la mascara, el degradado no se queda en el borde, TAPA la
+   tarjeta entera y el contenido desaparece bajo una mancha. Sin la guarda, el
+   modulo se rompe entero en vez de degradarse. */
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .checklists-page-bg .ds-card,
+  .checklists-page-bg .surface-panel {
+    /* El borde real pasa a transparente: lo pinta el pseudo-elemento. */
+    border-color: transparent;
+  }
+  .checklists-page-bg .ds-card::after,
+  .checklists-page-bg .surface-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, .95) 0%,
+      rgba(255, 255, 255, .35) 34%,
+      color-mix(in oklch, var(--m-listas) 30%, transparent) 68%,
+      rgba(255, 255, 255, .55) 100%);
+    /* El orden importa: el shorthand -webkit-mask REINICIA mask-composite. Cada
+       shorthand va antes de su propio composite, y el estandar cierra. */
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+}
+
+/* Reflejo especular: mancha de luz suave arriba-izquierda. Solo en las tarjetas
+   sin franja de acento, que ya usan ::before para pintarla. */
+.checklists-page-bg .ds-card:not(.ds-card-accent)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(120% 80% at 8% -10%, rgba(255, 255, 255, .72), transparent 58%);
+}
+
+/* Elevacion al pasar por encima. Solo transform y box-shadow: son las dos que el
+   compositor anima sin recalcular el layout. */
+.checklists-page-bg .ds-card {
+  transition: transform 220ms cubic-bezier(.2, .8, .2, 1), box-shadow 220ms ease;
+}
+.checklists-page-bg .ds-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .9) inset,
+    0 18px 44px rgba(0, 62, 96, .14),
+    0 4px 10px rgba(0, 62, 96, .06);
+}
+
+/* --- Hero: aro holografico giratorio --- */
+/* Mismo truco de mascara, pero con un conic-gradient cuyo angulo se anima. Se
+   limita al hero: un conic animado repinta en cada frame y no conviene tener
+   varios a la vez en una tablet. */
+.checklists-hero { isolation: isolate; }
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .checklists-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--cl-angle),
+      transparent 0deg,
+      color-mix(in oklch, var(--m-listas-light) 85%, white) 40deg,
+      rgba(255, 255, 255, .9) 80deg,
+      transparent 150deg,
+      transparent 210deg,
+      color-mix(in oklch, var(--m-listas-light) 70%, white) 280deg,
+      transparent 340deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: cl-orbit 9s linear infinite;
+  }
+}
+@keyframes cl-orbit { to { --cl-angle: 360deg; } }
+
+/* Cifra tabular en las estadisticas del hero: son las que se leen de lejos con
+   la tablet en la mano, y sin ella bailan al actualizarse. */
+.checklists-hero .hero-stat-inline .num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+
+/* `balance` reparte las lineas del titulo en vez de dejar una palabra huerfana
+   en la ultima; `pretty` hace lo propio en los parrafos de ayuda. */
+.checklists-page-bg h1,
+.checklists-page-bg h2,
+.checklists-hero h1 { text-wrap: balance; }
+.checklists-page-bg p,
+.checklists-page-bg .survey-config-hint { text-wrap: pretty; }
+
+/* --- Pestañas: indicador con halo en vez de una linea seca --- */
+.checklists-page-bg .ds-tabs-item.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--m-listas), var(--m-listas-light));
+  box-shadow: 0 0 12px color-mix(in oklch, var(--m-listas) 55%, transparent);
+}
+
+/* --- Boton primario: brillo que barre al pasar el cursor --- */
+.checklists-page-bg .ds-button-primary {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.checklists-page-bg .ds-button-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .38) 48%, transparent 66%);
+  translate: -140% 0;
+  transition: translate 620ms cubic-bezier(.2, .8, .2, 1);
+}
+.checklists-page-bg .ds-button-primary:hover:not(:disabled)::after { translate: 140% 0; }
+
+/* --- Grillas que responden a SU contenedor, no a la ventana --- */
+/* Estas listas viven dentro de una tarjeta estrecha; con media queries salian a
+   varias columnas apretadas solo porque la ventana era ancha. La consulta de
+   contenedor mide el espacio que el elemento realmente tiene. */
+/* El contenedor se declara en la TARJETA que envuelve la grilla, no en la grilla:
+   una consulta de contenedor puede dar estilo a los descendientes, nunca al
+   propio contenedor. Puesta sobre la grilla, la consulta no se cumple jamas y la
+   lista se queda en una columna. Se localiza con :has() para no tener que
+   inventar una clase nueva en el JSX. */
+.checklists-page-bg .ds-card:has(> .checklist-seed-grid) { container-type: inline-size; }
+@container (min-width: 620px) {
+  .checklist-seed-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 1040px) {
+  .checklist-seed-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* --- Estados derivados del DOM con :has(), sin clases extra desde React --- */
+/* Un criterio con el campo enfocado enciende su borde entero: en tablet se busca
+   la tarjeta activa de un vistazo, no el recuadro del input. */
+.checklist-criterion:has(:focus-visible),
+.checklist-criterion:has(.ds-input:focus) {
+  border-left-color: var(--m-listas);
+  background: rgba(255, 255, 255, .78);
+  box-shadow: 0 6px 20px rgba(0, 127, 188, .12);
+}
+/* En tres columnas la fila del formato queda estrecha y el distintivo "Ya cargada"
+   se partia en dos lineas. El texto puede envolver; el distintivo no. */
+.checklist-seed-row > span:last-child { flex: none; white-space: nowrap; }
+
+/* Fila de asignacion marcada: se deduce del propio checkbox. */
+.checklist-assign-row:has(input:checked) {
+  border-color: var(--m-listas);
+  box-shadow: 0 6px 18px rgba(0, 127, 188, .16);
+}
+
+/* --- Celdas C / NC / NA: halo del color del valor elegido --- */
+.fill-value.is-active,
+.sim-value.is-active { transform: translateY(-1px); }
+.fill-value--c.is-active {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, oklch(0.6 0.15 150) 45%, transparent),
+    0 6px 16px color-mix(in oklch, oklch(0.6 0.15 150) 28%, transparent);
+}
+.fill-value--nc.is-active {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent),
+    0 6px 16px color-mix(in srgb, var(--danger) 26%, transparent);
+}
+.fill-value--na.is-active {
+  box-shadow:
+    0 0 0 1px rgba(120, 140, 155, .38),
+    0 5px 14px rgba(90, 110, 125, .18);
+}
+
+/* --- Grillas de calificacion: scroll contenido y cabecera con profundidad --- */
+/* `overscroll-behavior: contain` evita que al llegar al final de la tabla el
+   gesto siga arrastrando la pagina entera: en tablet ese rebote hace perder de
+   vista la fila que se estaba calificando. */
+.checklist-fill-wrap,
+.checklist-sim-wrap {
+  overscroll-behavior: contain;
+  scrollbar-color: color-mix(in oklch, var(--m-listas) 42%, transparent) transparent;
+  scrollbar-width: thin;
+}
+/* Sombra bajo la cabecera y a la derecha de la columna fijas, para que se lea
+   que hay contenido pasando por debajo. */
+.checklist-fill-grid thead th,
+.checklist-sim-grid thead th { box-shadow: 0 1px 0 rgba(0, 90, 135, .12), 0 6px 12px -8px rgba(0, 62, 96, .35); }
+.checklist-fill-grid td.fill-criterion,
+.checklist-sim-grid td.sim-criterion { box-shadow: 1px 0 0 rgba(0, 90, 135, .10), 8px 0 14px -12px rgba(0, 62, 96, .30); }
+
+/* --- Entrada escalonada de las tarjetas --- */
+/* Se probo primero con `animation-timeline: view()`, que es lo que se estila hoy
+   para esto, y se descarto: una tarjeta que aun no se ha desplazado a la vista se
+   queda en el fotograma inicial, o sea en opacity 0. Al fotografiar la pagina
+   entera (y al imprimirla) medio modulo salia EN BLANCO. En una herramienta donde
+   el auditor imprime la lista, contenido invisible no es un efecto, es un fallo.
+   Una animacion normal siempre termina, se haya visto o no. */
+@media (prefers-reduced-motion: no-preference) {
+  .checklists-page-bg .ds-card {
+    animation: cl-enter 480ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  .checklists-page-bg .ds-card:nth-of-type(2) { animation-delay: 70ms; }
+  .checklists-page-bg .ds-card:nth-of-type(3) { animation-delay: 140ms; }
+  .checklists-page-bg .ds-card:nth-of-type(n + 4) { animation-delay: 200ms; }
+  @keyframes cl-enter {
+    from { opacity: 0; transform: translateY(14px) scale(.985); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* --- Repliegue donde no hay soporte o se pide menos movimiento --- */
+/* Sin backdrop-filter el vidrio se ve como una tarjeta lavada; ahi conviene una
+   superficie solida, que ademas sube el contraste del texto. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .checklists-page-bg .ds-card,
+  .checklists-page-bg .surface-panel,
+  .checklist-criterion,
+  .checklist-assign-row,
+  .checklist-seed-row,
+  .signature-item { background: rgba(255, 255, 255, .94); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .checklists-hero::after { animation: none; }
+  .checklists-page-bg .ds-card { transition: none; }
+  .checklists-page-bg .ds-card:hover { transform: none; }
+  .checklists-page-bg .ds-button-primary::after { display: none; }
+  .checklists-page-bg::after { display: none; }
+}
