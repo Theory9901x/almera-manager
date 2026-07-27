@@ -1,6 +1,7 @@
 import type {
   AdherenceResult, AssignedTemplate, AuditDetail, AuditSummary, ChecklistArea, ChecklistMembership,
-  ChecklistTemplate, ChecklistTemplateDetail, ChecklistValue, DirectorySubject,
+  ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail, ChecklistValue, DirectorySubject,
+  SignerSuggestion,
 } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -68,4 +69,12 @@ export const checklistsService = {
 
   closeAudit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}/close`, { method: 'POST' }),
   reopenAudit: (auditId: string) => call<AuditDetail>(`/audits/${auditId}/reopen`, { method: 'POST' }),
+
+  // ---- Fase 3: firmas ----
+
+  signers: () => call<SignerSuggestion[]>('/signers/directory'),
+  addSignature: (auditId: string, data: { signerName: string; signerRole: string; signatureImage: string }) =>
+    call<ChecklistSignature>(`/audits/${auditId}/signatures`, { method: 'POST', body: JSON.stringify(data) }),
+  removeSignature: (auditId: string, signatureId: string) =>
+    call<{ ok: true }>(`/audits/${auditId}/signatures/${signatureId}`, { method: 'DELETE' }),
 }

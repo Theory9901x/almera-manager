@@ -1,14 +1,15 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Info, Loader2, Lock, Plus, Save, Trash2, Unlock, UserPlus } from 'lucide-react'
+import { ArrowLeft, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, SaveStatusIndicator, Select,
   ToastProvider, moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
+import { SignaturePad } from '../components/SignaturePad'
 import {
   CHECKLIST_VALUE_LABELS, type AuditDetail, type ChecklistField, type ChecklistValue,
-  type DirectorySubject,
+  type DirectorySubject, type SignerSuggestion,
 } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -37,6 +38,7 @@ function ChecklistAuditContent() {
   const [marks, setMarks] = useState<Record<string, ChecklistValue>>({})
   const [header, setHeader] = useState<Record<string, string>>({})
   const [showSubjectForm, setShowSubjectForm] = useState(false)
+  const [signers, setSigners] = useState<SignerSuggestion[]>([])
   const headerDirty = useRef(false)
 
   function hydrate(detail: AuditDetail) {
@@ -54,7 +56,12 @@ function ChecklistAuditContent() {
     try {
       const detail = await checklistsService.audit(auditId)
       hydrate(detail)
-      setDirectory(await checklistsService.directory(detail.template_id).catch(() => []))
+      const [subjectDirectory, signerDirectory] = await Promise.all([
+        checklistsService.directory(detail.template_id).catch(() => []),
+        checklistsService.signers().catch(() => []),
+      ])
+      setDirectory(subjectDirectory)
+      setSigners(signerDirectory)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar la auditoría') }
     finally { setLoading(false) }
   }
@@ -139,9 +146,35 @@ function ChecklistAuditContent() {
     if (!audit) return
     setBusy(true)
     try {
-      hydrate(await checklistsService.reopenAudit(audit.id))
-      toast.push('success', 'Auditoría reabierta')
+      const detail = await checklistsService.reopenAudit(audit.id)
+      hydrate(detail)
+      // Reabrir invalida las firmas (ver el endpoint): avisarlo, porque el auditor tendra que
+      // volver a recogerlas antes de cerrar de nuevo.
+      toast.push('success', detail.invalidatedSignatures
+        ? `Auditoría reabierta. Se invalidaron ${detail.invalidatedSignatures} firma${detail.invalidatedSignatures === 1 ? '' : 's'}: habrá que volver a firmar.`
+        : 'Auditoría reabierta')
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible reabrir') }
+    finally { setBusy(false) }
+  }
+
+  async function addSignature(signerName: string, signerRole: string, signatureImage: string) {
+    if (!audit) return
+    setBusy(true)
+    try {
+      await checklistsService.addSignature(audit.id, { signerName, signerRole, signatureImage })
+      await load()
+      toast.push('success', 'Firma registrada')
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible registrar la firma') }
+    finally { setBusy(false) }
+  }
+
+  async function removeSignature(signatureId: string) {
+    if (!audit) return
+    setBusy(true)
+    try {
+      await checklistsService.removeSignature(audit.id, signatureId)
+      await load()
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible quitar la firma') }
     finally { setBusy(false) }
   }
 
@@ -332,6 +365,15 @@ function ChecklistAuditContent() {
         </Card>
       )}
 
+      <SignaturesCard
+        signatures={audit.signatures}
+        signers={signers}
+        closed={closed}
+        busy={busy}
+        onAdd={addSignature}
+        onRemove={removeSignature}
+      />
+
       <Card accent={identity.color} className="p-5">
         <p className="ds-eyebrow">Resultado</p>
         <h2 className="mt-1 text-xl font-black">Adherencia {closed ? 'final' : 'en curso'}</h2>
@@ -375,6 +417,98 @@ function ChecklistAuditContent() {
         )}
       </Card>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Firmas. Se recogen con la auditoria ABIERTA y quedan congeladas al cerrar; reabrir las
+// invalida (el servidor las borra), porque una firma avala un contenido concreto.
+
+function SignaturesCard({ signatures, signers, closed, busy, onAdd, onRemove }: {
+  signatures: AuditDetail['signatures']
+  signers: SignerSuggestion[]
+  closed: boolean
+  busy: boolean
+  onAdd(signerName: string, signerRole: string, image: string): void
+  onRemove(signatureId: string): void
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [role, setRole] = useState('')
+  const [image, setImage] = useState<string | null>(null)
+
+  function pickSigner(value: string) {
+    if (value === 'NEW') { setName(''); setRole(''); return }
+    const found = signers.find(signer => signer.signer_name === value)
+    if (found) { setName(found.signer_name); setRole(found.signer_role) }
+  }
+
+  function submit() {
+    if (!name.trim() || !image) return
+    onAdd(name.trim(), role.trim(), image)
+    setOpen(false); setName(''); setRole(''); setImage(null)
+  }
+
+  return (
+    <Card accent={identity.color} className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="ds-eyebrow">Trazabilidad</p>
+          <h2 className="mt-1 text-xl font-black">Firmas</h2>
+        </div>
+        {!closed && !open && <Button identity={identity} onClick={() => setOpen(true)}><PenLine size={15} /> Agregar firma</Button>}
+      </div>
+
+      {signatures.length ? (
+        <div className="signature-list mt-4">
+          {signatures.map(signature => (
+            <div key={signature.id} className="signature-item">
+              <img src={signature.signature_image} alt={`Firma de ${signature.signer_name}`} />
+              <div className="signature-item-meta">
+                <strong>{signature.signer_name}</strong>
+                {signature.signer_role && <small>{signature.signer_role}</small>}
+                <time>{new Date(signature.signed_at).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
+              </div>
+              {!closed && <button className="survey-icon-button is-danger is-tiny" title="Quitar firma" onClick={() => onRemove(signature.id)}><Trash2 size={12} /></button>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="survey-config-hint mt-3">
+          {closed
+            ? 'Esta auditoría se cerró sin firmas registradas.'
+            : 'Aún no hay firmas. Recógelas antes de cerrar: al cerrar quedan congeladas junto al resultado.'}
+        </p>
+      )}
+
+      {open && !closed && (
+        <div className="signature-capture mt-4">
+          <div className="signature-capture-fields">
+            {signers.length > 0 && (
+              <div className="min-w-[220px]">
+                <Field label="Firmante frecuente" hint="Opcional">
+                  <Select
+                    value="NEW"
+                    onChange={pickSigner}
+                    options={[{ value: 'NEW', label: 'Nuevo firmante' }, ...signers.map(signer => ({ value: signer.signer_name, label: signer.signer_name }))]}
+                  />
+                </Field>
+              </div>
+            )}
+            <div className="min-w-[220px] flex-1"><Field label="Nombre de quien firma *"><Input value={name} onChange={event => setName(event.target.value)} placeholder="Nombre completo" /></Field></div>
+            <div className="min-w-[200px]"><Field label="Rol" hint="Responsable, profesional auditado…"><Input value={role} onChange={event => setRole(event.target.value)} /></Field></div>
+          </div>
+
+          <SignaturePad onChange={setImage} />
+
+          <div className="mt-3 flex items-center gap-3">
+            <Button identity={identity} onClick={submit} disabled={busy || !name.trim() || !image}><PenLine size={15} /> Registrar firma</Button>
+            <button className="survey-config-add" onClick={() => { setOpen(false); setImage(null) }}>Cancelar</button>
+            {!image && <span className="survey-config-hint">Traza la firma en el recuadro para poder registrarla.</span>}
+          </div>
+        </div>
+      )}
+    </Card>
   )
 }
 

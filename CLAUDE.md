@@ -29,14 +29,14 @@ server/
   security.mjs     Hash de password y de token de sesión
   pdf.mjs          Puppeteer compartido para renderizar HTML → PDF
   schema.sql       ÚNICA fuente de verdad del esquema (idempotente)
-  routes/          auth, admin, almera, adherence, surveys, surveysPublic, carbon
+  routes/          auth, admin, almera, adherence, surveys, surveysPublic, carbon, checklists
   templates/       HTML de los informes PDF
 src/
   App.tsx          Rutas + guardas por permiso
   index.css        Tokens CSS y todo el estilo del sistema
   design-system/   Componentes y tokens compartidos (ver §5)
   platform/        Login, layout/sidebar, páginas administrativas y de plataforma
-  modules/         adherence · almera · carbon · surveys
+  modules/         adherence · almera · carbon · checklists · surveys
   shared/          Utilidades y UI heredada (evitar ampliar)
 scripts/
   deploy-manual.sh Despliegue manual al VPS
@@ -156,7 +156,7 @@ tono, para que **ningún módulo pese visualmente más que otro**.
 | `--m-usuarios` | 350 | Usuarios / Admin |
 | `--m-planes` | 130 | **libre** (`#518200`) |
 | `--m-documentos` | 230 | **libre** (`#007fbc`) |
-| `--m-seguridad` | 40 | **libre** (`#bb4717`) |
+| `--m-seguridad` | 40 | Listas de Chequeo (`#bb4717`) |
 | `--m-riesgos` | 70 | **libre** (`#aa5b00`) |
 | `--m-indicadores` | 330 | **libre** (`#a3489d`) |
 
@@ -278,7 +278,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
-| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-2**: constructor, motor y diligenciamiento |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-3**: constructor, motor, diligenciamiento y firmas |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -333,13 +333,13 @@ página y visor propio de PDF.
 ## 11. Trabajo pendiente
 
 **Módulo "Listas de Chequeo" (auditoría por adherencia)** — plan de 5 fases.
-**Fases 1 y 2 entregadas**; **faltan las fases 3 a 5**:
+**Fases 1, 2 y 3 entregadas**; **faltan las fases 4 y 5**:
 
 | Fase | Alcance | Estado |
 |---|---|---|
 | 1 | Modelo, constructor, motor de adherencia, semaforización | **Hecha** |
 | 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | **Hecha** |
-| 3 | Firmas digitales en canvas + directorio de firmantes | Pendiente |
+| 3 | Firmas digitales en canvas + directorio de firmantes | **Hecha** |
 | 4 | Analítica, gráficas e informes PDF | Pendiente |
 | 5 | Migración de las 13 listas reales de seguridad del paciente | Pendiente |
 

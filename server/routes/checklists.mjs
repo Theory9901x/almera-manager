@@ -248,10 +248,11 @@ async function assertAudit(request, { requireOpen = false } = {}) {
 
 async function auditPayload(audit) {
   const structure = await loadStructure(audit.template_id)
-  const [subjects, answers, headerFields] = await Promise.all([
+  const [subjects, answers, headerFields, signatures] = await Promise.all([
     query('SELECT * FROM checklist_audit_subjects WHERE audit_id = $1 ORDER BY order_index, id', [audit.id]),
     query('SELECT * FROM checklist_answers WHERE audit_id = $1', [audit.id]),
     query('SELECT * FROM checklist_header_fields WHERE template_id = $1 ORDER BY order_index, id', [audit.template_id]),
+    query('SELECT * FROM checklist_signatures WHERE audit_id = $1 ORDER BY signed_at', [audit.id]),
   ])
   const result = computeAdherence({
     domains: structure.domains,
@@ -265,6 +266,7 @@ async function auditPayload(audit) {
     domains: structure.domains,
     subjects: subjects.rows,
     answers: answers.rows,
+    signatures: signatures.rows,
     adherence: { ...result, concept: conceptFromPercent(result.overall.percent) },
   }
 }
@@ -437,6 +439,57 @@ checklistsRouter.put('/audits/:auditId/answers', checklistsModule, fill, async (
   } finally { client.release() }
 })
 
+// ---- Firmas ----
+// La firma se guarda como PNG en data URL. Se limita el tamano porque el trazo llega desde un
+// canvas del cliente: sin tope, una firma manipulada podria inflar la fila sin control.
+const MAX_SIGNATURE_BYTES = 400 * 1024
+
+// Directorio de firmantes: se deriva de las firmas ya registradas en la entidad en vez de
+// mantener una tabla aparte. Asi el directorio se mantiene solo — quien firmo una vez queda
+// disponible para las rondas siguientes, sin alta previa ni datos que se queden viejos.
+checklistsRouter.get('/signers/directory', checklistsModule, view, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT DISTINCT ON (lower(s.signer_name)) s.signer_name, s.signer_role
+       FROM checklist_signatures s JOIN checklist_audits a ON a.id = s.audit_id
+       WHERE a.organization_id = $1 AND s.signer_name <> ''
+       ORDER BY lower(s.signer_name), s.signed_at DESC
+       LIMIT 200`,
+      [oid(request)],
+    )
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.post('/audits/:auditId/signatures', checklistsModule, fill, async (request, response, next) => {
+  try {
+    // Solo se firma con la auditoria abierta: una vez cerrada es un registro firmado y no se
+    // le agregan ni quitan firmas. El orden natural es firmar y despues cerrar.
+    const audit = await assertAudit(request, { requireOpen: true })
+    const body = request.body || {}
+    const signerName = String(body.signerName || '').trim()
+    if (!signerName) fail(400, 'Escribe el nombre de quien firma')
+    const image = String(body.signatureImage || '')
+    if (!image.startsWith('data:image/png;base64,')) fail(400, 'Firma inválida')
+    if (image.length > MAX_SIGNATURE_BYTES) fail(413, 'La firma es demasiado pesada')
+    const inserted = await query(
+      `INSERT INTO checklist_signatures (audit_id, signer_name, signer_role, signature_image)
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [audit.id, signerName, String(body.signerRole || '').trim(), image],
+    )
+    response.status(201).json(inserted.rows[0])
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.delete('/audits/:auditId/signatures/:signatureId', checklistsModule, fill, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request, { requireOpen: true })
+    await query('DELETE FROM checklist_signatures WHERE id = $1 AND audit_id = $2',
+      [Number(request.params.signatureId), audit.id])
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
 // ---- Cierre y reapertura ----
 
 checklistsRouter.post('/audits/:auditId/close', checklistsModule, fill, async (request, response, next) => {
@@ -460,17 +513,27 @@ checklistsRouter.post('/audits/:auditId/close', checklistsModule, fill, async (r
 })
 
 checklistsRouter.post('/audits/:auditId/reopen', checklistsModule, fill, async (request, response, next) => {
+  const client = await pool.connect()
   try {
     const audit = await assertAudit(request)
     if (audit.status !== 'CERRADA') fail(400, 'La auditoría no está cerrada')
-    await query(
+    await client.query('BEGIN')
+    // Al reabrir se INVALIDAN las firmas: quien firmo avalo un contenido concreto, y reabrir
+    // permite cambiarlo. Conservarlas dejaria firmas avalando algo que ya no es lo que se
+    // firmo. Hay que volver a firmar antes de cerrar de nuevo.
+    const removed = await client.query('DELETE FROM checklist_signatures WHERE audit_id = $1 RETURNING id', [audit.id])
+    await client.query(
       `UPDATE checklist_audits SET status = 'BORRADOR', adherence_percent = NULL, concept = NULL,
               closed_at = NULL, updated_at = NOW() WHERE id = $1`,
       [audit.id],
     )
+    await client.query('COMMIT')
     const refreshed = await assertAudit(request)
-    response.json(await auditPayload(refreshed))
-  } catch (error) { next(error) }
+    response.json({ ...await auditPayload(refreshed), invalidatedSignatures: removed.rowCount })
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {})
+    next(error)
+  } finally { client.release() }
 })
 
 checklistsRouter.get('/:id', checklistsModule, view, async (request, response, next) => {

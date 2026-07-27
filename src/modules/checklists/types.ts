@@ -148,6 +148,20 @@ export interface AuditSummary {
   subject_count: number
 }
 
+export interface ChecklistSignature {
+  id: string
+  signer_name: string
+  signer_role: string
+  signature_image: string
+  signed_at: string
+}
+
+/** Firmante ya usado antes en la entidad; el directorio se deriva del historial de firmas. */
+export interface SignerSuggestion {
+  signer_name: string
+  signer_role: string
+}
+
 export interface AuditDetail {
   id: string
   template_id: string
@@ -168,5 +182,8 @@ export interface AuditDetail {
   domains: ChecklistDomain[]
   subjects: AuditSubject[]
   answers: ChecklistAnswer[]
+  signatures: ChecklistSignature[]
   adherence: AdherenceResult
+  /** Solo al reabrir: cuántas firmas se invalidaron por volver a editar la auditoría. */
+  invalidatedSignatures?: number
 }

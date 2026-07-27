@@ -1,8 +1,8 @@
 # Módulo "Listas de Chequeo" — Auditoría por Adherencia
 
-Estado: **Fases 1 y 2 entregadas** (modelo, constructor, motor de adherencia y entorno de
-diligenciamiento); fases 3 a 5 pendientes. Este documento es el plan completo — ver §8
-para las fases, §10 y §11 para lo ya construido. Leer primero `CLAUDE.md` (arquitectura,
+Estado: **Fases 1, 2 y 3 entregadas** (modelo, constructor, motor de adherencia, entorno de
+diligenciamiento y firmas); fases 4 y 5 pendientes. Este documento es el plan completo — ver §8
+para las fases y §10-§12 para lo ya construido. Leer primero `CLAUDE.md` (arquitectura,
 sistema de diseño y reglas de trabajo).
 
 ---
@@ -279,7 +279,7 @@ no como parche aislado). **No avanzar sin verificar la anterior.**
 |---|---|---|
 | **1** ✅ | Modelo de datos, constructor de listas por área, motor de adherencia dinámico con exclusión de NA, semaforización. Sin firmas ni analítica. | **Entregada.** Ver §10. |
 | **2** ✅ | Entorno de diligenciamiento: asignación, cabecera → sujetos → evaluación → guardado con cálculo. Directorio reutilizable de sujetos. | Un profesional asignado completa una auditoría de principio a fin y ve su adherencia semaforizada. |
-| **3** | Firmas digitales en canvas (tablet), asociación al registro, directorio reutilizable de firmantes. | Firmar una auditoría desde pantalla táctil y ver la firma en el registro. |
+| **3** ✅ | Firmas digitales en canvas (tablet), asociación al registro, directorio reutilizable de firmantes. | Firmar una auditoría desde pantalla táctil y ver la firma en el registro. |
 | **4** | Analítica: tableros por dominio/criterio/servicio/evolución, informe PDF individual y consolidado. | PDF institucional generado y tablero con datos reales. |
 | **5** | Migración de las listas reales de seguridad del paciente. | FO-24 y FO-26 cargadas **solo con configuración, sin código nuevo por lista**. |
 
@@ -446,3 +446,47 @@ para uso con el dedo, instructivo bajo el criterio, y el resultado cuadrando con
 
 Firmas digitales (fase 3), analítica e informes PDF (fase 4) y la carga de las 13 listas
 reales (fase 5). La tabla `checklist_signatures` ya existe pero aún no tiene interfaz.
+
+---
+
+## 12. Fase 3 — entregada
+
+Firmas manuscritas en pantalla táctil, asociadas al registro con persona y fecha.
+
+| Archivo | Rol |
+|---|---|
+| `src/modules/checklists/components/SignaturePad.tsx` | Lienzo de firma (nuevo) |
+| `server/routes/checklists.mjs` | Alta/baja de firma, directorio de firmantes, invalidación al reabrir |
+| `src/modules/checklists/pages/ChecklistAuditPage.tsx` | Tarjeta de firmas |
+| `src/modules/checklists/types.ts`, `services/checklistsService.ts`, `src/index.css` | Tipos, cliente y estilos |
+
+### Decisiones
+
+- **Pointer Events, no touch/mouse por separado.** Una sola ruta de código cubre dedo,
+  lápiz óptico y ratón. `setPointerCapture` evita que el trazo se corte si el dedo se sale
+  del lienzo a mitad de la firma.
+- **`touch-action: none` en el lienzo.** Sin eso, arrastrar el dedo para firmar hace
+  *scroll* de la página en vez de trazar — en tablet el pad sería inservible.
+- **Se dibuja a `devicePixelRatio` pero se exporta a tamaño lógico fijo** (600×180). Si se
+  exportara el lienzo escalado, en una tablet retina cada firma pesaría el cuádruple sin
+  verse mejor en el informe. Medido: ~8 KB por firma.
+- **Tope de 400 KB por firma** en el servidor: el trazo llega desde un canvas del cliente y
+  sin límite una firma manipulada podría inflar la fila sin control.
+- **Un toque simple deja punto.** Sin la línea de 0.1 px en `pointerdown`, firmar con un
+  punto no dibujaría nada.
+- **Reabrir una auditoría INVALIDA sus firmas** (el servidor las borra en la misma
+  transacción y devuelve cuántas). Una firma avala un contenido concreto; si se reabre para
+  cambiar respuestas, conservarla dejaría firmas avalando algo que ya no es lo firmado. La
+  interfaz avisa que habrá que volver a firmar.
+- **Solo se firma con la auditoría abierta.** Cerrada es un registro firmado: no se agregan
+  ni quitan firmas.
+- **El directorio de firmantes se deriva del historial** (`DISTINCT ON` sobre las firmas de
+  la entidad) en vez de mantener una tabla aparte: se mantiene solo, sin alta previa ni
+  datos que se queden viejos. Quien firmó una vez queda disponible para las rondas
+  siguientes.
+
+### Verificación
+
+Probado con interacción real de puntero en Puppeteer, no solo render estático: se traza una
+firma sobre el lienzo, se comprueba que el componente emite la imagen (`HAS_IMAGE`), se
+registra y aparece en la lista con nombre, rol y fecha. PNG resultante: 8.026 bytes.

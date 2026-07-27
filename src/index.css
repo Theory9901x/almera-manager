@@ -2829,3 +2829,43 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion { min-width: 220px; }
   .fill-value { min-width: 38px; height: 40px; }
 }
+
+/* --- Fase 3: firmas digitales --- */
+.signature-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.signature-item {
+  position: relative; display: grid; gap: 8px; padding: 12px;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card-sm, 14px); background: #fff;
+}
+.signature-item img {
+  width: 100%; height: 90px; object-fit: contain; background: #fcfcfd;
+  border-bottom: 1px solid var(--border-hairline);
+}
+.signature-item-meta strong { display: block; font-size: 12.5px; color: var(--ink); }
+.signature-item-meta small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.signature-item-meta time { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.signature-item > .survey-icon-button { position: absolute; top: 8px; right: 8px; }
+
+.signature-capture {
+  padding: 16px; border-radius: var(--radius-card-sm, 14px);
+  border: 1px dashed color-mix(in srgb, var(--m-seguridad) 40%, transparent);
+  background: color-mix(in srgb, var(--m-seguridad) 4%, #fff);
+}
+.signature-capture-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+
+.signature-pad { position: relative; }
+.signature-pad-canvas {
+  display: block; width: 100%; max-width: 600px; aspect-ratio: 600 / 180;
+  border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
+  /* Sin esto, arrastrar el dedo para firmar hace scroll de la pagina en vez de trazar. */
+  touch-action: none; cursor: crosshair;
+}
+.signature-pad-hint {
+  position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+  color: #b9c0c9; font-size: 12.5px; font-weight: 600; max-width: 600px;
+}
+.signature-pad-clear {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+  border: 1px solid var(--border-hairline); border-radius: 8px; background: #fff;
+  padding: 6px 12px; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer;
+}
+.signature-pad-clear:hover { color: var(--ink); border-color: #9aa3ad; }
