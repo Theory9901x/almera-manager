@@ -306,3 +306,48 @@ export interface DataCenterOptions {
   shifts: string[]
   domains: { id: string; name: string }[]
 }
+
+// ---- Repositorio de auditorías ----
+
+export interface RepositoryFilters {
+  dateFrom?: string
+  dateTo?: string
+  areaId?: string
+  templateId?: string
+  auditorId?: string
+  /** Nombre, documento o cualquier atributo del sujeto (cama, documento…). */
+  subject?: string
+  /** Busca en los valores de la cabecera (responsable, personal de turno…). */
+  staff?: string
+  shift?: string
+  status?: string
+  maxPercent?: string
+  page?: string
+  size?: string
+}
+
+export interface RepositoryRow {
+  id: string
+  audit_date: string
+  shift: string | null
+  status: AuditStatus
+  adherence_percent: number | null
+  concept: string | null
+  template_code: string
+  template_version: string
+  template_name: string
+  subject_label: string
+  area_name: string
+  auditor_name: string
+  signature_count: number
+  subject_count: number
+  subjects: string | null
+}
+
+export interface RepositoryPage {
+  rows: RepositoryRow[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}

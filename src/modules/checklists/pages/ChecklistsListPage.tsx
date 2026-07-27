@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardCheck, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { Archive, BarChart3, ClipboardCheck, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -8,6 +8,7 @@ import {
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
 import { DataCenterPanel } from '../components/DataCenterPanel'
+import { RepositoryPanel } from '../components/RepositoryPanel'
 import { StartAuditDialog, type StartContext } from '../components/StartAuditDialog'
 import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate, SeedTemplate } from '../types'
 
@@ -34,7 +35,7 @@ function ChecklistsListContent() {
   const canManage = Boolean(session?.permissions.includes('checklists.manage'))
   const canFill = Boolean(session?.permissions.includes('checklists.fill'))
 
-  const [section, setSection] = useState<'auditorias' | 'analitica' | 'listas'>('auditorias')
+  const [section, setSection] = useState<'auditorias' | 'repositorio' | 'analitica' | 'listas'>('auditorias')
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([])
   const [areas, setAreas] = useState<ChecklistArea[]>([])
   const [audits, setAudits] = useState<AuditSummary[]>([])
@@ -205,6 +206,11 @@ function ChecklistsListContent() {
             onClick={() => setSection('auditorias')}
           >Auditorías</button>
           <button
+            className={`ds-tabs-item ${section === 'repositorio' ? 'is-active' : ''}`}
+            style={section === 'repositorio' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            onClick={() => setSection('repositorio')}
+          ><Archive size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Repositorio</button>
+          <button
             className={`ds-tabs-item ${section === 'analitica' ? 'is-active' : ''}`}
             style={section === 'analitica' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
             onClick={() => setSection('analitica')}
@@ -355,6 +361,8 @@ function ChecklistsListContent() {
               </Card>
             </>
           )}
+
+          {section === 'repositorio' && <RepositoryPanel canManage={canManage} />}
 
           {section === 'analitica' && <DataCenterPanel />}
 

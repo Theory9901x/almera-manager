@@ -423,6 +423,12 @@ checklistsRouter.get('/audits/log', checklistsModule, manage, async (request, re
 checklistsRouter.get('/audits/:auditId', checklistsModule, view, async (request, response, next) => {
   try {
     const audit = await assertAudit(request)
+    // Consultar una ronda ajena queda registrado: lleva nombre de paciente, documento y firmas.
+    // El auditor abriendo LO SUYO no se anota, o la bitacora se llena de ruido y deja de servir
+    // para lo que importa, que es saber quien miro lo que no es suyo.
+    if (String(audit.auditor_id) !== String(uid(request))) {
+      await logAudit(request, { auditId: audit.id, label: auditLabel(audit), action: 'CONSULTADA', detail: 'Abrió el detalle' })
+    }
     response.json(await auditPayload(audit))
   } catch (error) { next(error) }
 })
@@ -710,6 +716,93 @@ checklistsRouter.post('/audits/:auditId/reopen', checklistsModule, fill, async (
     await client.query('ROLLBACK').catch(() => {})
     next(error)
   } finally { client.release() }
+})
+
+
+// ===========================================================================
+// REPOSITORIO DE AUDITORIAS
+// ===========================================================================
+
+/**
+ * Filtros del repositorio. La FECHA es el eje: la vista ordena por ella y el filtro de rango es
+ * el primero, porque la pregunta real del auditor es "¿que audite el 15 de julio?".
+ *
+ * El aislamiento por autor NO es opcional ni configurable: se aplica aqui, en la consulta. Un
+ * auditor solo agrega lo suyo aunque pida otra cosa por API.
+ */
+function repositoryFilters(request) {
+  const params = [oid(request)]
+  const where = ['a.organization_id = $1']
+  const q = request.query || {}
+  const add = (value, sql) => { params.push(value); where.push(sql.replace('$$', `$${params.length}`)) }
+
+  const canManage = request.auth.permissions.includes('checklists.manage')
+  if (!canManage) add(uid(request), 'a.auditor_id = $$')
+  else if (q.auditorId) add(Number(q.auditorId), 'a.auditor_id = $$')
+
+  if (q.dateFrom) add(String(q.dateFrom), 'a.audit_date >= $$')
+  if (q.dateTo) add(String(q.dateTo), 'a.audit_date <= $$')
+  if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
+  if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
+  if (q.shift) add(String(q.shift), 'a.shift = $$')
+  if (q.status) add(String(q.status), 'a.status = $$')
+  if (q.maxPercent) add(Number(q.maxPercent), 'a.adherence_percent < $$')
+
+  // Sujeto auditado: busca en el nombre Y en los atributos guardados (documento, cama...), que
+  // es como se pregunta de verdad ("el de la cama 203" o "CC 23.456.789"). El snapshot es jsonb,
+  // asi que se compara sobre su texto. El valor se empuja una vez y se referencia dos.
+  if (q.subject) {
+    params.push(`%${String(q.subject).toLowerCase()}%`)
+    const i = params.length
+    where.push(`EXISTS (SELECT 1 FROM checklist_audit_subjects s
+                         WHERE s.audit_id = a.id
+                           AND (lower(s.display_name) LIKE $${i}
+                                OR lower(s.attributes_snapshot::text) LIKE $${i}))`)
+  }
+
+  // Personal de turno / responsable: vive en los valores de la cabecera, que tambien son jsonb.
+  if (q.staff) add(`%${String(q.staff).toLowerCase()}%`, 'lower(a.header_values::text) LIKE $$')
+
+  return { params, where: where.join(' AND '), canManage }
+}
+
+checklistsRouter.get('/repository', checklistsModule, view, async (request, response, next) => {
+  try {
+    const { params, where } = repositoryFilters(request)
+    const page = Math.max(1, Number(request.query.page) || 1)
+    const size = Math.min(100, Math.max(5, Number(request.query.size) || 25))
+
+    const [rows, total] = await Promise.all([
+      query(
+        `SELECT a.id, a.audit_date, a.shift, a.status, a.adherence_percent, a.concept,
+                a.template_code, a.template_version, a.created_at, a.updated_at,
+                t.name AS template_name, t.subject_label,
+                COALESCE(ar.name, 'Sin servicio') AS area_name,
+                u.full_name AS auditor_name,
+                (SELECT COUNT(*)::int FROM checklist_signatures g WHERE g.audit_id = a.id) AS signature_count,
+                (SELECT COUNT(*)::int FROM checklist_audit_subjects s WHERE s.audit_id = a.id) AS subject_count,
+                (SELECT string_agg(s.display_name, ' · ' ORDER BY s.order_index)
+                   FROM checklist_audit_subjects s WHERE s.audit_id = a.id) AS subjects
+         FROM checklist_audits a
+         JOIN checklist_templates t ON t.id = a.template_id
+         LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+         JOIN users u ON u.id = a.auditor_id
+         WHERE ${where}
+         ORDER BY a.audit_date DESC, a.id DESC
+         LIMIT ${size} OFFSET ${(page - 1) * size}`,
+        params,
+      ),
+      query(`SELECT COUNT(*)::int AS n FROM checklist_audits a WHERE ${where}`, params),
+    ])
+
+    response.json({
+      rows: rows.rows.map(row => ({ ...row, id: String(row.id) })),
+      total: total.rows[0].n,
+      page,
+      size,
+      pages: Math.max(1, Math.ceil(total.rows[0].n / size)),
+    })
+  } catch (error) { next(error) }
 })
 
 // El formato EN BLANCO de la lista, listo para imprimir. Se registra antes que GET /:id porque
@@ -1277,6 +1370,8 @@ checklistsRouter.get('/audits/:auditId/report.pdf', checklistsModule, view, asyn
       adherence: payload.adherence,
     })
     const pdf = await renderPdf(html)
+    // Siempre, sea propia o ajena: un PDF sale del sistema y puede acabar en cualquier parte.
+    await logAudit(request, { auditId: audit.id, label: auditLabel(audit), action: 'DESCARGADA', detail: 'Informe PDF' })
     response.setHeader('Content-Type', 'application/pdf')
     response.setHeader('Content-Disposition', `attachment; filename="lista-chequeo-${audit.id}.pdf"`)
     response.send(pdf)

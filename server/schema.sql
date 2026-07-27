@@ -1010,3 +1010,17 @@ CREATE TABLE IF NOT EXISTS checklist_audit_log (
 -- audit_id sin FK a proposito: al BORRAR la auditoria el registro tiene que sobrevivir, que es
 -- justo el caso que mas importa auditar.
 CREATE INDEX IF NOT EXISTS checklist_audit_log_idx ON checklist_audit_log(organization_id, created_at DESC);
+
+-- Accesos a datos sensibles: consultar el detalle de una auditoria (nombre de paciente,
+-- documento, firmas) y descargar su PDF tambien son acciones que hay que poder rastrear, no solo
+-- las que modifican. Se amplia el CHECK en vez de recrear la tabla, para no perder el historico.
+ALTER TABLE checklist_audit_log DROP CONSTRAINT IF EXISTS checklist_audit_log_action_check;
+ALTER TABLE checklist_audit_log ADD CONSTRAINT checklist_audit_log_action_check
+  CHECK (action IN ('CREADA', 'EDITADA', 'CERRADA', 'REABIERTA', 'ELIMINADA', 'CONSULTADA', 'DESCARGADA'));
+
+-- El repositorio se ordena y se filtra por fecha: es el eje de la vista.
+CREATE INDEX IF NOT EXISTS checklist_audits_repo_idx
+  ON checklist_audits(organization_id, audit_date DESC, id DESC);
+-- Buscar por nombre de paciente o de colaborador sin recorrer toda la tabla.
+CREATE INDEX IF NOT EXISTS checklist_audit_subjects_name_idx
+  ON checklist_audit_subjects(lower(display_name));

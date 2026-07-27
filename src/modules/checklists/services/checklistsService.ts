@@ -1,6 +1,6 @@
 import type {
   AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
-  DataCenter, DataCenterFilters, DataCenterOptions,
+  DataCenter, DataCenterFilters, DataCenterOptions, RepositoryFilters, RepositoryPage,
   ChecklistArea, ChecklistMembership, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
@@ -124,6 +124,11 @@ export const checklistsService = {
   importSeeds: (codes?: string[]) =>
     call<{ results: { code: string; status: string; domains?: number; criteria?: number }[] }>(
       '/seed/import', { method: 'POST', body: JSON.stringify({ codes: codes || [] }) }),
+
+  // ---- Repositorio ----
+
+  repository: (filters: RepositoryFilters) =>
+    call<RepositoryPage>(`/repository${toQueryString(filters as Record<string, string | undefined>)}`),
 
   // ---- Centro de datos ----
 
