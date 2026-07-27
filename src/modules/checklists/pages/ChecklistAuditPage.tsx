@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronUp,
-  CircleDashed, Clock, CreditCard, User, UserCheck,
+  CircleDashed, Clock, CreditCard, MessageSquare, Paperclip, Settings2, User, UserCheck,
   Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
 } from 'lucide-react'
 import {
@@ -18,6 +18,17 @@ import {
 } from '../types'
 
 const identity = moduleIdentity('checklists')
+
+/** Etiqueta del anillo. Usa los mismos cortes que el semaforo del sistema, no unos propios. */
+const CONCEPT_TEXT: Record<string, string> = {
+  OPTIMO: 'Excelente', ACEPTABLE: 'Bueno', DEFICIENTE: 'Regular', MUY_DEFICIENTE: 'Crítico',
+}
+function conceptOf(percent: number) {
+  if (percent >= 90) return 'OPTIMO'
+  if (percent >= 80) return 'ACEPTABLE'
+  if (percent >= 70) return 'DEFICIENTE'
+  return 'MUY_DEFICIENTE'
+}
 const VALUES: ChecklistValue[] = ['C', 'NC', 'NA']
 
 function answerKey(subjectRowId: string, criterionId: string) { return `${subjectRowId}|${criterionId}` }
@@ -333,6 +344,7 @@ function ChecklistAuditContent() {
       </ModuleHero>
 
       <div className="eval-context">
+        <div className="eval-context-grid">
         <div className="eval-context-cell">
           <span className="eval-context-icon"><CalendarDays size={16} /></span>
           <div>
@@ -372,6 +384,8 @@ function ChecklistAuditContent() {
         <div className="eval-context-cell">
           <span className="eval-context-icon"><UserCheck size={16} /></span>
           <div><dt>Responsable</dt><dd>{audit.auditor_name}</dd></div>
+        </div>
+
         </div>
 
         <div className="eval-strip">
@@ -505,8 +519,60 @@ function ChecklistAuditContent() {
                   </button>
 
                   {!isCollapsed && (
+                    audit.subjects.length === 1 ? (
+                      <div className="dbody">
+                        {domain.criteria.map((criterion, criterionIndex) => {
+                          const subject = audit.subjects[0]
+                          const key = answerKey(subject.id, criterion.id)
+                          const current = marks[key]
+                          return (
+                            <div className="crit" key={criterion.id}>
+                              <div className="cnum">
+                                {audit.numbered_items && criterion.item_number
+                                  ? criterion.item_number
+                                  : `${domainIndex + 1}.${criterionIndex + 1}`}
+                              </div>
+                              <div className="ctext">
+                                <b>{criterion.text}</b>
+                                {criterion.guidance ? <span>{criterion.guidance}</span> : null}
+                              </div>
+                              <div className="segs">
+                                {VALUES.map(value => (
+                                  <button
+                                    key={value} type="button" disabled={closed}
+                                    title={CHECKLIST_VALUE_LABELS[value]}
+                                    className={`seg ${value} ${current === value ? 'on' : ''}`}
+                                    onClick={() => toggle(subject.id, criterion.id, value)}
+                                  >{value}</button>
+                                ))}
+                              </div>
+                              <button
+                                className="cico" type="button" disabled={closed}
+                                title="Escribir una observación"
+                                onClick={() => document.getElementById(`obs-${criterion.id}`)?.focus()}
+                              ><MessageSquare size={15} /></button>
+                              <input
+                                id={`obs-${criterion.id}`}
+                                className="cobs" disabled={closed}
+                                placeholder="Observación (opcional)…"
+                                value={notesByAnswer[key] ?? ''}
+                                onChange={event => {
+                                  setNotesByAnswer(current => ({ ...current, [key]: event.target.value }))
+                                  setDirty(true)
+                                }}
+                              />
+                              <button
+                                className="cico" type="button" disabled={closed}
+                                title="Adjuntar evidencia a este criterio"
+                                onClick={() => document.querySelector<HTMLElement>('.eval-drop')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                              ><Paperclip size={15} /></button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
                     <div className="checklist-fill-wrap eval-domain-body">
-                      <table className="checklist-fill-grid">
+                      <table className="checklist-fill-grid has-many">
                         <thead>
                           <tr>
                             <th className="fill-criterion">Criterio</th>
@@ -522,7 +588,7 @@ function ChecklistAuditContent() {
                                 <div className="fill-criterion-text">
                                   <span className="fill-num">
                                     {audit.numbered_items && criterion.item_number
-                                      ? `${criterion.item_number}.`
+                                      ? criterion.item_number
                                       : `${domainIndex + 1}.${criterionIndex + 1}`}
                                   </span>
                                   <span>{criterion.text}</span>
@@ -544,23 +610,6 @@ function ChecklistAuditContent() {
                                         >{value}</button>
                                       ))}
                                     </div>
-                                    {/* Observacion por criterio. Solo con un sujeto: con varios
-                                        columnas de texto libre la fila se vuelve ilegible, y la
-                                        observacion general del pie cubre ese caso. */}
-                                    {audit.subjects.length === 1 && (
-                                      <div className="fill-extra mt-2">
-                                        <input
-                                          className="fill-note"
-                                          disabled={closed}
-                                          placeholder="Observación (opcional)…"
-                                          value={notesByAnswer[answerKey(subject.id, criterion.id)] ?? ''}
-                                          onChange={event => {
-                                            setNotesByAnswer(current => ({ ...current, [answerKey(subject.id, criterion.id)]: event.target.value }))
-                                            setDirty(true)
-                                          }}
-                                        />
-                                      </div>
-                                    )}
                                   </td>
                                 )
                               })}
@@ -569,6 +618,7 @@ function ChecklistAuditContent() {
                         </tbody>
                       </table>
                     </div>
+                    )
                   )}
                 </section>
               )
@@ -579,64 +629,90 @@ function ChecklistAuditContent() {
               marca sin dejar de marcar. En pantalla angosta se pliega arriba (ver CSS) para no
               robarle ancho a la grilla, que es donde se trabaja. */}
           <aside className="eval-summary">
-            <div className="eval-summary-inner">
-              <div className="eval-ring">
-                <ProgressRing percent={shownPercent} size={132} strokeWidth={12} showLabel={false} />
-                <div className="eval-ring-center">
-                  <strong style={{ color: shownPercent === null ? 'var(--muted)' : semaphoreColor(shownPercent) }}>
-                    {shownPercent === null ? '—' : `${shownPercent.toFixed(0)}%`}
-                  </strong>
-                  <span>Cumplimiento</span>
+            <div className="summary">
+              <div className="scard">
+                <div className="shead">
+                  <b>Resumen ejecutivo</b>
+                  <span className="cfg" title="La escala y los cortes del semáforo son fijos en todo el sistema"><Settings2 size={14} /></span>
+                </div>
+                <div className="ring-wrap">
+                  <div className="ring">
+                    {/* Anillo propio y no ProgressRing: la maqueta pide 170 px con degradado
+                        violeta -> cian y tres lineas dentro, que el componente compartido no
+                        dibuja. El valor sigue saliendo del mismo calculo. */}
+                    <svg width="170" height="170" viewBox="0 0 170 170">
+                      <circle cx="85" cy="85" r="74" fill="none" stroke="#EDEFF6" strokeWidth="15" />
+                      <circle
+                        cx="85" cy="85" r="74" fill="none" stroke="url(#ringGrad)" strokeWidth="15"
+                        strokeLinecap="round" strokeDasharray={464.9}
+                        strokeDashoffset={464.9 - (464.9 * Math.max(0, Math.min(100, shownPercent ?? 0))) / 100}
+                        style={{ transition: 'stroke-dashoffset 600ms cubic-bezier(.22,1,.36,1)' }}
+                      />
+                      <defs>
+                        <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0" stopColor="#5B4BE8" /><stop offset="1" stopColor="#38BDF8" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="ctr">
+                      <div className="lbl">Cumplimiento general</div>
+                      <div className="pct">{shownPercent === null ? '—' : `${shownPercent.toFixed(0)}%`}</div>
+                      {shownPercent !== null && (
+                        <div className="tag" style={{
+                          background: `color-mix(in srgb, ${semaphoreColor(shownPercent)} 14%, white)`,
+                          color: semaphoreColor(shownPercent),
+                        }}>● {CONCEPT_TEXT[conceptOf(shownPercent)]}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="stat3">
+                  <div className="s"><div className="n">{totalCells}</div><div className="l">Total ítems</div></div>
+                  <div className="s"><div className="n">{markedCells}</div><div className="l">Respondidos</div></div>
+                  <div className="s"><div className="n pend">{closed ? 0 : localPending}</div><div className="l">Pendientes</div></div>
                 </div>
               </div>
-              <p className="eval-ring-sub">{markedCells} de {totalCells} marcas</p>
 
-              <div className="eval-counters">
-                <div><b>{markedCells}</b><span>Respuestas</span></div>
-                <div><b className={findings ? 'is-bad' : ''}>{findings}</b><span>Hallazgos</span></div>
-                <div><b>{closed ? 0 : localPending}</b><span>Pendientes</span></div>
-              </div>
-
-              <div className="eval-meta">
-                <span><Badge tone={closed ? 'info' : 'neutral'}>{closed ? 'Finalizada' : 'En proceso'}</Badge></span>
-                <span className="eval-clock"><Clock size={13} /> {clock}</span>
-              </div>
-
-              <h4 className="eval-summary-title">Cumplimiento por dominio</h4>
-              <div className="eval-domain-bars">
-                {audit.domains.map(domain => {
+              <div className="scard cat">
+                <h5>Cumplimiento por categoría</h5>
+                {audit.domains.map((domain, index) => {
                   const tally = domainTally(domain)
                   return (
-                    <div key={domain.id} className="eval-domain-bar">
-                      <span className="nm" title={domain.name}>{domain.name}</span>
-                      <span className="tk">
+                    <div className="catrow" key={domain.id}>
+                      <div className="top">
+                        <span>
+                          <span className="cn" style={{ background: identity.color }}>{index + 1}</span>
+                          {domain.name}
+                        </span>
+                        <b>{tally.percent === null ? '—' : `${tally.percent.toFixed(0)}%`}</b>
+                      </div>
+                      <div className="bar">
                         <i style={{
                           width: `${tally.percent ?? 0}%`,
-                          background: tally.percent === null ? 'var(--muted)' : semaphoreColor(tally.percent),
+                          background: tally.percent === null ? '#CBD5E1' : semaphoreColor(tally.percent),
                         }} />
-                      </span>
-                      <span className="pv" style={{ color: tally.percent === null ? 'var(--muted)' : semaphoreColor(tally.percent) }}>
-                        {tally.percent === null ? '—' : `${tally.percent.toFixed(0)}%`}
-                      </span>
+                      </div>
                     </div>
                   )
                 })}
               </div>
 
-              {findings > 0 && (
-                <div className="eval-findings">
-                  <AlertTriangle size={17} />
-                  <div>
-                    <strong>{findings} hallazgo{findings === 1 ? '' : 's'}</strong>
-                    <small>Marcados como NC: requieren acción</small>
-                  </div>
+              <div className="alert crit">
+                <div className="ic"><AlertTriangle size={16} /></div>
+                <div className="tx">
+                  <b>Hallazgos críticos</b>
+                  <span>Ítems marcados como NC que requieren acción inmediata.</span>
                 </div>
-              )}
+                <div className="big">{findings}</div>
+              </div>
 
-              <div className="eval-legend">
-                <span><i className="is-c" /> Cumple</span>
-                <span><i className="is-nc" /> No cumple</span>
-                <span><i className="is-na" /> No aplica</span>
+              <div className="alert ev">
+                <div className="ic"><Paperclip size={16} /></div>
+                <div className="tx">
+                  <b>Evidencias cargadas</b>
+                  <span>Archivos e imágenes adjuntadas a esta evaluación.</span>
+                </div>
+                <div className="big">{(audit.evidences || []).length}</div>
               </div>
             </div>
           </aside>
@@ -653,6 +729,11 @@ function ChecklistAuditContent() {
         onRemove={removeEvidence}
         onNotesChange={value => { setNotes(value); setDirty(true) }}
       />
+
+      <div className="scale-note">
+        <Info size={14} /> Escala: <strong>C</strong> = Cumple · <strong>NC</strong> = No cumple ·
+        {' '}<strong>NA</strong> = No aplica. NA se excluye del cálculo.
+      </div>
 
       <SignaturesCard
         signatures={audit.signatures}

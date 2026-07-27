@@ -62,7 +62,7 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   // --m-listas (azul, tono 230) — Listas de Chequeo
   // Violeta/indigo por decision del usuario sobre la maqueta aprobada. Se separa de
   // --m-matrices (magenta, tono 300) lo suficiente para no confundirse en el sidebar.
-  checklists: { key: 'checklists', color: '#6366f1', gradientFrom: '#6366f1', gradientTo: '#8b5cf6' },
+  checklists: { key: 'checklists', color: '#5B4BE8', gradientFrom: '#5B4BE8', gradientTo: '#8B5CF6' },
   // --m-usuarios (rosa-fucsia, tono 350)
   admin: { key: 'admin', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
   users: { key: 'users', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
