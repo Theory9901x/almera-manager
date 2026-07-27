@@ -1376,6 +1376,8 @@ function repositoryFilters(request) {
   if (q.dateFrom) add(String(q.dateFrom), 'a.audit_date >= $$')
   if (q.dateTo) add(String(q.dateTo), 'a.audit_date <= $$')
   if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
+  // Mismo filtro por sede que en el centro de datos.
+  if (q.center) add(String(q.center), 'EXISTS (SELECT 1 FROM checklist_areas ca WHERE ca.id = a.area_id AND ca.center = $$)')
   if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
   if (q.shift) add(String(q.shift), 'a.shift = $$')
   if (q.status) add(String(q.status), 'a.status = $$')
@@ -1757,6 +1759,9 @@ function dataCenterFilters(request) {
 
   if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
   if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
+  // Centro de atencion: recorta a TODOS los servicios de esa sede. Es un filtro propio, no un
+  // prefijo del servicio: primero la sede, luego (opcional) el servicio concreto.
+  if (q.center) add(String(q.center), 'EXISTS (SELECT 1 FROM checklist_areas ca WHERE ca.id = a.area_id AND ca.center = $$)')
   if (q.auditorId) add(Number(q.auditorId), 'a.auditor_id = $$')
   if (q.shift) add(String(q.shift), 'a.shift = $$')
   if (q.dateFrom) add(String(q.dateFrom), 'a.audit_date >= $$')
@@ -1992,16 +1997,20 @@ checklistsRouter.post('/analytics/datacenter.pdf', checklistsModule, view, async
   } catch (error) { next(error) }
 })
 
-/** Opciones para armar los desplegables del panel de filtros. */
+/** Opciones para armar los desplegables del panel de filtros.
+ *  Listas y servicios se listan COMPLETOS (todo el catalogo activo), no solo los que ya tienen
+ *  rondas: un filtro que solo ofrece lo ya auditado parece un catalogo incompleto y no deja
+ *  preguntar "¿por que este servicio no tiene rondas?". Los servicios llevan su CENTRO, porque
+ *  el filtro los presenta en dos campos separados: primero la sede, luego el servicio. */
 checklistsRouter.get('/analytics/options', checklistsModule, view, async (request, response, next) => {
   try {
     const [templates, areas, auditors, shifts, domains] = await Promise.all([
-      query(`SELECT DISTINCT t.id, t.name, t.code FROM checklist_templates t
-               JOIN checklist_audits a ON a.template_id = t.id
-              WHERE a.organization_id = $1 ORDER BY t.name`, [oid(request)]),
-      query(`SELECT DISTINCT ar.id, ar.name FROM checklist_areas ar
-               JOIN checklist_audits a ON a.area_id = ar.id
-              WHERE a.organization_id = $1 ORDER BY ar.name`, [oid(request)]),
+      query(`SELECT t.id, t.name, t.code FROM checklist_templates t
+              WHERE t.organization_id = $1 AND t.status <> 'ARCHIVADA' ORDER BY t.name`, [oid(request)]),
+      query(`SELECT ar.id, ar.name, ar.center FROM checklist_areas ar
+              WHERE ar.organization_id = $1 AND ar.active
+              ORDER BY CASE WHEN ar.center LIKE 'Hospital Central%' THEN 0
+                            WHEN ar.center = '' THEN 2 ELSE 1 END, ar.center, ar.name`, [oid(request)]),
       query(`SELECT DISTINCT u.id, u.full_name AS name FROM users u
                JOIN checklist_audits a ON a.auditor_id = u.id
               WHERE a.organization_id = $1 ORDER BY u.full_name`, [oid(request)]),
@@ -2014,6 +2023,8 @@ checklistsRouter.get('/analytics/options', checklistsModule, view, async (reques
     response.json({
       templates: templates.rows.map(r => ({ ...r, id: String(r.id) })),
       areas: areas.rows.map(r => ({ ...r, id: String(r.id) })),
+      // Centros unicos, en el mismo orden de las areas (HOCY primero).
+      centers: [...new Set(areas.rows.map(r => r.center))],
       auditors: auditors.rows.map(r => ({ ...r, id: String(r.id) })),
       shifts: shifts.rows.map(r => r.shift),
       domains: domains.rows.map(r => ({ ...r, id: String(r.id) })),

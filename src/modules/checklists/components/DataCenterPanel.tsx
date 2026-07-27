@@ -134,6 +134,7 @@ export function DataCenterPanel() {
     const out: { key: keyof DataCenterFilters; label: string }[] = []
     const name = (list: { id: string; name: string }[], id?: string) => list.find(x => x.id === id)?.name
     if (filters.templateId) out.push({ key: 'templateId', label: `Lista: ${name(options.templates, filters.templateId) || filters.templateId}` })
+    if (filters.center) out.push({ key: 'center', label: `Centro: ${filters.center === 'SIN' ? 'Sin centro' : filters.center}` })
     if (filters.areaId) out.push({ key: 'areaId', label: `Servicio: ${name(options.areas, filters.areaId) || filters.areaId}` })
     if (filters.auditorId) out.push({ key: 'auditorId', label: `Auditor: ${name(options.auditors, filters.auditorId) || filters.auditorId}` })
     if (filters.domainId) out.push({ key: 'domainId', label: `Dominio: ${name(options.domains, filters.domainId) || filters.domainId}` })
@@ -148,9 +149,20 @@ export function DataCenterPanel() {
   const scope = useMemo(() => {
     if (!options) return 'Visión general'
     if (filters.templateId) return `Lista: ${options.templates.find(t => t.id === filters.templateId)?.name || ''}`
-    if (filters.areaId) return `Servicio: ${options.areas.find(a => a.id === filters.areaId)?.name || ''}`
+    if (filters.areaId) {
+      const area = options.areas.find(a => a.id === filters.areaId)
+      return `Servicio: ${area ? `${area.center ? `${area.center} — ` : ''}${area.name}` : ''}`
+    }
+    if (filters.center) return `Centro: ${filters.center === 'SIN' ? 'Sin centro' : filters.center}`
     return 'Visión general — todas las listas y servicios'
-  }, [filters.templateId, filters.areaId, options])
+  }, [filters.templateId, filters.areaId, filters.center, options])
+
+  // Servicios de la sede elegida; sin sede, el catalogo entero. 'SIN' agrupa las areas sin centro.
+  const centerAreas = useMemo(() => {
+    if (!options) return []
+    if (!filters.center) return options.areas
+    return options.areas.filter(area => (area.center || 'SIN') === filters.center)
+  }, [options, filters.center])
 
   // Busqueda y paginacion de la tabla, en el cliente: el recorte ya viene acotado del servidor
   // (<=300 filas) y paginarlo alla obligaria a otro viaje por cada tecla.
@@ -262,9 +274,22 @@ export function DataCenterPanel() {
                 <Select value={filters.templateId || 'ALL'} onChange={value => set({ templateId: value === 'ALL' ? undefined : value })}
                   options={[{ value: 'ALL', label: 'Todas' }, ...options.templates.map(t => ({ value: t.id, label: t.name }))]} />
               </div>
+              {/* Centro y servicio SEPARADOS, en ese orden: primero la sede, luego su servicio.
+                  El catalogo es completo (los 47 sembrados), no solo lo ya auditado. */}
+              <div className="dcx-fgroup"><label>Centro de atención</label>
+                <Select value={filters.center || 'ALL'}
+                  onChange={value => {
+                    const next = value === 'ALL' ? undefined : value
+                    // Al cambiar de sede, un servicio elegido de otra sede deja de valer.
+                    setFilters(current => ({ ...current, center: next, areaId: undefined }))
+                  }}
+                  options={[{ value: 'ALL', label: 'Todos' },
+                    ...options.centers.map(item => ({ value: item || 'SIN', label: item || 'Sin centro' }))]} />
+              </div>
               <div className="dcx-fgroup"><label>Servicio / proceso</label>
                 <Select value={filters.areaId || 'ALL'} onChange={value => set({ areaId: value === 'ALL' ? undefined : value })}
-                  options={[{ value: 'ALL', label: 'Todos' }, ...options.areas.map(a => ({ value: a.id, label: a.name }))]} />
+                  options={[{ value: 'ALL', label: filters.center ? 'Todos los de la sede' : 'Todos' },
+                    ...centerAreas.map(a => ({ value: a.id, label: filters.center ? a.name : `${a.center ? `${a.center} · ` : ''}${a.name}` }))]} />
               </div>
               <div className="dcx-fgroup"><label>Auditor</label>
                 <Select value={filters.auditorId || 'ALL'} onChange={value => set({ auditorId: value === 'ALL' ? undefined : value })}

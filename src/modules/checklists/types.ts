@@ -281,6 +281,8 @@ export interface AuditDetail {
 export interface DataCenterFilters {
   templateId?: string
   areaId?: string
+  /** Centro de atención (sede): recorta a todos los servicios de esa sede. */
+  center?: string
   auditorId?: string
   domainId?: string
   shift?: string
@@ -343,7 +345,10 @@ export interface DataCenter {
 
 export interface DataCenterOptions {
   templates: { id: string; name: string; code: string }[]
-  areas: { id: string; name: string }[]
+  /** Catálogo COMPLETO de servicios activos, con su centro; no solo los que ya tienen rondas. */
+  areas: { id: string; name: string; center: string }[]
+  /** Centros únicos, en orden institucional (HOCY primero). */
+  centers: string[]
   auditors: { id: string; name: string }[]
   shifts: string[]
   domains: { id: string; name: string }[]
@@ -355,6 +360,8 @@ export interface RepositoryFilters {
   dateFrom?: string
   dateTo?: string
   areaId?: string
+  /** Centro de atención (sede). */
+  center?: string
   templateId?: string
   auditorId?: string
   /** Nombre, documento o cualquier atributo del sujeto (cama, documento…). */

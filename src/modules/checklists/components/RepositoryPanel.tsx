@@ -61,6 +61,7 @@ export function RepositoryPanel({ canManage }: { canManage: boolean }) {
     const name = (list: { id: string; name: string }[] | undefined, id?: string) => list?.find(x => x.id === id)?.name
     if (filters.dateFrom) out.push({ key: 'dateFrom', label: `Desde ${filters.dateFrom}` })
     if (filters.dateTo) out.push({ key: 'dateTo', label: `Hasta ${filters.dateTo}` })
+    if (filters.center) out.push({ key: 'center', label: `Centro: ${filters.center === 'SIN' ? 'Sin centro' : filters.center}` })
     if (filters.areaId) out.push({ key: 'areaId', label: `Servicio: ${name(options?.areas, filters.areaId) || filters.areaId}` })
     if (filters.templateId) out.push({ key: 'templateId', label: `Lista: ${name(options?.templates, filters.templateId) || filters.templateId}` })
     if (filters.auditorId) out.push({ key: 'auditorId', label: `Auditor: ${name(options?.auditors, filters.auditorId) || filters.auditorId}` })
@@ -124,11 +125,28 @@ export function RepositoryPanel({ canManage }: { canManage: boolean }) {
         <div className="dc-filters">
           <Field label="Desde"><DatePicker value={filters.dateFrom || ''} onChange={value => set({ dateFrom: value || undefined })} /></Field>
           <Field label="Hasta"><DatePicker value={filters.dateTo || ''} onChange={value => set({ dateTo: value || undefined })} /></Field>
+          {/* Centro y servicio como DOS campos, en ese orden — igual que al abrir la ronda. */}
+          <Field label="Centro de atención">
+            <Select
+              value={filters.center || 'ALL'}
+              onChange={value => {
+                const next = value === 'ALL' ? undefined : value
+                setPage(1)
+                // El servicio elegido era de otra sede: se limpia junto con el cambio de centro.
+                setFilters(current => ({ ...current, center: next, areaId: undefined }))
+              }}
+              options={[{ value: 'ALL', label: 'Todos' },
+                ...(options?.centers || []).map(item => ({ value: item || 'SIN', label: item || 'Sin centro' }))]}
+            />
+          </Field>
           <Field label="Servicio">
             <Select
               value={filters.areaId || 'ALL'}
               onChange={value => set({ areaId: value === 'ALL' ? undefined : value })}
-              options={[{ value: 'ALL', label: 'Todos' }, ...(options?.areas || []).map(a => ({ value: a.id, label: a.name }))]}
+              options={[{ value: 'ALL', label: filters.center ? 'Todos los de la sede' : 'Todos' },
+                ...(options?.areas || [])
+                  .filter(a => !filters.center || (a.center || 'SIN') === filters.center)
+                  .map(a => ({ value: a.id, label: filters.center ? a.name : `${a.center ? `${a.center} · ` : ''}${a.name}` }))]}
             />
           </Field>
           <Field label="Lista">
