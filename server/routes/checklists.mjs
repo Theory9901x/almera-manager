@@ -1,4 +1,8 @@
 import { Router } from 'express'
+import multer from 'multer'
+import { randomUUID } from 'node:crypto'
+import { mkdir, unlink } from 'node:fs/promises'
+import { extname, join, resolve, sep } from 'node:path'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { computeAdherence, conceptFromPercent, isChecklistValue } from '../checklistScoring.mjs'
@@ -309,11 +313,14 @@ async function persistResults(client, auditId, result) {
 
 async function auditPayload(audit) {
   const structure = await loadStructure(audit.template_id)
-  const [subjects, answers, headerFields, signatures] = await Promise.all([
+  const [subjects, answers, headerFields, signatures, evidences] = await Promise.all([
     query('SELECT * FROM checklist_audit_subjects WHERE audit_id = $1 ORDER BY order_index, id', [audit.id]),
     query('SELECT * FROM checklist_answers WHERE audit_id = $1', [audit.id]),
     query('SELECT * FROM checklist_header_fields WHERE template_id = $1 ORDER BY order_index, id', [audit.template_id]),
     query('SELECT * FROM checklist_signatures WHERE audit_id = $1 ORDER BY signed_at', [audit.id]),
+    query(`SELECT e.*, u.full_name AS uploaded_by_name FROM checklist_evidences e
+             LEFT JOIN users u ON u.id = e.uploaded_by_id
+            WHERE e.audit_id = $1 ORDER BY e.created_at`, [audit.id]),
   ])
   const result = computeAdherence({
     domains: structure.domains,
@@ -331,6 +338,7 @@ async function auditPayload(audit) {
     subjects: subjects.rows,
     answers: answers.rows,
     signatures: signatures.rows,
+    evidences: evidences.rows.map(row => ({ ...row, id: String(row.id) })),
     adherence: { ...result, concept: conceptFromPercent(result.overall.percent) },
   }
 }
@@ -597,6 +605,121 @@ checklistsRouter.put('/audits/:auditId/answers', checklistsModule, fill, async (
     await client.query('ROLLBACK').catch(() => {})
     next(error)
   } finally { client.release() }
+})
+
+
+// ---- Evidencias de una auditoria ----
+//
+// Los archivos NO se sirven como estatico publico, a diferencia de las presentaciones de
+// encuestas: aqui una foto puede mostrar a un paciente o una historia clinica. Se guardan fuera
+// del arbol servido y se entregan solo por la ruta de descarga de abajo, que vuelve a pasar por
+// assertAudit — es decir, por el mismo aislamiento por autor que el resto.
+const evidenceRoot = resolve(process.env.CHECKLISTS_UPLOAD_DIR || 'uploads/checklists')
+await mkdir(evidenceRoot, { recursive: true }).catch(() => {})
+
+// El despliegue crea una carpeta nueva por release y solo enlaza .env; lo que quede dentro del
+// release se pierde en el siguiente. Si la ruta de evidencias cae ahi, el sistema seguiria
+// funcionando y las fotos desapareceran sin que nadie se entere hasta que hagan falta. Se avisa
+// fuerte al arrancar en vez de dejarlo en silencio.
+if (evidenceRoot.split(sep).includes('releases')) {
+  console.warn(
+    `[checklists] AVISO: las evidencias se estan guardando dentro del release (${evidenceRoot}). ` +
+    'Se perderan en el proximo despliegue. Define CHECKLISTS_UPLOAD_DIR apuntando a la carpeta compartida.',
+  )
+}
+
+const EVIDENCE_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif', 'application/pdf',
+])
+
+const evidenceUpload = multer({
+  storage: multer.diskStorage({
+    destination: evidenceRoot,
+    // Nombre generado, nunca el del usuario: un nombre original puede traer rutas ("../") o
+    // caracteres que el sistema de archivos interprete.
+    filename: (_request, file, callback) => callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase().slice(0, 8)}`),
+  }),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_request, file, callback) => {
+    if (EVIDENCE_TYPES.has(file.mimetype)) return callback(null, true)
+    const error = new Error('Solo se permiten imágenes (JPG, PNG, WEBP, HEIC) o PDF de hasta 10 MB')
+    error.status = 415
+    callback(error)
+  },
+})
+
+checklistsRouter.post('/audits/:auditId/evidences', checklistsModule, fill, evidenceUpload.single('file'), async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request, { requireOpen: true })
+    if (!request.file) fail(400, 'No llegó ningún archivo')
+    const inserted = await query(
+      `INSERT INTO checklist_evidences (audit_id, criterion_id, audit_subject_id, stored_name,
+                                        original_name, mime_type, size_bytes, uploaded_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [audit.id,
+        request.body?.criterionId ? Number(request.body.criterionId) : null,
+        request.body?.auditSubjectId ? Number(request.body.auditSubjectId) : null,
+        request.file.filename, request.file.originalname, request.file.mimetype, request.file.size,
+        uid(request)],
+    )
+    await logAudit(request, {
+      auditId: audit.id, label: auditLabel(audit), action: 'EDITADA',
+      detail: `Adjuntó evidencia "${request.file.originalname}"`,
+    })
+    response.status(201).json({ ...inserted.rows[0], id: String(inserted.rows[0].id) })
+  } catch (error) { next(error) }
+})
+
+// Descarga. Pasa por assertAudit a proposito: si el archivo se sirviera por su nombre desde una
+// carpeta estatica, cualquiera con la URL lo tendria, y esa URL viaja en el HTML.
+checklistsRouter.get('/audits/:auditId/evidences/:evidenceId', checklistsModule, view, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request)
+    const result = await query(
+      'SELECT * FROM checklist_evidences WHERE id = $1 AND audit_id = $2',
+      [Number(request.params.evidenceId), audit.id],
+    )
+    const evidence = result.rows[0]
+    if (!evidence) fail(404, 'Evidencia no encontrada')
+    await logAudit(request, {
+      auditId: audit.id, label: auditLabel(audit), action: 'DESCARGADA',
+      detail: `Evidencia "${evidence.original_name}"`,
+    })
+    response.setHeader('Content-Type', evidence.mime_type || 'application/octet-stream')
+    response.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(evidence.original_name)}"`)
+    response.sendFile(join(evidenceRoot, evidence.stored_name))
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.delete('/audits/:auditId/evidences/:evidenceId', checklistsModule, fill, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request, { requireOpen: true })
+    const result = await query(
+      'DELETE FROM checklist_evidences WHERE id = $1 AND audit_id = $2 RETURNING *',
+      [Number(request.params.evidenceId), audit.id],
+    )
+    const evidence = result.rows[0]
+    if (!evidence) fail(404, 'Evidencia no encontrada')
+    // El archivo se borra despues de la fila: si falla el disco, no queda una fila apuntando a
+    // algo que ya no esta.
+    await unlink(join(evidenceRoot, evidence.stored_name)).catch(() => {})
+    await logAudit(request, {
+      auditId: audit.id, label: auditLabel(audit), action: 'EDITADA',
+      detail: `Quitó la evidencia "${evidence.original_name}"`,
+    })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
+// Observaciones generales de la ronda.
+checklistsRouter.put('/audits/:auditId/notes', checklistsModule, fill, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request, { requireOpen: true })
+    const notes = String(request.body?.notes ?? '').slice(0, 4000)
+    await query('UPDATE checklist_audits SET notes = $1, updated_at = NOW(), updated_by_id = $2 WHERE id = $3',
+      [notes, uid(request), audit.id])
+    response.json({ ok: true })
+  } catch (error) { next(error) }
 })
 
 // ---- Firmas ----

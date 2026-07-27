@@ -10,6 +10,7 @@ import {
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
 import { SignaturePad } from '../components/SignaturePad'
+import { EvidencesCard } from '../components/EvidencesCard'
 import {
   CHECKLIST_VALUE_LABELS, type AuditDetail, type ChecklistField, type ChecklistValue,
   type DirectorySubject, type SignerSuggestion,
@@ -49,6 +50,7 @@ function ChecklistAuditContent() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const startedAt = useRef(Date.now())
   const [elapsed, setElapsed] = useState(0)
+  const [notes, setNotes] = useState('')
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -56,6 +58,7 @@ function ChecklistAuditContent() {
     for (const answer of detail.answers) next[answerKey(answer.audit_subject_id, answer.criterion_id)] = answer.value
     setMarks(next)
     setHeader(detail.header_values || {})
+    setNotes(detail.notes || '')
     setDirty(false)
     headerDirty.current = false
   }
@@ -117,11 +120,29 @@ function ChecklistAuditContent() {
     setSaveState('idle')
   }
 
+  async function addEvidence(file: File) {
+    if (!audit) return
+    await checklistsService.addEvidence(audit.id, file)
+    await load()
+    toast.push('success', 'Evidencia adjuntada')
+  }
+
+  async function removeEvidence(evidenceId: string) {
+    if (!audit) return
+    try {
+      await checklistsService.removeEvidence(audit.id, evidenceId)
+      await load()
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible quitar la evidencia') }
+  }
+
   async function saveAll() {
     if (!audit || !dirty) return
     setSaveState('saving')
     try {
       if (headerDirty.current) await checklistsService.updateAudit(audit.id, { headerValues: header })
+      // Las observaciones van con el mismo boton "Guardar": para el auditor es una sola accion,
+      // no dos cosas que se guardan por separado.
+      if ((audit.notes || '') !== notes) await checklistsService.saveNotes(audit.id, notes)
       // Se manda tambien lo desmarcado (value null) para que el servidor borre esas filas: sin
       // esto, deshacer una marca no se persistiria nunca.
       const payload: { auditSubjectId: string; criterionId: string; value: ChecklistValue | null }[] = []
@@ -530,6 +551,17 @@ function ChecklistAuditContent() {
           </aside>
         </div>
       )}
+
+      <EvidencesCard
+        auditId={audit.id}
+        evidences={audit.evidences || []}
+        notes={notes}
+        closed={closed}
+        evidenceUrl={checklistsService.evidenceUrl}
+        onUpload={addEvidence}
+        onRemove={removeEvidence}
+        onNotesChange={value => { setNotes(value); setDirty(true) }}
+      />
 
       <SignaturesCard
         signatures={audit.signatures}

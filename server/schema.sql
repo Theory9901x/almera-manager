@@ -1024,3 +1024,27 @@ CREATE INDEX IF NOT EXISTS checklist_audits_repo_idx
 -- Buscar por nombre de paciente o de colaborador sin recorrer toda la tabla.
 CREATE INDEX IF NOT EXISTS checklist_audit_subjects_name_idx
   ON checklist_audit_subjects(lower(display_name));
+
+-- Evidencias de una auditoria: fotos y documentos que respaldan una calificacion.
+--
+-- El archivo NO se sirve como estatico publico, a diferencia de las presentaciones de encuestas:
+-- aqui una foto puede mostrar a un paciente o una historia clinica. Se entrega solo por una ruta
+-- autenticada que vuelve a comprobar quien puede ver esa auditoria.
+CREATE TABLE IF NOT EXISTS checklist_evidences (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  -- Nulos = evidencia general de la ronda; con valor = evidencia de un criterio concreto.
+  criterion_id BIGINT REFERENCES checklist_criteria(id) ON DELETE SET NULL,
+  audit_subject_id BIGINT REFERENCES checklist_audit_subjects(id) ON DELETE CASCADE,
+  stored_name TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL DEFAULT '',
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  uploaded_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_evidences_idx ON checklist_evidences(audit_id, created_at);
+
+-- Observaciones generales de la ronda: van en la auditoria, no por criterio (esas ya existen en
+-- checklist_answers.observation).
+ALTER TABLE checklist_audits ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';

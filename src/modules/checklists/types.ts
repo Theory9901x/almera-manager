@@ -242,6 +242,8 @@ export interface AuditDetail {
   subjects: AuditSubject[]
   answers: ChecklistAnswer[]
   signatures: ChecklistSignature[]
+  evidences: ChecklistEvidence[]
+  notes: string
   adherence: AdherenceResult
   /** Solo al reabrir: cuántas firmas se invalidaron por volver a editar la auditoría. */
   invalidatedSignatures?: number
@@ -350,4 +352,16 @@ export interface RepositoryPage {
   page: number
   size: number
   pages: number
+}
+
+/** Evidencia adjunta a una auditoría (foto o PDF). Solo se descarga por ruta autenticada. */
+export interface ChecklistEvidence {
+  id: string
+  criterion_id: string | null
+  audit_subject_id: string | null
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  uploaded_by_name: string | null
+  created_at: string
 }

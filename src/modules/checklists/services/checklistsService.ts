@@ -110,6 +110,29 @@ export const checklistsService = {
   removeSignature: (auditId: string, signatureId: string) =>
     call<{ ok: true }>(`/audits/${auditId}/signatures/${signatureId}`, { method: 'DELETE' }),
 
+  // ---- Evidencias y observaciones ----
+
+  /** Sube un archivo. Va por FormData, no JSON: una foto en base64 crece un tercio y hay que
+   *  sostenerla entera en memoria en los dos extremos. */
+  addEvidence: async (auditId: string, file: File, criterionId?: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (criterionId) form.append('criterionId', criterionId)
+    const response = await fetch(`/api/checklists/audits/${auditId}/evidences`, {
+      method: 'POST', credentials: 'same-origin', body: form,
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'No fue posible subir la evidencia')
+    return data
+  },
+  removeEvidence: (auditId: string, evidenceId: string) =>
+    call<{ ok: true }>(`/audits/${auditId}/evidences/${evidenceId}`, { method: 'DELETE' }),
+  evidenceUrl: (auditId: string, evidenceId: string) =>
+    `/api/checklists/audits/${auditId}/evidences/${evidenceId}`,
+
+  saveNotes: (auditId: string, notes: string) =>
+    call<{ ok: true }>(`/audits/${auditId}/notes`, { method: 'PUT', body: JSON.stringify({ notes }) }),
+
   // ---- Fase 4: analítica e informes ----
 
   analytics: (filters: AnalyticsFilters = {}) =>
