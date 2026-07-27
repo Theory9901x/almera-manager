@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus } from 'lucide-react'
+import { ArrowLeft, Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, SaveStatusIndicator, Select,
   ToastProvider, moduleIdentity, semaphoreColor, useToast,
@@ -39,6 +39,7 @@ function ChecklistAuditContent() {
   const [header, setHeader] = useState<Record<string, string>>({})
   const [showSubjectForm, setShowSubjectForm] = useState(false)
   const [signers, setSigners] = useState<SignerSuggestion[]>([])
+  const [exporting, setExporting] = useState(false)
   const headerDirty = useRef(false)
 
   function hydrate(detail: AuditDetail) {
@@ -157,6 +158,14 @@ function ChecklistAuditContent() {
     finally { setBusy(false) }
   }
 
+  async function exportPdf() {
+    if (!audit) return
+    setExporting(true)
+    try { await checklistsService.downloadAuditReport(audit.id) }
+    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible generar el informe') }
+    finally { setExporting(false) }
+  }
+
   async function addSignature(signerName: string, signerRole: string, signatureImage: string) {
     if (!audit) return
     setBusy(true)
@@ -223,6 +232,9 @@ function ChecklistAuditContent() {
             <SaveStatusIndicator state={saveState} />
             <Badge tone={closed ? 'info' : 'neutral'}>{closed ? 'Cerrada' : 'Borrador'}</Badge>
             {!closed && <Button identity={identity} onClick={() => void saveAll()} disabled={!dirty || saveState === 'saving'}><Save size={15} /> Guardar</Button>}
+            <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => void exportPdf()} disabled={exporting}>
+              <Download size={15} /> {exporting ? 'Generando…' : 'Informe PDF'}
+            </Button>
             {!closed
               ? <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => void closeAudit()} disabled={busy}><Lock size={15} /> Cerrar auditoría</Button>
               : <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => void reopenAudit()} disabled={busy}><Unlock size={15} /> Reabrir</Button>}

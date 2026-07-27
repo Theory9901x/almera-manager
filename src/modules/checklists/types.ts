@@ -148,6 +148,40 @@ export interface AuditSummary {
   subject_count: number
 }
 
+// ---- Fase 4: analítica ----
+
+/** Fila agregada. `percent` en null = nada aplicable (todo NA), nunca 0 %. */
+export interface AnalyticsRow {
+  id?: string
+  name?: string
+  period?: string
+  text?: string
+  template_name?: string
+  audits?: number
+  c: number
+  nc: number
+  na: number
+  applicable: number
+  percent: number | null
+}
+
+export interface AnalyticsSummary {
+  auditCount: number
+  overall: { c: number; nc: number; na: number; percent: number | null }
+  byTemplate: AnalyticsRow[]
+  byArea: AnalyticsRow[]
+  byDomain: AnalyticsRow[]
+  byMonth: AnalyticsRow[]
+  worstCriteria: AnalyticsRow[]
+}
+
+export interface AnalyticsFilters {
+  templateId?: string
+  areaId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
 export interface ChecklistSignature {
   id: string
   signer_name: string

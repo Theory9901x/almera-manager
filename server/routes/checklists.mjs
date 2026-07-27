@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { computeAdherence, conceptFromPercent, isChecklistValue } from '../checklistScoring.mjs'
+import { renderPdf } from '../pdf.mjs'
+import { renderChecklistAuditReportHtml, renderChecklistConsolidatedHtml } from '../templates/checklistReport.mjs'
 
 export const checklistsRouter = Router()
 
@@ -708,5 +710,168 @@ checklistsRouter.post('/:id/simulate', checklistsModule, view, async (request, r
     const answers = (Array.isArray(body.answers) ? body.answers : []).filter(answer => isChecklistValue(answer.value))
     const result = computeAdherence({ domains: structure.domains, subjects, answers })
     response.json({ ...result, concept: conceptFromPercent(result.overall.percent) })
+  } catch (error) { next(error) }
+})
+
+// ===========================================================================
+// FASE 4 — Analitica e informes
+// ===========================================================================
+
+// Filtros comunes de analitica/consolidado. Solo entran auditorias CERRADAS: una en borrador
+// esta a medio diligenciar y contarla distorsionaria el indicador.
+function analyticsFilters(request) {
+  const params = [oid(request)]
+  const where = ["a.organization_id = $1", "a.status = 'CERRADA'"]
+  if (request.query.templateId) { params.push(Number(request.query.templateId)); where.push(`a.template_id = $${params.length}`) }
+  if (request.query.areaId) { params.push(Number(request.query.areaId)); where.push(`a.area_id = $${params.length}`) }
+  if (request.query.dateFrom) { params.push(request.query.dateFrom); where.push(`a.audit_date >= $${params.length}`) }
+  if (request.query.dateTo) { params.push(request.query.dateTo); where.push(`a.audit_date <= $${params.length}`) }
+  return { params, where: where.join(' AND ') }
+}
+
+// Agregacion en SQL sobre las respuestas, NO promediando los porcentajes ya calculados de cada
+// auditoria: promediar promedios le daria el mismo peso a una ronda de 1 sujeto que a una de 20.
+// Se cuenta C y NC sobre el total real de criterios evaluados; NA queda fuera del denominador.
+const TALLY = `
+  COUNT(*) FILTER (WHERE ans.value = 'C')::int AS c,
+  COUNT(*) FILTER (WHERE ans.value = 'NC')::int AS nc,
+  COUNT(*) FILTER (WHERE ans.value = 'NA')::int AS na`
+
+function percentOf(row) {
+  const applicable = Number(row.c) + Number(row.nc)
+  return applicable > 0 ? (Number(row.c) / applicable) * 100 : null
+}
+
+checklistsRouter.get('/analytics/summary', checklistsModule, view, async (request, response, next) => {
+  try {
+    const { params, where } = analyticsFilters(request)
+    const join = `FROM checklist_audits a JOIN checklist_answers ans ON ans.audit_id = a.id WHERE ${where}`
+
+    const [overall, byTemplate, byArea, byDomain, byMonth, worst, auditCount] = await Promise.all([
+      query(`SELECT ${TALLY} ${join}`, params),
+      query(`SELECT t.id, t.name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
+             ${join} JOIN checklist_templates t ON t.id = a.template_id
+             GROUP BY t.id, t.name ORDER BY t.name`, params),
+      query(`SELECT COALESCE(ar.name, 'Sin área') AS name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
+             ${join} LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+             GROUP BY ar.name ORDER BY ar.name NULLS LAST`, params),
+      query(`SELECT d.id, d.name, ${TALLY}
+             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id
+                     JOIN checklist_domains d ON d.id = c.domain_id
+             GROUP BY d.id, d.name ORDER BY d.name`, params),
+      query(`SELECT to_char(a.audit_date, 'YYYY-MM') AS period, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
+             ${join} GROUP BY period ORDER BY period`, params),
+      query(`SELECT c.id, c.text, t.name AS template_name, ${TALLY}
+             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id
+                     JOIN checklist_domains d ON d.id = c.domain_id
+                     JOIN checklist_templates t ON t.id = d.template_id
+             GROUP BY c.id, c.text, t.name
+             HAVING COUNT(*) FILTER (WHERE ans.value IN ('C','NC')) > 0
+             ORDER BY (COUNT(*) FILTER (WHERE ans.value = 'C')::numeric
+                       / NULLIF(COUNT(*) FILTER (WHERE ans.value IN ('C','NC')), 0)) ASC,
+                      COUNT(*) FILTER (WHERE ans.value = 'NC') DESC
+             LIMIT 10`, params),
+      query(`SELECT COUNT(*)::int AS n FROM checklist_audits a WHERE ${where}`, params),
+    ])
+
+    const shape = rows => rows.map(row => ({
+      id: row.id ? String(row.id) : undefined,
+      name: row.name, period: row.period, template_name: row.template_name, text: row.text,
+      audits: row.audits, c: Number(row.c), nc: Number(row.nc), na: Number(row.na),
+      applicable: Number(row.c) + Number(row.nc), percent: percentOf(row),
+    }))
+
+    const totals = overall.rows[0] || { c: 0, nc: 0, na: 0 }
+    response.json({
+      auditCount: auditCount.rows[0].n,
+      overall: { c: Number(totals.c), nc: Number(totals.nc), na: Number(totals.na), percent: percentOf(totals) },
+      byTemplate: shape(byTemplate.rows),
+      byArea: shape(byArea.rows),
+      byDomain: shape(byDomain.rows),
+      byMonth: shape(byMonth.rows),
+      worstCriteria: shape(worst.rows),
+    })
+  } catch (error) { next(error) }
+})
+
+// ---- Informe PDF de una auditoria ----
+
+checklistsRouter.get('/audits/:auditId/report.pdf', checklistsModule, view, async (request, response, next) => {
+  try {
+    const audit = await assertAudit(request)
+    const payload = await auditPayload(audit)
+    const organization = await query('SELECT name FROM organizations WHERE id = $1', [oid(request)])
+    const html = renderChecklistAuditReportHtml({
+      organizationName: organization.rows[0]?.name || 'Entidad',
+      audit: payload,
+      domains: payload.domains,
+      subjects: payload.subjects,
+      answers: payload.answers,
+      signatures: payload.signatures,
+      adherence: payload.adherence,
+    })
+    const pdf = await renderPdf(html)
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', `attachment; filename="lista-chequeo-${audit.id}.pdf"`)
+    response.send(pdf)
+  } catch (error) { next(error) }
+})
+
+// ---- Informe consolidado ----
+
+checklistsRouter.get('/analytics/consolidated.pdf', checklistsModule, view, async (request, response, next) => {
+  try {
+    const { params, where } = analyticsFilters(request)
+    const join = `FROM checklist_audits a JOIN checklist_answers ans ON ans.audit_id = a.id WHERE ${where}`
+
+    const [overall, byTemplate, byArea, byDomain, worst, audits, organization] = await Promise.all([
+      query(`SELECT ${TALLY} ${join}`, params),
+      query(`SELECT t.name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
+             ${join} JOIN checklist_templates t ON t.id = a.template_id GROUP BY t.name ORDER BY t.name`, params),
+      query(`SELECT COALESCE(ar.name, 'Sin área') AS name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
+             ${join} LEFT JOIN checklist_areas ar ON ar.id = a.area_id GROUP BY ar.name ORDER BY ar.name NULLS LAST`, params),
+      query(`SELECT d.name, ${TALLY}
+             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id JOIN checklist_domains d ON d.id = c.domain_id
+             GROUP BY d.name ORDER BY d.name`, params),
+      query(`SELECT c.text, t.name AS template_name, ${TALLY}
+             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id
+                     JOIN checklist_domains d ON d.id = c.domain_id
+                     JOIN checklist_templates t ON t.id = d.template_id
+             GROUP BY c.text, t.name
+             HAVING COUNT(*) FILTER (WHERE ans.value IN ('C','NC')) > 0
+             ORDER BY (COUNT(*) FILTER (WHERE ans.value = 'C')::numeric
+                       / NULLIF(COUNT(*) FILTER (WHERE ans.value IN ('C','NC')), 0)) ASC
+             LIMIT 12`, params),
+      query(`SELECT a.id FROM checklist_audits a WHERE ${where}`, params),
+      query('SELECT name FROM organizations WHERE id = $1', [oid(request)]),
+    ])
+
+    const withPercent = rows => rows.map(row => ({
+      ...row, c: Number(row.c), nc: Number(row.nc), na: Number(row.na),
+      applicable: Number(row.c) + Number(row.nc), percent: percentOf(row),
+    }))
+    const totals = overall.rows[0] || { c: 0, nc: 0, na: 0 }
+
+    const describeFilters = [
+      request.query.dateFrom || request.query.dateTo
+        ? `Periodo: ${request.query.dateFrom || 'inicio'} a ${request.query.dateTo || 'hoy'}`
+        : 'Todo el periodo registrado',
+      'Solo auditorías cerradas',
+    ].join(' · ')
+
+    const html = renderChecklistConsolidatedHtml({
+      organizationName: organization.rows[0]?.name || 'Entidad',
+      filters: describeFilters,
+      audits: audits.rows,
+      byTemplate: withPercent(byTemplate.rows),
+      byArea: withPercent(byArea.rows),
+      byDomain: withPercent(byDomain.rows),
+      worstCriteria: withPercent(worst.rows),
+      overall: { c: Number(totals.c), nc: Number(totals.nc), na: Number(totals.na), percent: percentOf(totals) },
+    })
+    const pdf = await renderPdf(html)
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', 'attachment; filename="consolidado-listas-chequeo.pdf"')
+    response.send(pdf)
   } catch (error) { next(error) }
 })

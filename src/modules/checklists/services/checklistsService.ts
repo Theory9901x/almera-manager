@@ -1,8 +1,32 @@
 import type {
-  AdherenceResult, AssignedTemplate, AuditDetail, AuditSummary, ChecklistArea, ChecklistMembership,
-  ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail, ChecklistValue, DirectorySubject,
-  SignerSuggestion,
+  AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditSummary,
+  ChecklistArea, ChecklistMembership, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
+  ChecklistValue, DirectorySubject, SignerSuggestion,
 } from '../types'
+
+function toQueryString(filters: Record<string, string | undefined>) {
+  const query = new URLSearchParams()
+  Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value) })
+  const suffix = query.toString()
+  return suffix ? `?${suffix}` : ''
+}
+
+// Descarga binaria: fetch + blob en vez de navegar a la URL, para que un error del servidor se
+// pueda mostrar como mensaje en vez de dejar al usuario en una pestaña con un JSON crudo.
+async function download(path: string, filename: string) {
+  const response = await fetch(`/api/checklists${path}`, { credentials: 'same-origin' })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.error || 'No fue posible generar el informe')
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/checklists${path}`, {
@@ -77,4 +101,15 @@ export const checklistsService = {
     call<ChecklistSignature>(`/audits/${auditId}/signatures`, { method: 'POST', body: JSON.stringify(data) }),
   removeSignature: (auditId: string, signatureId: string) =>
     call<{ ok: true }>(`/audits/${auditId}/signatures/${signatureId}`, { method: 'DELETE' }),
+
+  // ---- Fase 4: analítica e informes ----
+
+  analytics: (filters: AnalyticsFilters = {}) =>
+    call<AnalyticsSummary>(`/analytics/summary${toQueryString(filters as Record<string, string | undefined>)}`),
+
+  downloadAuditReport: (auditId: string) =>
+    download(`/audits/${auditId}/report.pdf`, `lista-chequeo-${auditId}.pdf`),
+
+  downloadConsolidated: (filters: AnalyticsFilters = {}) =>
+    download(`/analytics/consolidated.pdf${toQueryString(filters as Record<string, string | undefined>)}`, 'consolidado-listas-chequeo.pdf'),
 }

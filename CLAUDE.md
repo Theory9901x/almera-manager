@@ -278,7 +278,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
-| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-3**: constructor, motor, diligenciamiento y firmas |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-4**; falta cargar las 13 listas reales |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -333,14 +333,14 @@ página y visor propio de PDF.
 ## 11. Trabajo pendiente
 
 **Módulo "Listas de Chequeo" (auditoría por adherencia)** — plan de 5 fases.
-**Fases 1, 2 y 3 entregadas**; **faltan las fases 4 y 5**:
+**Fases 1 a 4 entregadas**; **solo falta la fase 5**:
 
 | Fase | Alcance | Estado |
 |---|---|---|
 | 1 | Modelo, constructor, motor de adherencia, semaforización | **Hecha** |
 | 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | **Hecha** |
 | 3 | Firmas digitales en canvas + directorio de firmantes | **Hecha** |
-| 4 | Analítica, gráficas e informes PDF | Pendiente |
+| 4 | Analítica, gráficas e informes PDF | **Hecha** |
 | 5 | Migración de las 13 listas reales de seguridad del paciente | Pendiente |
 
 Pieza clave ya disponible: `server/checklistScoring.mjs` (motor puro; cubre los cuatro

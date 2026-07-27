@@ -1,8 +1,8 @@
 # Módulo "Listas de Chequeo" — Auditoría por Adherencia
 
-Estado: **Fases 1, 2 y 3 entregadas** (modelo, constructor, motor de adherencia, entorno de
-diligenciamiento y firmas); fases 4 y 5 pendientes. Este documento es el plan completo — ver §8
-para las fases y §10-§12 para lo ya construido. Leer primero `CLAUDE.md` (arquitectura,
+Estado: **Fases 1 a 4 entregadas** (modelo, constructor, motor, diligenciamiento, firmas,
+analítica e informes PDF); **solo falta la fase 5** (cargar las 13 listas reales). Este documento
+es el plan completo — ver §8 para las fases y §10-§13 para lo ya construido. Leer primero `CLAUDE.md` (arquitectura,
 sistema de diseño y reglas de trabajo).
 
 ---
@@ -280,7 +280,7 @@ no como parche aislado). **No avanzar sin verificar la anterior.**
 | **1** ✅ | Modelo de datos, constructor de listas por área, motor de adherencia dinámico con exclusión de NA, semaforización. Sin firmas ni analítica. | **Entregada.** Ver §10. |
 | **2** ✅ | Entorno de diligenciamiento: asignación, cabecera → sujetos → evaluación → guardado con cálculo. Directorio reutilizable de sujetos. | Un profesional asignado completa una auditoría de principio a fin y ve su adherencia semaforizada. |
 | **3** ✅ | Firmas digitales en canvas (tablet), asociación al registro, directorio reutilizable de firmantes. | Firmar una auditoría desde pantalla táctil y ver la firma en el registro. |
-| **4** | Analítica: tableros por dominio/criterio/servicio/evolución, informe PDF individual y consolidado. | PDF institucional generado y tablero con datos reales. |
+| **4** ✅ | Analítica: tableros por dominio/criterio/servicio/evolución, informe PDF individual y consolidado. | PDF institucional generado y tablero con datos reales. |
 | **5** | Migración de las listas reales de seguridad del paciente. | FO-24 y FO-26 cargadas **solo con configuración, sin código nuevo por lista**. |
 
 La Fase 5 es **la prueba de fuego del constructor genérico**: empezar por FO-24 (ronda,
@@ -490,3 +490,47 @@ Firmas manuscritas en pantalla táctil, asociadas al registro con persona y fech
 Probado con interacción real de puntero en Puppeteer, no solo render estático: se traza una
 firma sobre el lienzo, se comprueba que el componente emite la imagen (`HAS_IMAGE`), se
 registra y aparece en la lista con nombre, rol y fecha. PNG resultante: 8.026 bytes.
+
+---
+
+## 13. Fase 4 — entregada
+
+Analítica agregada e informes PDF (individual y consolidado).
+
+| Archivo | Rol |
+|---|---|
+| `server/templates/checklistReport.mjs` | Plantillas HTML de ambos informes (nuevo) |
+| `server/routes/checklists.mjs` | `/analytics/summary`, `/audits/:id/report.pdf`, `/analytics/consolidated.pdf` |
+| `src/modules/checklists/components/AnalyticsPanel.tsx` | Pestaña de analítica (nuevo) |
+| `src/modules/checklists/pages/ChecklistsListPage.tsx` | Tercera pestaña «Analítica» |
+| `src/modules/checklists/pages/ChecklistAuditPage.tsx` | Botón «Informe PDF» |
+
+### Decisiones
+
+- **La agregación se hace en SQL sobre las respuestas, no promediando los porcentajes
+  ya calculados de cada auditoría.** Promediar promedios le daría el mismo peso a una
+  ronda de 1 sujeto que a una de 20. Se cuentan C y NC sobre el total real de criterios
+  evaluados y NA queda fuera del denominador, igual que en el motor.
+- **Solo entran auditorías CERRADAS.** Una en borrador está a medio diligenciar; contarla
+  hundiría el indicador con criterios que aún nadie ha mirado.
+- **«Sin dato» se propaga hasta el papel.** Un dominio o criterio con todo NA se imprime
+  en gris como «Sin dato», nunca como 0 % en rojo — verificado en ambos informes.
+- **Las barras del gráfico usan color semántico**, no el azul del módulo: el semáforo
+  manda sobre la identidad cuando lo que se comunica es «qué tan bien va esto».
+- **La descarga usa `fetch` + blob**, no navegación directa a la URL: así un error del
+  servidor se muestra como mensaje en vez de dejar al usuario en una pestaña con un JSON
+  crudo.
+- **Plantillas y áreas se cargan para cualquiera con `.view`**, no solo para quien
+  administra: los filtros de la analítica las necesitan.
+
+### Verificación
+
+Ambos PDF generados de verdad con el motor real (`renderPdf` sobre Puppeteer) y revisados
+visualmente renderizando el mismo HTML del que salen:
+
+- **Individual**: cabecera institucional con código y versión, datos generales, resultado
+  77.8 % ámbar con concepto «Deficiente», desglose por dominio y por paciente, matriz
+  criterio × sujeto con C/NC/NA en color, y las firmas. El criterio con todos los sujetos
+  en NA aparece como **«Sin dato»**.
+- **Consolidado**: 71.7 % con tallies, desglose por lista, por área y por dominio con
+  barras semaforizadas, y ranking de criterios más incumplidos.

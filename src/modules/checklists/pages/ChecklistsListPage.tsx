@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardCheck, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
+import { BarChart3, ClipboardCheck, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
+import { AnalyticsPanel } from '../components/AnalyticsPanel'
 import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -32,7 +33,7 @@ function ChecklistsListContent() {
   const canManage = Boolean(session?.permissions.includes('checklists.manage'))
   const canFill = Boolean(session?.permissions.includes('checklists.fill'))
 
-  const [section, setSection] = useState<'auditorias' | 'listas'>('auditorias')
+  const [section, setSection] = useState<'auditorias' | 'analitica' | 'listas'>('auditorias')
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([])
   const [areas, setAreas] = useState<ChecklistArea[]>([])
   const [audits, setAudits] = useState<AuditSummary[]>([])
@@ -50,11 +51,11 @@ function ChecklistsListContent() {
       ])
       setAudits(auditList)
       setAssigned(assignedList)
-      if (canManage) {
-        const [list, areaList] = await Promise.all([checklistsService.list(), checklistsService.areas()])
-        setTemplates(list)
-        setAreas(areaList)
-      }
+      // Plantillas y areas se cargan siempre, no solo para quien administra: los filtros de la
+      // pestaña de analitica las necesitan y esa pestaña la ve cualquiera con .view.
+      const [list, areaList] = await Promise.all([checklistsService.list(), checklistsService.areas()])
+      setTemplates(list)
+      setAreas(areaList)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar el módulo') }
     finally { setLoading(false) }
   }
@@ -116,6 +117,11 @@ function ChecklistsListContent() {
             style={section === 'auditorias' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
             onClick={() => setSection('auditorias')}
           >Auditorías</button>
+          <button
+            className={`ds-tabs-item ${section === 'analitica' ? 'is-active' : ''}`}
+            style={section === 'analitica' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            onClick={() => setSection('analitica')}
+          ><BarChart3 size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Analítica</button>
           {canManage && (
             <button
               className={`ds-tabs-item ${section === 'listas' ? 'is-active' : ''}`}
@@ -211,6 +217,8 @@ function ChecklistsListContent() {
               </Card>
             </>
           )}
+
+          {section === 'analitica' && <AnalyticsPanel templates={templates} areas={areas} />}
 
           {section === 'listas' && canManage && (
             <>
