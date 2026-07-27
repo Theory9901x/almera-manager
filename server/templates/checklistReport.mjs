@@ -356,3 +356,91 @@ export function renderChecklistBlankFormatHtml({ organizationName, template, col
     <p class="foot">${escapeHtml(template.name)}${template.code ? ` · ${escapeHtml(template.code)} v${escapeHtml(template.version)}` : ''} · Formato en blanco · Generado por SGIMR</p>
   </body></html>`
 }
+
+/**
+ * Informe del CENTRO DE DATOS: el recorte que el usuario esta viendo, tal cual.
+ *
+ * Los graficos llegan como SVG ya pintados por el navegador y se incrustan literalmente. No se
+ * vuelven a dibujar en el servidor a proposito: un grafico redibujado seria "otro" grafico, y lo
+ * que se pidio es que el PDF refleje exactamente la pantalla.
+ */
+export function renderDataCenterHtml({ organizationName, activeFilters = [], data, charts = [] }) {
+  const pct = value => formatPercent(value)
+  const row = (cells) => `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`
+
+  const kpi = (label, value, color) => `
+    <div class="kpi"><b style="${color ? `color:${color}` : ''}">${value}</b><span>${escapeHtml(label)}</span></div>`
+
+  const tabla = (titulo, cabeceras, filas) => `
+    <h2>${escapeHtml(titulo)}</h2>
+    <table>
+      <thead><tr>${cabeceras.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+      <tbody>${filas.join('')}</tbody>
+    </table>`
+
+  const bloqueGraficos = charts.length ? `
+    <h2>Gráficos</h2>
+    <div class="charts">
+      ${charts.map(chart => `
+        <figure>
+          <figcaption>${escapeHtml(chart.title)}</figcaption>
+          ${chart.svg}
+        </figure>`).join('')}
+    </div>` : ''
+
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8" /><style>${baseStyles()}
+    .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+    .kpi { border: 1px solid #d6dde5; border-radius: 8px; padding: 10px; background: #f8fbfe; text-align: center; }
+    .kpi b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .kpi span { font-size: 8px; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
+    .filtros { margin-top: 10px; font-size: 10px; color: #526074; }
+    .filtros b { display: inline-block; margin: 0 6px 4px 0; padding: 3px 9px; border-radius: 99px;
+                 background: #eef7fc; color: #003452; font-weight: 700; }
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+    .charts figure { margin: 0; border: 1px solid #d6dde5; border-radius: 8px; padding: 8px; background: #fff;
+                     break-inside: avoid; }
+    .charts figcaption { font-size: 9.5px; font-weight: 700; color: #003452; margin-bottom: 4px; }
+    .charts svg { width: 100%; height: auto; }
+  </style></head><body>
+    ${docHead(organizationName, 'Centro de datos — Listas de Chequeo',
+      'Adherencia del recorte seleccionado', '', '')}
+
+    <div class="filtros">
+      <strong>Filtros aplicados:</strong><br/>
+      ${activeFilters.length ? activeFilters.map(f => `<b>${escapeHtml(f)}</b>`).join('') : '<b>Sin filtros — todas las auditorías cerradas</b>'}
+    </div>
+
+    <div class="kpis">
+      ${kpi('Adherencia', pct(data.overall.percent), colorFor(data.overall.percent))}
+      ${kpi('Auditorías', data.kpis.audits)}
+      ${kpi('Servicios', data.kpis.areas)}
+      ${kpi('Evaluados', data.kpis.subjects)}
+      ${kpi('Criterios críticos', data.kpis.criticalCriteria)}
+    </div>
+
+    ${bloqueGraficos}
+
+    ${tabla('Por servicio', ['Servicio', 'Auditorías', 'C', 'NC', 'NA', 'Adherencia'],
+      data.byArea.map(r => row([escapeHtml(r.name || ''), r.audits ?? '', r.c, r.nc, r.na,
+        `<b style="color:${colorFor(r.percent)}">${pct(r.percent)}</b>`])))}
+
+    ${tabla('Por dominio', ['Dominio', 'C', 'NC', 'NA', 'Adherencia'],
+      data.byDomain.map(r => row([escapeHtml(r.name || ''), r.c, r.nc, r.na,
+        `<b style="color:${colorFor(r.percent)}">${pct(r.percent)}</b>`])))}
+
+    ${tabla('Criterios más incumplidos', ['Criterio', 'Dominio', 'C', 'NC', 'Adherencia'],
+      data.byCriterion.slice(0, 15).map(r => row([
+        escapeHtml(`${r.item_number ? r.item_number + '. ' : ''}${r.text || ''}`),
+        escapeHtml(r.domain_name || ''), r.c, r.nc,
+        `<b style="color:${colorFor(r.percent)}">${pct(r.percent)}</b>`])))}
+
+    ${tabla('Auditorías del recorte', ['Lista', 'Servicio', 'Fecha', 'Turno', 'Auditor', 'Adherencia'],
+      data.byAudit.slice(0, 40).map(r => row([
+        escapeHtml(r.template_name || ''), escapeHtml(r.area_name || '—'),
+        formatDate(r.audit_date), escapeHtml(r.shift || '—'), escapeHtml(r.auditor_name || ''),
+        `<b style="color:${colorFor(r.percent)}">${pct(r.percent)}</b>`])))}
+
+    <p class="foot">${escapeHtml(organizationName)} · Centro de datos de Listas de Chequeo ·
+      Solo auditorías cerradas · Generado por SGIMR el ${formatDate(new Date())}</p>
+  </body></html>`
+}

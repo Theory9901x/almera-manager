@@ -3,7 +3,7 @@ import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { computeAdherence, conceptFromPercent, isChecklistValue } from '../checklistScoring.mjs'
 import { renderPdf } from '../pdf.mjs'
-import { renderChecklistAuditReportHtml, renderChecklistBlankFormatHtml, renderChecklistConsolidatedHtml } from '../templates/checklistReport.mjs'
+import { renderChecklistAuditReportHtml, renderChecklistBlankFormatHtml, renderChecklistConsolidatedHtml, renderDataCenterHtml } from '../templates/checklistReport.mjs'
 import { CHECKLIST_SEEDS } from '../checklistSeed.mjs'
 
 export const checklistsRouter = Router()
@@ -986,6 +986,263 @@ checklistsRouter.get('/analytics/summary', checklistsModule, view, async (reques
       byMonth: shape(byMonth.rows),
       worstCriteria: shape(worst.rows),
     })
+  } catch (error) { next(error) }
+})
+
+
+// ===========================================================================
+// CENTRO DE DATOS
+// ===========================================================================
+
+/**
+ * Filtros combinables del tablero. Se arman una sola vez y los usan TODAS las consultas: si
+ * cada vista construyera los suyos, bastaria olvidar uno para que un grafico contradijera al
+ * KPI de arriba, y ese es el fallo que nadie nota hasta que alguien decide con el dato malo.
+ *
+ * `domainId` y `level` filtran a nivel de RESPUESTA, no de auditoria: "solo el dominio X" no
+ * quiere decir "las auditorias que tienen el dominio X", quiere decir sus respuestas.
+ */
+function dataCenterFilters(request) {
+  const params = [oid(request)]
+  const where = ['a.organization_id = $1', "a.status = 'CERRADA'"]
+  const q = request.query || {}
+  const add = (value, sql) => { params.push(value); where.push(sql.replace('$$', `$${params.length}`)) }
+
+  if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
+  if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
+  if (q.auditorId) add(Number(q.auditorId), 'a.auditor_id = $$')
+  if (q.shift) add(String(q.shift), 'a.shift = $$')
+  if (q.dateFrom) add(String(q.dateFrom), 'a.audit_date >= $$')
+  if (q.dateTo) add(String(q.dateTo), 'a.audit_date <= $$')
+  if (q.domainId) add(Number(q.domainId), 'd.id = $$')
+  // Nivel de adherencia: recorta por el resultado YA calculado de la auditoria (ej. "solo <70%").
+  if (q.maxPercent) add(Number(q.maxPercent), 'a.adherence_percent < $$')
+  if (q.minPercent) add(Number(q.minPercent), 'a.adherence_percent >= $$')
+
+  return { params, where: where.join(' AND ') }
+}
+
+// Todas las vistas parten del mismo grafo: auditoria -> respuesta -> criterio -> dominio. Se
+// une siempre, aunque la vista no agrupe por dominio, para que el filtro por dominio pueda
+// aplicarse de forma homogenea.
+const DC_FROM = `
+  FROM checklist_audits a
+  JOIN checklist_answers ans ON ans.audit_id = a.id
+  JOIN checklist_criteria c ON c.id = ans.criterion_id
+  JOIN checklist_domains d ON d.id = c.domain_id`
+
+const DC_TALLY = `
+  COUNT(*) FILTER (WHERE ans.value = 'C')::int AS c,
+  COUNT(*) FILTER (WHERE ans.value = 'NC')::int AS nc,
+  COUNT(*) FILTER (WHERE ans.value = 'NA')::int AS na`
+
+/** Agrupacion temporal. Es una lista blanca: el valor entra en el SQL sin parametrizar. */
+const PERIOD_TRUNC = { dia: 'day', semana: 'week', mes: 'month', trimestre: 'quarter' }
+
+/** Todo el calculo del tablero en un solo sitio: lo usan el endpoint y el PDF. */
+async function dataCenterData(request) {
+    const { params, where } = dataCenterFilters(request)
+    const period = PERIOD_TRUNC[String(request.query.period || 'mes')] || 'month'
+
+    const [overall, byAudit, byAuditor, bySubject, byDate, byArea, byDomain, byCriterion, kpis] = await Promise.all([
+      query(`SELECT ${DC_TALLY} ${DC_FROM} WHERE ${where}`, params),
+
+      query(`SELECT a.id, a.audit_date, a.shift, a.adherence_percent, a.concept,
+                    a.template_code, t.name AS template_name, ar.name AS area_name,
+                    u.full_name AS auditor_name, ${DC_TALLY}
+             ${DC_FROM}
+             JOIN checklist_templates t ON t.id = a.template_id
+             LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+             JOIN users u ON u.id = a.auditor_id
+             WHERE ${where}
+             GROUP BY a.id, a.audit_date, a.shift, a.adherence_percent, a.concept, a.template_code,
+                      t.name, ar.name, u.full_name
+             ORDER BY a.audit_date DESC, a.id DESC LIMIT 300`, params),
+
+      query(`SELECT u.id, u.full_name AS name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+             ${DC_FROM} JOIN users u ON u.id = a.auditor_id
+             WHERE ${where} GROUP BY u.id, u.full_name ORDER BY u.full_name`, params),
+
+      // Profesional EVALUADO, que no es lo mismo que el auditor. Se agrupa por nombre y no por
+      // id porque el mismo profesional puede haberse registrado suelto en una ronda y desde el
+      // directorio en otra.
+      query(`SELECT s.display_name AS name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+             ${DC_FROM} JOIN checklist_audit_subjects s ON s.id = ans.audit_subject_id
+             WHERE ${where} GROUP BY s.display_name ORDER BY s.display_name`, params),
+
+      query(`SELECT to_char(date_trunc('${period}', a.audit_date), 'YYYY-MM-DD') AS period,
+                    COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+             ${DC_FROM} WHERE ${where}
+             GROUP BY 1 ORDER BY 1`, params),
+
+      query(`SELECT COALESCE(ar.name, 'Sin servicio') AS name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+             ${DC_FROM} LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+             WHERE ${where} GROUP BY ar.name ORDER BY ar.name NULLS LAST`, params),
+
+      // Agrupado por NOMBRE, no por id: el mismo dominio ("Indague al personal de turno") existe
+      // en varias listas y por id salia repetido en la grafica. Aqui la pregunta es que paquete
+      // concentra el incumplimiento en la entidad, no en que fila de que lista esta.
+      query(`SELECT d.name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+             ${DC_FROM} WHERE ${where} GROUP BY d.name ORDER BY d.name`, params),
+
+      query(`SELECT c.id, c.text, c.item_number, d.name AS domain_name, t.name AS template_name, ${DC_TALLY}
+             ${DC_FROM}
+             JOIN checklist_templates t ON t.id = d.template_id
+             WHERE ${where}
+             GROUP BY c.id, c.text, c.item_number, d.name, t.name
+             HAVING COUNT(*) FILTER (WHERE ans.value IN ('C','NC')) > 0
+             ORDER BY (COUNT(*) FILTER (WHERE ans.value = 'C')::numeric
+                       / NULLIF(COUNT(*) FILTER (WHERE ans.value IN ('C','NC')), 0)) ASC,
+                      COUNT(*) FILTER (WHERE ans.value = 'NC') DESC
+             LIMIT 25`, params),
+
+      query(`SELECT COUNT(DISTINCT a.id)::int AS audits,
+                    COUNT(DISTINCT a.area_id)::int AS areas,
+                    COUNT(DISTINCT ans.audit_subject_id)::int AS subjects,
+                    COUNT(DISTINCT a.auditor_id)::int AS auditors
+             ${DC_FROM} WHERE ${where}`, params),
+    ])
+
+    const shape = rows => rows.map(row => {
+      const applicable = Number(row.c) + Number(row.nc)
+      return {
+        ...row,
+        id: row.id !== undefined && row.id !== null ? String(row.id) : undefined,
+        c: Number(row.c), nc: Number(row.nc), na: Number(row.na), applicable,
+        percent: applicable > 0 ? (Number(row.c) / applicable) * 100 : null,
+      }
+    })
+
+    const totals = overall.rows[0] || { c: 0, nc: 0, na: 0 }
+    const globalPercent = (Number(totals.c) + Number(totals.nc)) > 0
+      ? (Number(totals.c) / (Number(totals.c) + Number(totals.nc))) * 100 : null
+    const criteria = shape(byCriterion.rows)
+
+    return {
+      overall: {
+        c: Number(totals.c), nc: Number(totals.nc), na: Number(totals.na),
+        percent: globalPercent, concept: conceptFromPercent(globalPercent),
+      },
+      kpis: {
+        audits: kpis.rows[0].audits,
+        areas: kpis.rows[0].areas,
+        subjects: kpis.rows[0].subjects,
+        auditors: kpis.rows[0].auditors,
+        // "Critico" = por debajo del corte mas bajo del semaforo, el mismo que pinta la pantalla
+        // y el PDF. No es un numero elegido aparte.
+        criticalCriteria: criteria.filter(row => row.percent !== null && row.percent < 70).length,
+      },
+      byAudit: shape(byAudit.rows),
+      byAuditor: shape(byAuditor.rows),
+      bySubject: shape(bySubject.rows),
+      byDate: shape(byDate.rows),
+      byArea: shape(byArea.rows),
+      byDomain: shape(byDomain.rows),
+      byCriterion: criteria,
+  }
+}
+
+checklistsRouter.get('/analytics/datacenter', checklistsModule, view, async (request, response, next) => {
+  try {
+    response.json(await dataCenterData(request))
+  } catch (error) { next(error) }
+})
+
+
+/**
+ * PDF del centro de datos. Va por POST porque el cliente manda los SVG de los graficos ya
+ * pintados (varios cientos de KB): no caben en una URL, y ademas asi el informe es exactamente
+ * lo que hay en pantalla y no una segunda version dibujada aparte.
+ *
+ * Los datos se recalculan aqui a partir de los MISMOS filtros, no se aceptan del cliente: un
+ * informe institucional no puede llevar cifras que las mando el navegador.
+ */
+checklistsRouter.post('/analytics/datacenter.pdf', checklistsModule, view, async (request, response, next) => {
+  try {
+    const body = request.body || {}
+    // Se reutiliza el mismo constructor de filtros pasando los del cuerpo como si fueran query.
+    const data = await dataCenterData({ ...request, query: body.filters || {} })
+    const organization = await query('SELECT name FROM organizations WHERE id = $1', [oid(request)])
+    const charts = (Array.isArray(body.charts) ? body.charts : [])
+      .filter(chart => typeof chart?.svg === 'string' && chart.svg.startsWith('<svg'))
+      .slice(0, 8)
+    const html = renderDataCenterHtml({
+      organizationName: organization.rows[0]?.name || 'Entidad',
+      activeFilters: Array.isArray(body.activeFilters) ? body.activeFilters.map(String).slice(0, 20) : [],
+      data,
+      charts,
+    })
+    const pdf = await renderPdf(html, { landscape: true })
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', 'attachment; filename="centro-de-datos-listas-chequeo.pdf"')
+    response.send(pdf)
+  } catch (error) { next(error) }
+})
+
+/** Opciones para armar los desplegables del panel de filtros. */
+checklistsRouter.get('/analytics/options', checklistsModule, view, async (request, response, next) => {
+  try {
+    const [templates, areas, auditors, shifts, domains] = await Promise.all([
+      query(`SELECT DISTINCT t.id, t.name, t.code FROM checklist_templates t
+               JOIN checklist_audits a ON a.template_id = t.id
+              WHERE a.organization_id = $1 ORDER BY t.name`, [oid(request)]),
+      query(`SELECT DISTINCT ar.id, ar.name FROM checklist_areas ar
+               JOIN checklist_audits a ON a.area_id = ar.id
+              WHERE a.organization_id = $1 ORDER BY ar.name`, [oid(request)]),
+      query(`SELECT DISTINCT u.id, u.full_name AS name FROM users u
+               JOIN checklist_audits a ON a.auditor_id = u.id
+              WHERE a.organization_id = $1 ORDER BY u.full_name`, [oid(request)]),
+      query(`SELECT DISTINCT shift FROM checklist_audits
+              WHERE organization_id = $1 AND shift IS NOT NULL ORDER BY shift`, [oid(request)]),
+      query(`SELECT DISTINCT d.id, d.name FROM checklist_domains d
+               JOIN checklist_templates t ON t.id = d.template_id
+              WHERE t.organization_id = $1 ORDER BY d.name`, [oid(request)]),
+    ])
+    response.json({
+      templates: templates.rows.map(r => ({ ...r, id: String(r.id) })),
+      areas: areas.rows.map(r => ({ ...r, id: String(r.id) })),
+      auditors: auditors.rows.map(r => ({ ...r, id: String(r.id) })),
+      shifts: shifts.rows.map(r => r.shift),
+      domains: domains.rows.map(r => ({ ...r, id: String(r.id) })),
+    })
+  } catch (error) { next(error) }
+})
+
+/**
+ * Exportacion en CSV del recorte que se esta viendo. Con BOM: sin el, Excel en Windows abre el
+ * archivo en la codificacion del sistema y "Prevención de caídas" llega hecho un jeroglifico.
+ */
+checklistsRouter.get('/analytics/export.csv', checklistsModule, view, async (request, response, next) => {
+  try {
+    const { params, where } = dataCenterFilters(request)
+    const result = await query(
+      `SELECT a.id, a.audit_date, a.shift, a.template_code, t.name AS template_name,
+              COALESCE(ar.name, 'Sin servicio') AS area_name, u.full_name AS auditor_name,
+              s.display_name AS evaluado, d.name AS dominio, c.item_number, c.text AS criterio,
+              ans.value, a.adherence_percent
+       ${DC_FROM}
+       JOIN checklist_templates t ON t.id = a.template_id
+       LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+       JOIN users u ON u.id = a.auditor_id
+       JOIN checklist_audit_subjects s ON s.id = ans.audit_subject_id
+       WHERE ${where}
+       ORDER BY a.audit_date DESC, a.id, s.order_index, d.order_index, c.order_index`,
+      params,
+    )
+    const columns = ['id', 'audit_date', 'shift', 'template_code', 'template_name', 'area_name',
+      'auditor_name', 'evaluado', 'dominio', 'item_number', 'criterio', 'value', 'adherence_percent']
+    const titles = ['Auditoría', 'Fecha', 'Turno', 'Código', 'Lista', 'Servicio', 'Auditor',
+      'Evaluado', 'Dominio', 'Ítem', 'Criterio', 'Calificación', 'Adherencia de la auditoría']
+    const escape = value => {
+      if (value === null || value === undefined) return ''
+      const text = value instanceof Date ? value.toISOString().slice(0, 10) : String(value)
+      return /[";\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+    }
+    // Separador ';': Excel en configuracion regional española no parte por comas.
+    const lines = [titles.join(';'), ...result.rows.map(row => columns.map(col => escape(row[col])).join(';'))]
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    response.setHeader('Content-Disposition', 'attachment; filename="listas-chequeo-datos.csv"')
+    response.send('﻿' + lines.join('\r\n'))
   } catch (error) { next(error) }
 })
 

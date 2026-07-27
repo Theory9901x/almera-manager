@@ -1,5 +1,6 @@
 import type {
   AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
+  DataCenter, DataCenterFilters, DataCenterOptions,
   ChecklistArea, ChecklistMembership, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
@@ -123,6 +124,36 @@ export const checklistsService = {
   importSeeds: (codes?: string[]) =>
     call<{ results: { code: string; status: string; domains?: number; criteria?: number }[] }>(
       '/seed/import', { method: 'POST', body: JSON.stringify({ codes: codes || [] }) }),
+
+  // ---- Centro de datos ----
+
+  dataCenterOptions: () => call<DataCenterOptions>('/analytics/options'),
+  dataCenter: (filters: DataCenterFilters) =>
+    call<DataCenter>(`/analytics/datacenter${toQueryString(filters as Record<string, string | undefined>)}`),
+  dataCenterCsv: (filters: DataCenterFilters) => {
+    // Navegacion directa en vez de fetch+blob: el navegador guarda el archivo con su nombre y no
+    // hay que cargar en memoria un CSV que puede ser de miles de filas.
+    window.open(`/api/checklists/analytics/export.csv${toQueryString(filters as Record<string, string | undefined>)}`, '_blank')
+  },
+  /** El PDF lleva los graficos TAL COMO estan en pantalla: se mandan sus SVG ya pintados. */
+  dataCenterPdf: async (filters: DataCenterFilters, charts: { title: string; svg: string }[], activeFilters: string[]) => {
+    const response = await fetch('/api/checklists/analytics/datacenter.pdf', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters, charts, activeFilters }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'No fue posible generar el informe')
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'centro-de-datos-listas-chequeo.pdf'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
 
   downloadConsolidated: (filters: AnalyticsFilters = {}) =>
     download(`/analytics/consolidated.pdf${toQueryString(filters as Record<string, string | undefined>)}`, 'consolidado-listas-chequeo.pdf'),

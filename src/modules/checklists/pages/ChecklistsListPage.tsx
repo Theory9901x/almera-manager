@@ -7,7 +7,7 @@ import {
 } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
-import { AnalyticsPanel } from '../components/AnalyticsPanel'
+import { DataCenterPanel } from '../components/DataCenterPanel'
 import { StartAuditDialog, type StartContext } from '../components/StartAuditDialog'
 import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate, SeedTemplate } from '../types'
 
@@ -208,7 +208,7 @@ function ChecklistsListContent() {
             className={`ds-tabs-item ${section === 'analitica' ? 'is-active' : ''}`}
             style={section === 'analitica' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
             onClick={() => setSection('analitica')}
-          ><BarChart3 size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Analítica</button>
+          ><BarChart3 size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Centro de datos</button>
           {canManage && (
             <button
               className={`ds-tabs-item ${section === 'listas' ? 'is-active' : ''}`}
@@ -356,7 +356,7 @@ function ChecklistsListContent() {
             </>
           )}
 
-          {section === 'analitica' && <AnalyticsPanel templates={templates} areas={areas} />}
+          {section === 'analitica' && <DataCenterPanel />}
 
           {section === 'listas' && canManage && (
             <>

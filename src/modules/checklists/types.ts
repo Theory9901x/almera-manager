@@ -246,3 +246,63 @@ export interface AuditDetail {
   /** Solo al reabrir: cuántas firmas se invalidaron por volver a editar la auditoría. */
   invalidatedSignatures?: number
 }
+
+// ---- Centro de datos ----
+
+export interface DataCenterFilters {
+  templateId?: string
+  areaId?: string
+  auditorId?: string
+  domainId?: string
+  shift?: string
+  dateFrom?: string
+  dateTo?: string
+  /** Recorte por nivel: "solo por debajo de N %". */
+  maxPercent?: string
+  minPercent?: string
+  /** Agrupación de la serie temporal. */
+  period?: string
+}
+
+export interface DataCenterRow {
+  id?: string
+  name?: string
+  period?: string
+  text?: string
+  item_number?: string
+  domain_name?: string
+  template_name?: string
+  template_code?: string
+  area_name?: string | null
+  auditor_name?: string
+  audit_date?: string
+  shift?: string | null
+  concept?: string | null
+  audits?: number
+  c: number
+  nc: number
+  na: number
+  applicable: number
+  /** null = nada aplicable (todo NA). Nunca 0 %. */
+  percent: number | null
+}
+
+export interface DataCenter {
+  overall: { c: number; nc: number; na: number; percent: number | null; concept: string | null }
+  kpis: { audits: number; areas: number; subjects: number; auditors: number; criticalCriteria: number }
+  byAudit: DataCenterRow[]
+  byAuditor: DataCenterRow[]
+  bySubject: DataCenterRow[]
+  byDate: DataCenterRow[]
+  byArea: DataCenterRow[]
+  byDomain: DataCenterRow[]
+  byCriterion: DataCenterRow[]
+}
+
+export interface DataCenterOptions {
+  templates: { id: string; name: string; code: string }[]
+  areas: { id: string; name: string }[]
+  auditors: { id: string; name: string }[]
+  shifts: string[]
+  domains: { id: string; name: string }[]
+}
