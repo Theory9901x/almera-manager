@@ -1343,6 +1343,48 @@ async function dataCenterData(request) {
       }
     })
 
+    // Mezcla por ESTADO: es la unica consulta que NO filtra por cerradas, porque justamente
+    // cuenta cuantas quedaron a medias. Solo tenemos dos estados reales (borrador y cerrada);
+    // no se inventan "vencidas" ni "pendientes" que el modelo no distingue.
+    const statusWhere = where.replace(" AND a.status = 'CERRADA'", '')
+    const statusMix = await query(
+      `SELECT a.status, COUNT(DISTINCT a.id)::int AS n
+         FROM checklist_audits a
+         LEFT JOIN checklist_answers ans ON ans.audit_id = a.id
+         LEFT JOIN checklist_criteria c ON c.id = ans.criterion_id
+         LEFT JOIN checklist_domains d ON d.id = c.domain_id
+        WHERE ${statusWhere} GROUP BY a.status`, params)
+
+    // Comparacion con el periodo anterior. Solo se calcula si hay un rango definido: sin fechas,
+    // "el periodo anterior" no existe y cualquier numero seria inventado. La ventana previa es
+    // del mismo largo y termina justo antes del inicio del rango.
+    let previous = null
+    const q = request.query || {}
+    if (q.dateFrom && q.dateTo) {
+      const desde = new Date(`${q.dateFrom}T00:00:00Z`)
+      const hasta = new Date(`${q.dateTo}T00:00:00Z`)
+      const dias = Math.max(1, Math.round((hasta - desde) / 86400000) + 1)
+      const finPrevio = new Date(desde.getTime() - 86400000)
+      const inicioPrevio = new Date(finPrevio.getTime() - (dias - 1) * 86400000)
+      const previoRequest = {
+        ...request,
+        query: { ...q, dateFrom: inicioPrevio.toISOString().slice(0, 10), dateTo: finPrevio.toISOString().slice(0, 10) },
+      }
+      const { params: pParams, where: pWhere } = dataCenterFilters(previoRequest)
+      const [pTally, pCount] = await Promise.all([
+        query(`SELECT ${DC_TALLY} ${DC_FROM} WHERE ${pWhere}`, pParams),
+        query(`SELECT COUNT(DISTINCT a.id)::int AS n ${DC_FROM} WHERE ${pWhere}`, pParams),
+      ])
+      const row = pTally.rows[0] || { c: 0, nc: 0 }
+      const aplicables = Number(row.c) + Number(row.nc)
+      previous = {
+        from: previoRequest.query.dateFrom,
+        to: previoRequest.query.dateTo,
+        percent: aplicables > 0 ? (Number(row.c) / aplicables) * 100 : null,
+        audits: pCount.rows[0].n,
+      }
+    }
+
     const totals = overall.rows[0] || { c: 0, nc: 0, na: 0 }
     const globalPercent = (Number(totals.c) + Number(totals.nc)) > 0
       ? (Number(totals.c) / (Number(totals.c) + Number(totals.nc))) * 100 : null
@@ -1369,6 +1411,8 @@ async function dataCenterData(request) {
       byArea: shape(byArea.rows),
       byDomain: shape(byDomain.rows),
       byCriterion: criteria,
+      statusMix: statusMix.rows.map(row => ({ status: row.status, n: row.n })),
+      previous,
   }
 }
 

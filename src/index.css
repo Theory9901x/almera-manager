@@ -3805,3 +3805,6 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 :root[data-theme="dark"] .ds-table tbody tr:hover td { background: color-mix(in srgb, var(--m-listas) 16%, transparent); }
 :root[data-theme="dark"] .ds-empty-state { color: var(--muted); }
 :root[data-theme="dark"] .ds-empty-state strong { color: var(--ink); }
+.dc-kpi-delta { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dc-kpi-delta.is-up { color: oklch(0.6 0.15 150); }
+.dc-kpi-delta.is-down { color: var(--danger); }

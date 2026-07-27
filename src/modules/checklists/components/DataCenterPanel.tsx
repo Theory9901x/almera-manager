@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, Download, FileSpreadsheet, Loader2, SlidersHorizontal, X } from 'lucide-react'
 import {
-  BarChart, Button, Card, DatePicker, EmptyState, Field, LineChart, Select, Table,
+  BarChart3, Download, Eye, FileSpreadsheet, Loader2, PenLine, SlidersHorizontal,
+  TrendingDown, TrendingUp, X,
+} from 'lucide-react'
+import {
+  BarChart, Button, Card, DatePicker, DonutChart, EmptyState, Field, LineChart, Select, Table,
   moduleIdentity, semaphoreColor, useCountUp, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
@@ -31,8 +34,10 @@ const fmt = (percent: number | null) => percent === null ? 'Sin dato' : `${perce
 const short = (text: string, max = 34) => text.length > max ? `${text.slice(0, max - 1)}…` : text
 
 /** KPI con conteo animado. El color sale del semáforo, no de una paleta decorativa. */
-function Kpi({ label, value, suffix = '', percent, hint }: {
+function Kpi({ label, value, suffix = '', percent, hint, delta }: {
   label: string; value: number; suffix?: string; percent?: number | null; hint?: string
+  /** Diferencia contra el período anterior. Solo se muestra si de verdad se pudo calcular. */
+  delta?: number | null
 }) {
   const animated = useCountUp(value)
   const color = percent === undefined ? undefined : semaphoreColor(percent)
@@ -42,6 +47,12 @@ function Kpi({ label, value, suffix = '', percent, hint }: {
         {suffix === ' %' ? animated.toFixed(1) : Math.round(animated)}{suffix}
       </span>
       <span className="dc-kpi-label">{label}</span>
+      {delta !== undefined && delta !== null && (
+        <span className={`dc-kpi-delta ${delta >= 0 ? 'is-up' : 'is-down'}`}>
+          {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+          {delta >= 0 ? '+' : ''}{delta.toFixed(1)} pts vs. período anterior
+        </span>
+      )}
       {hint && <span className="dc-kpi-hint">{hint}</span>}
     </div>
   )
@@ -218,8 +229,17 @@ export function DataCenterPanel() {
       {!loading && hasData && data && (
         <>
           <div className="dc-kpis">
-            <Kpi label="Adherencia del filtro" value={data.overall.percent ?? 0} suffix=" %" percent={data.overall.percent} hint={`${data.overall.c} C · ${data.overall.nc} NC · ${data.overall.na} NA`} />
-            <Kpi label="Auditorías" value={data.kpis.audits} />
+            <Kpi
+              label="Adherencia del filtro" value={data.overall.percent ?? 0} suffix=" %"
+              percent={data.overall.percent}
+              hint={`${data.overall.c} C · ${data.overall.nc} NC · ${data.overall.na} NA`}
+              delta={data.previous && data.previous.percent !== null && data.overall.percent !== null
+                ? data.overall.percent - data.previous.percent : null}
+            />
+            <Kpi
+              label="Auditorías" value={data.kpis.audits}
+              hint={data.previous ? `${data.previous.audits} en el período anterior` : undefined}
+            />
             <Kpi label="Servicios evaluados" value={data.kpis.areas} />
             <Kpi label="Profesionales evaluados" value={data.kpis.subjects} />
             <Kpi label="Criterios críticos" value={data.kpis.criticalCriteria} percent={data.kpis.criticalCriteria > 0 ? 0 : 100} hint="Por debajo del 70 %" />
@@ -238,6 +258,23 @@ export function DataCenterPanel() {
                   data={data.byDate.map(row => ({ label: row.period || '', value: row.percent }))}
                   color={identity.color} area height={260} valueFormatter={v => `${Math.round(v)}`}
                   referenceLine={{ value: 70, label: 'Mínimo aceptable' }}
+                />
+              </div>
+            </Card>
+
+            <Card accent={identity.color} className="p-5">
+              <p className="ds-eyebrow">Estado</p><h3>Auditorías por estado</h3>
+              {/* Solo dos estados, que son los que el modelo distingue de verdad. No hay
+                  "vencidas" porque ninguna lista tiene plazo. */}
+              <div data-chart="Auditorías por estado">
+                <DonutChart
+                  height={260}
+                  centerLabel="Auditorías"
+                  data={data.statusMix.map(row => ({
+                    label: row.status === 'CERRADA' ? 'Cerradas' : 'En borrador',
+                    value: row.n,
+                    color: row.status === 'CERRADA' ? identity.color : '#94A3B8',
+                  }))}
                 />
               </div>
             </Card>
@@ -332,10 +369,20 @@ export function DataCenterPanel() {
                       <td>{row.auditor_name}</td>
                       <td className="tabular-col"><strong style={{ color: semaphoreColor(row.percent) }}>{fmt(row.percent)}</strong></td>
                       <td>
-                        <button className="row-action" style={{ color: identity.color }}
-                                onClick={() => navigate(`/app/listas-chequeo/auditorias/${row.id}`)}>
-                          Ver y editar
-                        </button>
+                        <div className="row-action-group">
+                          <button className="row-action" style={{ color: identity.color }} title="Ver el detalle"
+                                  onClick={() => navigate(`/app/listas-chequeo/auditorias/${row.id}`)}>
+                            <Eye size={13} /> Ver
+                          </button>
+                          <button className="row-action" style={{ color: identity.color }} title="Abrir para editar"
+                                  onClick={() => navigate(`/app/listas-chequeo/auditorias/${row.id}`)}>
+                            <PenLine size={13} />
+                          </button>
+                          <a className="row-action" style={{ color: identity.color }} title="Descargar su informe PDF"
+                             href={`/api/checklists/audits/${row.id}/report.pdf`} target="_blank" rel="noreferrer">
+                            <Download size={13} />
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   ))}

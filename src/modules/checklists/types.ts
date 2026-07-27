@@ -291,6 +291,11 @@ export interface DataCenterRow {
 
 export interface DataCenter {
   overall: { c: number; nc: number; na: number; percent: number | null; concept: string | null }
+  /** Reparto por estado. Cuenta TODAS, también las que siguen en borrador. */
+  statusMix: { status: string; n: number }[]
+  /** Ventana anterior de igual longitud. `null` si no se filtró por fechas: sin rango, «el
+   *  período anterior» no existe y cualquier número sería inventado. */
+  previous: { from: string; to: string; percent: number | null; audits: number } | null
   kpis: { audits: number; areas: number; subjects: number; auditors: number; criticalCriteria: number }
   byAudit: DataCenterRow[]
   byAuditor: DataCenterRow[]
