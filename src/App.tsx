@@ -9,6 +9,7 @@ import ModulePage from '@/platform/pages/ModulePage'
 import AdherenceConfigPage from '@/platform/pages/AdherenceConfigPage'
 import AdherenceOperationPage from '@/platform/pages/AdherenceOperationPage'
 import AdherenceMyPlansPage from '@/platform/pages/AdherenceMyPlansPage'
+import HcMatrixWindowPage from '@/modules/adherence/pages/HcMatrixWindowPage'
 import MyAccountPage from '@/platform/pages/MyAccountPage'
 import DesignSystemGalleryPage from '@/platform/pages/DesignSystemGalleryPage'
 import SurveysListPage from '@/modules/surveys/pages/SurveysListPage'
@@ -44,6 +45,15 @@ function AdherenceOperationRoute() {
   const canOperate = Boolean(session?.permissions.some(item => ['adherence_matrix.evaluate', 'adherence_matrix.manage'].includes(item)))
   if (!canOperate) return <Navigate to="/app" replace />
   return <AdherenceOperationPage />
+}
+
+function AdherenceMatrixWindowRoute() {
+  const { session } = useAuth()
+  // Misma guarda que la pantalla de operacion: quien puede evaluar puede calificar aqui. El
+  // servidor revalida en cada escritura, asi que la guarda solo evita entrar a una pantalla vacia.
+  const canOperate = Boolean(session?.permissions.some(item => ['adherence_matrix.evaluate', 'adherence_matrix.manage'].includes(item)))
+  if (!canOperate) return <Navigate to="/app" replace />
+  return <HcMatrixWindowPage />
 }
 
 function AdherenceMyPlansRoute() {
@@ -150,6 +160,9 @@ function AppRoutes() {
         <Route path="adherencia/configuracion" element={<AdherenceConfigRoute />} />
         <Route path="adherencia/operacion" element={<AdherenceOperationRoute />} />
         <Route path="adherencia/mis-planes" element={<AdherenceMyPlansRoute />} />
+        {/* La matriz sola, para abrirla en otra ventana/monitor. Dentro de /app para heredar la
+            sesion; el overlay se pinta encima del layout y lo tapa por completo. */}
+        <Route path="adherencia/matriz/:evaluationId" element={<AdherenceMatrixWindowRoute />} />
         <Route path="encuestas" element={<SurveysRoute />} />
         <Route path="encuestas/consolidado" element={<SurveyConsolidatedRoute />} />
         <Route path="encuestas/:surveyId/constructor" element={<SurveyBuilderRoute />} />

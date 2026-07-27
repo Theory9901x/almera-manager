@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  ChevronsLeft, ChevronsRight, Download, Eye, EyeOff, FileSpreadsheet, Minimize2, Pin, Save,
-  Search, Table2,
+  ChevronsLeft, ChevronsRight, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Minimize2,
+  Pin, RefreshCw, Save, Search, Table2,
 } from 'lucide-react'
 import type { Criterion, EvaluationRecord, Score, Scope } from '../types'
 import { HcMatrix } from './HcMatrix'
@@ -33,11 +33,14 @@ const csvCell = (value: string | number | null) => {
  * que sincronizar, hay una sola arriba.
  */
 export function HcMatrixFullscreen({
-  open, onClose, evaluationTitle, evaluationSubtitle, scopes, criteria, records, scores, live,
-  disabled, onScore, onSave, saving, onExportPdf, exporting,
+  open, onClose, closeLabel, evaluationTitle, evaluationSubtitle, scopes, criteria, records,
+  scores, live, disabled, onScore, onSave, saving, onExportPdf, exporting, onOpenWindow, dirty,
+  onReload,
 }: {
   open: boolean
   onClose(): void
+  /** «Salir de pantalla completa» en el overlay; «Cerrar ventana» en la ventana dedicada. */
+  closeLabel?: string
   evaluationTitle: string
   evaluationSubtitle: string
   scopes: Scope[]
@@ -51,6 +54,12 @@ export function HcMatrixFullscreen({
   saving?: boolean
   onExportPdf?(): void
   exporting?: boolean
+  /** Solo en el overlay: abre la matriz en una ventana aparte (dos monitores). */
+  onOpenWindow?(): void
+  /** Hay cambios sin guardar: se dice en el pie, que es donde vive el botón de guardar. */
+  dirty?: boolean
+  /** Solo en la ventana dedicada: recarga desde el servidor para traer lo que se guardó en la otra. */
+  onReload?(): void
 }) {
   const [zoom, setZoom] = useState(100)
   const [stickyColumns, setStickyColumns] = useState(true)
@@ -182,13 +191,23 @@ export function HcMatrixFullscreen({
               <Download size={14} /> {exporting ? 'Generando…' : 'Informe PDF'}
             </button>
           )}
+          {onReload && (
+            <button className="hcfs-btn" onClick={onReload} title="Traer lo que se haya guardado desde la otra pantalla">
+              <RefreshCw size={14} /> Recargar
+            </button>
+          )}
+          {onOpenWindow && (
+            <button className="hcfs-btn" onClick={onOpenWindow} disabled={saving} title="Guarda y abre la matriz en una ventana aparte, para dos monitores">
+              <ExternalLink size={14} /> Ventana nueva
+            </button>
+          )}
           {!disabled && (
-            <button className="hcfs-btn is-pri" onClick={onSave} disabled={saving}>
-              <Save size={14} /> {saving ? 'Guardando…' : 'Guardar calificaciones'}
+            <button className={`hcfs-btn is-pri${dirty ? ' is-dirty' : ''}`} onClick={onSave} disabled={saving}>
+              <Save size={14} /> {saving ? 'Guardando…' : dirty ? 'Guardar cambios' : 'Guardar calificaciones'}
             </button>
           )}
           <button className="hcfs-btn" onClick={onClose}>
-            <Minimize2 size={14} /> Salir de pantalla completa
+            <Minimize2 size={14} /> {closeLabel || 'Salir de pantalla completa'}
           </button>
         </div>
       </header>
@@ -289,6 +308,7 @@ export function HcMatrixFullscreen({
         <div className="hcfs-showing">
           Mostrando {visibleRecords.length} de {records.length} historias clínicas
           {pending > 0 ? ` · faltan ${pending} celdas por calificar` : ' · todo calificado'}
+          {dirty && <span className="hcfs-dirty">· cambios sin guardar</span>}
         </div>
         <div className="hcfs-progress">
           <span><i style={{ width: `${progress}%` }} /></span>

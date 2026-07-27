@@ -5283,3 +5283,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hcfs-cnt b { font-size: 13px; font-weight: 800; color: #E6EAF5; font-variant-numeric: tabular-nums; }
 .hcfs-overall { display: flex; align-items: center; gap: 9px; font-size: 11px; color: #94A0C8; }
 .hcfs-overall b { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* Ventana dedicada de la matriz: mensajes de carga/error a pantalla completa, sobre el mismo
+   fondo oscuro del overlay para que no parpadee en blanco antes de pintar la matriz. */
+.hcwin-msg {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-content: center; justify-items: center;
+  gap: 12px; padding: 24px; text-align: center;
+  background: #0A0E22; color: #94A0C8; font-size: 13px;
+}
+.hcfs-dirty { color: #FBBF24; font-weight: 700; margin-left: 6px; }
+.hcfs-btn.is-pri.is-dirty { box-shadow: 0 0 0 2px rgba(251, 191, 36, .45); }

@@ -12,6 +12,7 @@ import { GradientButton } from '../design/GradientButton'
 import { HcMatrix } from '../design/HcMatrix'
 import { HcMatrixFullscreen } from '../design/HcMatrixFullscreen'
 import { ToastStack } from '../design/Toast'
+import { buildScoreMap, scoresToPayload } from '../design/scoreMap'
 import { useLiveCompliance, type ScoreMap } from '../design/useLiveCompliance'
 import { colorForPercent, conceptFromPercent, CONCEPT_LABELS, type Concept } from '../design/scopeColors'
 
@@ -116,13 +117,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     try {
       const result = await adherenceService.evaluationDetail(id)
       setDetail(result)
-      const map: ScoreMap = {}
-      for (const record of result.records) map[record.id] = {}
-      for (const scoreRow of result.scores) {
-        map[scoreRow.evaluation_record_id] = map[scoreRow.evaluation_record_id] || {}
-        map[scoreRow.evaluation_record_id][scoreRow.criterion_id] = scoreRow.score
-      }
-      setScores(map)
+      setScores(buildScoreMap(result))
       setConcept(result.evaluation.concept)
       setClosureForm({
         generalObservations: result.evaluation.general_observations || '',
@@ -199,9 +194,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     if (!selectedId) return
     setBusy(true); setError('')
     try {
-      const payload = Object.entries(scores).flatMap(([recordId, byCriterion]) =>
-        Object.entries(byCriterion).map(([criterionId, score]) => ({ recordId, criterionId, score })))
-      const result = await adherenceService.saveScores(selectedId, payload)
+      const result = await adherenceService.saveScores(selectedId, scoresToPayload(scores))
       setConcept(result.concept)
       notify('Calificaciones guardadas')
     } catch (caught) { fail(caught, 'No fue posible guardar las calificaciones') } finally { setBusy(false) }
@@ -262,6 +255,28 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       notify('Firma del profesional registrada')
     } catch (caught) { fail(caught, 'No fue posible registrar la firma') } finally { setBusy(false) }
   }
+
+  /**
+   * Abre la matriz en una ventana aparte (dos monitores). GUARDA PRIMERO a proposito: la ventana
+   * nueva carga su copia del servidor y no puede ver el buffer de esta pantalla, asi que sin
+   * guardar arrancaria sin lo ultimo marcado. Si el guardado falla, no se abre nada — mejor un
+   * mensaje que dos ventanas mostrando cosas distintas.
+   */
+  const openInWindow = async () => {
+    if (!selectedId) return
+    setBusy(true); setError('')
+    try {
+      if (!isClosedById(selectedId)) await adherenceService.saveScores(selectedId, scoresToPayload(scores))
+      const url = `${window.location.origin}/app/adherencia/matriz/${selectedId}`
+      const opened = window.open(url, `sgimr-matriz-${selectedId}`, 'width=1600,height=1000')
+      if (!opened) setError('El navegador bloqueó la ventana. Permite las ventanas emergentes de sgimr.cloud e inténtalo de nuevo.')
+      else notify('Calificaciones guardadas y matriz abierta en una ventana aparte')
+    } catch (caught) { fail(caught, 'No fue posible guardar antes de abrir la ventana') }
+    finally { setBusy(false) }
+  }
+
+  /** Una evaluacion cerrada no acepta escrituras: abrir su ventana no debe intentar guardar. */
+  const isClosedById = (id: string) => detail?.evaluation.id === id && detail.evaluation.status === 'CLOSED'
 
   const downloadReport = async () => {
     if (!selectedId) return
@@ -512,6 +527,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           saving={busy}
           onExportPdf={() => void downloadReport()}
           exporting={busy}
+          onOpenWindow={() => void openInWindow()}
         />
 
         <Card accent={identity.color} className="p-5">

@@ -406,6 +406,12 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   `position: sticky` y con 25 columnas el sticky es justo lo que hace usable la matriz.
 - Sticky en los dos ejes con `left` fijos en px (260 / 312): si se cambia el ancho de la columna
   de criterio hay que ajustar los tres, o las columnas fijas se solapan.
+- **Ventana aparte para dos monitores**: ruta `/app/adherencia/matriz/:evaluationId`
+  (`HcMatrixWindowPage`). Es solo para CALIFICAR — sin cierre, firmas ni plan de mejora, que
+  siguen en operacion donde tienen contexto. Carga su propia copia del servidor porque una
+  ventana no puede leer el estado de React de la otra, y por eso el boton «Ventana nueva»
+  **guarda antes de abrir**; si el guardado falla no abre nada. Las conversiones del buffer
+  (`design/scoreMap.ts`) son compartidas para que no haya dos definiciones del payload.
 
 ## 13. Vidrio del módulo de Listas de Chequeo
 
