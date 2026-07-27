@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  ChevronsLeft, ChevronsRight, Download, Eye, EyeOff, Minimize2, Pin, Save, Search, Table2,
+  ChevronsLeft, ChevronsRight, Download, Eye, EyeOff, FileSpreadsheet, Minimize2, Pin, Save,
+  Search, Table2,
 } from 'lucide-react'
 import type { Criterion, EvaluationRecord, Score, Scope } from '../types'
 import { HcMatrix } from './HcMatrix'
@@ -9,6 +10,19 @@ import { colorForPercent } from './scopeColors'
 import type { LiveCompliance, ScoreMap } from './useLiveCompliance'
 
 const ZOOMS = [75, 100, 125]
+
+/** Celda de la escala tal como se lee en la hoja: el numero crudo confundiria 0 con "vacio". */
+function scoreLabel(value: Score | undefined) {
+  if (value === undefined) return ''
+  if (value === null) return 'NA'
+  return String(value)
+}
+
+const csvCell = (value: string | number | null) => {
+  if (value === null || value === undefined) return ''
+  const text = String(value)
+  return /[";\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
 
 /**
  * Modo ampliado de la matriz: overlay a pantalla completa, tema oscuro, pensado para las hasta
@@ -65,6 +79,65 @@ export function HcMatrixFullscreen({
     return true
   }), [records, pinned, hideCompleted, search, live.completedRecordIds])
 
+  /**
+   * Exportacion a Excel del recorte QUE SE ESTA VIENDO: las mismas HC visibles y en el mismo
+   * orden, con la escala tal cual y los porcentajes ponderados. Se arma en el cliente a
+   * proposito — el servidor no sabe que HC oculto el auditor ni cuales fijo, y un export que
+   * no coincide con la pantalla es peor que no tenerlo.
+   */
+  const exportCsv = () => {
+    const head = [
+      'Dimensión', 'Criterio', 'Peso', '% Cumplimiento criterio',
+      ...visibleRecords.map(record => `HC ${record.record_number}`),
+    ]
+    const lines: string[] = [head.map(csvCell).join(';')]
+
+    for (const scope of scopes) {
+      const scopeCriteria = criteria.filter(criterion => criterion.scope_id === scope.id)
+      const scopeWeight = scopeCriteria.reduce((sum, criterion) => sum + Number(criterion.weight), 0)
+      const scopePercent = live.byScope.get(scope.id) ?? null
+      lines.push([
+        scope.name, '(dimensión)', scopeWeight.toFixed(1),
+        scopePercent === null ? 'Sin dato' : scopePercent.toFixed(1),
+        ...visibleRecords.map(() => ''),
+      ].map(csvCell).join(';'))
+
+      for (const criterion of scopeCriteria) {
+        const percent = live.byCriterion.get(criterion.id) ?? null
+        lines.push([
+          scope.name, criterion.text, Number(criterion.weight).toFixed(0),
+          percent === null ? 'Sin dato' : percent.toFixed(1),
+          ...visibleRecords.map(record => scoreLabel(scores[record.id]?.[criterion.id])),
+        ].map(csvCell).join(';'))
+      }
+    }
+
+    lines.push([
+      '% Cumplimiento total por HC', '', '',
+      live.overall === null ? 'Sin dato' : live.overall.toFixed(1),
+      ...visibleRecords.map(record => {
+        const percent = live.byRecord.get(record.id) ?? null
+        return percent === null ? 'Sin dato' : percent.toFixed(1)
+      }),
+    ].map(csvCell).join(';'))
+
+    lines.push('')
+    lines.push(['Escala', '2 = cumple; 1 = parcial; 0 = no cumple; NA = no aplica (excluido del cálculo ponderado)'].map(csvCell).join(';'))
+    lines.push(['Cumple', String(live.counts.two), 'Parcial', String(live.counts.one), 'No cumple', String(live.counts.zero), 'No aplica', String(live.counts.na)].map(csvCell).join(';'))
+    lines.push(['Celdas calificadas', `${live.graded} de ${live.totalCells}`].map(csvCell).join(';'))
+    lines.push([evaluationTitle, evaluationSubtitle].map(csvCell).join(';'))
+
+    // BOM: sin el, Excel en Windows abre el archivo en la codificacion del sistema y
+    // "Diagnóstico" llega hecho un jeroglifico. Separador ';' por la configuracion española.
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `matriz-adherencia-${evaluationTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (!open) return null
 
   const scrollTo = (edge: 'start' | 'end') => {
@@ -101,9 +174,12 @@ export function HcMatrixFullscreen({
           </div>
         </div>
         <div className="hcfs-top-r">
+          <button className="hcfs-btn" onClick={exportCsv} title="Exporta las HC visibles, en el mismo orden que en pantalla">
+            <FileSpreadsheet size={14} /> Excel
+          </button>
           {onExportPdf && (
             <button className="hcfs-btn" onClick={onExportPdf} disabled={exporting}>
-              <Download size={14} /> {exporting ? 'Generando…' : 'Exportar'}
+              <Download size={14} /> {exporting ? 'Generando…' : 'Informe PDF'}
             </button>
           )}
           {!disabled && (
