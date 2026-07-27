@@ -68,7 +68,8 @@ el constructor **no puede tener estructura fija**.
 | Inventario, aseo, orden, limpieza y desinfección | 5–9 |
 | Almacenamiento y conservación | 10, 11, 13–17 |
 
-- Fila final **"Cumplimiento de adherencia"** por colaborador, escala `C` / `NC`.
+- Fila final **"Cumplimiento de adherencia"** por colaborador. En el papel solo trae
+  columnas `C` / `NC`; en la versión digital se unifica a **C / NC / NA** (ver §2.4).
 - Columna de **Observaciones**.
 - **Firma del colaborador** evaluado (no del auditor).
 
@@ -85,26 +86,44 @@ el constructor **no puede tener estructura fija**.
 | Instructivo por criterio | Sí (hoja aparte) | No |
 
 **Por tanto, es configurable por lista (no fijo en código):** los campos de cabecera; el
-tipo de sujeto auditado y sus atributos; la escala de calificación; si los criterios van
-numerados; la cantidad de dominios y criterios; y quién firma y cuántas firmas se
-capturan.
+tipo de sujeto auditado y sus atributos; si los criterios van numerados; la cantidad de
+dominios y criterios; y quién firma y cuántas firmas se capturan.
+
+**La escala NO es configurable:** es fija en todo el módulo (§2.4).
 
 Objetivo declarado por la usuaria: *"el constructor debe ser igual para todas las
 listas"* — una sola herramienta que arma cualquiera de las 13 mediante configuración,
 sin desarrollo nuevo por lista.
 
-### 2.4 Puntos a confirmar con la usuaria antes de la Fase 5
+### 2.4 Decisión tomada: escala única C / NC / NA
 
-1. **Escala real de FO-24.** La grilla impresa solo trae columnas `C` y `NC`, pero el
-   instructivo dice explícitamente *"Marque NA"* en varios criterios. Lo más probable es
-   que la versión digital deba soportar **C/NC/NA**; confirmarlo.
-2. **Granularidad del instructivo de FO-24.** Los criterios del instructivo no calzan
+**Todas las listas usan siempre la misma escala de tres valores**, sin importar lo que
+traiga el formato en papel:
+
+| Valor | Significado | Efecto en el cálculo |
+|---|---|---|
+| `C` | Cumple | Suma al numerador y al denominador |
+| `NC` | No cumple | Suma solo al denominador |
+| `NA` | No aplica | **Se excluye por completo** |
+
+Esto zanja la ambigüedad de los formatos: FO-24 imprime solo `C`/`NC` pero su
+instructivo dice *"Marque NA"* en varios criterios, y FO-26 tampoco trae columna de NA
+aunque hay criterios que no aplican a todo colaborador. Al unificar:
+
+- **La escala no se configura por lista** — no hay selector de escala en el constructor
+  ni tabla de escalas en el modelo.
+- **Todo criterio admite NA**, siempre. No hace falta un campo `admite_na`.
+- El motor de adherencia tiene **una sola fórmula**, sin ramas por tipo de escala (§4).
+
+### 2.5 Puntos aún por confirmar con la usuaria antes de la Fase 5
+
+1. **Granularidad del instructivo de FO-24.** Los criterios del instructivo no calzan
    1:1 con los de la grilla (el instructivo separa "manilla con datos correctos" y
    "manilla con datos legibles"; la grilla los une). Hay que decidir cuál manda.
-3. **Numeración con saltos** (FO-26 va 11 → 13): ¿se corrige o se respeta el formato
+2. **Numeración con saltos** (FO-26 va 11 → 13): ¿se corrige o se respeta el formato
    institucional? Mientras no se decida, el número debe ser **texto libre**, no
    autogenerado.
-4. **FO-41 está duplicado** en la carpeta: confirmar cuál versión es la vigente.
+3. **FO-41 está duplicado** en la carpeta: confirmar cuál versión es la vigente.
 
 ---
 
@@ -115,12 +134,11 @@ Sigue las convenciones de `schema.sql` (idempotente, prefijo por módulo,
 
 ```
 checklist_templates        La lista: código, versión, nombre, area_id, tipo de sujeto,
-                           escala, si numera ítems, activa, organization_id
+                           si numera ítems, activa, organization_id
 checklist_header_fields    Campos de cabecera configurables (label, tipo, orden, requerido)
 checklist_subject_fields   Atributos del sujeto auditado (label, tipo, orden, requerido)
 checklist_domains          Dominios/paquetes (nombre, orden) → template
-checklist_criteria         Criterios (texto, número opcional, instructivo, admite_na, orden) → dominio
-checklist_scales           Escala por lista: valores, etiqueta, si cuenta como cumple/no aplica
+checklist_criteria         Criterios (texto, número opcional, instructivo, orden) → dominio
 checklist_assignments      Qué membresía puede diligenciar qué lista
 
 checklist_audits           Una auditoría diligenciada: template, fecha, autor, estado,
@@ -134,9 +152,13 @@ checklist_signatures       Firma: auditoría, persona, rol de firma, imagen, fec
 
 Notas de diseño:
 
-- **Reservar variedad en el enum de escala desde el inicio** aunque la UI de la Fase 1
-  solo exponga C/NC/NA — es el patrón que ya se usó en `survey_questions.type` para no
-  rehacer el modelo después.
+- `checklist_answers.value` es un enum `C` / `NC` / `NA` con `CHECK`, igual para todas
+  las listas. Al ser una columna enum y no un booleano, si algún día apareciera un valor
+  nuevo se agrega al `CHECK` sin rehacer el modelo — pero **hoy no se expone ninguna
+  opción de escala en el constructor**.
+- Un criterio sin responder (`NULL`) **no es lo mismo que `NA`**: `NULL` es "falta
+  diligenciar" y debe bloquear el cierre de la auditoría; `NA` es una respuesta válida
+  que declara que el criterio no aplica.
 - El **snapshot de atributos** del sujeto en la auditoría importa: si un colaborador
   cambia de cargo, la auditoría vieja debe seguir mostrando el cargo que tenía.
 - La firma se guarda como imagen (data URL o archivo en `shared/uploads/checklists`) y
@@ -146,17 +168,20 @@ Notas de diseño:
 
 ## 4. Cálculo de adherencia
 
-Regla base:
+Fórmula **única**, igual para todas las listas (la escala es fija, §2.4):
 
 ```
-Adherencia (%) = criterios en C / criterios aplicables × 100
-donde criterios aplicables = evaluados − marcados NA
+Adherencia (%) = C / (C + NC) × 100
 ```
 
-- Con escala que incluye NA, el **NA se excluye del denominador** (igual que en
-  Matrices de Adherencia: un criterio que no aplica no penaliza). Con escala C/NC el
-  denominador es el total evaluado.
-- El motor debe ser **dinámico y configurable**, nunca una fórmula fija por lista.
+- El **NA se excluye del denominador**: un criterio que no aplica no penaliza. Es el
+  mismo criterio que ya usa Matrices de Adherencia.
+- Si un sujeto o dominio queda con **todo NA**, el denominador es 0: la adherencia es
+  `null` ("sin dato"), **no 0 %**. Mostrarlo con el gris de `SEMAPHORE_NO_DATA`, nunca
+  en rojo — marcar como incumplimiento algo que no aplicaba sería un error de lectura
+  clínica.
+- El motor recorre dominios y criterios de forma **dinámica** (cada lista tiene distinta
+  cantidad), pero la fórmula no cambia por lista.
   Referencia obligada: `computeCompliance()` en `server/routes/adherence.mjs`, que ya
   resuelve la exclusión de NA (ahí, `score === null`) y la agregación por ámbito.
 - Se calcula a **cuatro niveles**:
@@ -175,10 +200,10 @@ configurables por lista y por defecto ≥90 / 80–89 / 70–79 / <70.
 
 ### A. Constructor y administración (equipo de calidad)
 
-- Crear lista: código, versión, área/servicio, tipo de sujeto auditado, escala,
-  umbrales de semáforo.
-- Definir dominios y, dentro de cada uno, criterios (texto, numeración opcional, si
-  admite NA, **texto de instructivo**).
+- Crear lista: código, versión, área/servicio, tipo de sujeto auditado, umbrales de
+  semáforo. **No hay selector de escala**: siempre es C / NC / NA.
+- Definir dominios y, dentro de cada uno, criterios (texto, numeración opcional,
+  **texto de instructivo**).
 - Configurar los campos de cabecera y los atributos del sujeto.
 - Asignar qué profesionales pueden diligenciar cada lista.
 - Vista previa tal como la verá el auditor.
