@@ -278,6 +278,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fase 1**: constructor + motor de adherencia |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -331,9 +332,23 @@ página y visor propio de PDF.
 
 ## 11. Trabajo pendiente
 
-**Módulo "Listas de Chequeo" (auditoría por adherencia)** — especificado y aún **no
-implementado**. Es el próximo gran bloque de trabajo, en 5 fases.
+**Módulo "Listas de Chequeo" (auditoría por adherencia)** — plan de 5 fases.
+**Fase 1 entregada** (modelo de datos completo, constructor genérico y motor de
+adherencia); **faltan las fases 2 a 5**:
 
-→ **`docs/MODULO-LISTAS-DE-CHEQUEO.md`** contiene el plan completo, el modelo de datos
-propuesto y el análisis real de los dos formatos institucionales que definen la
-estructura. Léelo antes de empezar.
+| Fase | Alcance | Estado |
+|---|---|---|
+| 1 | Modelo, constructor, motor de adherencia, semaforización | **Hecha** |
+| 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | Pendiente |
+| 3 | Firmas digitales en canvas + directorio de firmantes | Pendiente |
+| 4 | Analítica, gráficas e informes PDF | Pendiente |
+| 5 | Migración de las 13 listas reales de seguridad del paciente | Pendiente |
+
+Piezas ya disponibles para las siguientes fases: `server/checklistScoring.mjs` (motor
+puro, ya cubre los cuatro niveles de agregación y el conteo de pendientes) y las tablas
+`checklist_audits` / `checklist_audit_subjects` / `checklist_answers` /
+`checklist_signatures`, creadas desde la Fase 1 aunque todavía sin interfaz.
+
+→ **`docs/MODULO-LISTAS-DE-CHEQUEO.md`** tiene el plan completo, el modelo, la decisión
+de escala fija C/NC/NA y el análisis real de los dos formatos institucionales. Léelo
+antes de continuar.

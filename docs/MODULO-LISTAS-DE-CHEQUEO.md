@@ -1,7 +1,8 @@
 # Módulo "Listas de Chequeo" — Auditoría por Adherencia
 
-Estado: **especificado, no implementado.** Este documento es el plan completo.
-Leer primero `CLAUDE.md` (arquitectura, sistema de diseño y reglas de trabajo).
+Estado: **Fase 1 entregada** (modelo, constructor y motor de adherencia); fases 2 a 5
+pendientes. Este documento es el plan completo — ver §8 para las fases y §10 para lo ya
+construido. Leer primero `CLAUDE.md` (arquitectura, sistema de diseño y reglas de trabajo).
 
 ---
 
@@ -123,7 +124,11 @@ aunque hay criterios que no aplican a todo colaborador. Al unificar:
 2. **Numeración con saltos** (FO-26 va 11 → 13): ¿se corrige o se respeta el formato
    institucional? Mientras no se decida, el número debe ser **texto libre**, no
    autogenerado.
-3. **FO-41 está duplicado** en la carpeta: confirmar cuál versión es la vigente.
+
+**Resuelto:** los dos archivos `GCM-SPA-FO-41` de la carpeta son la misma lista. Se
+carga **una sola vez**; el módulo no debe crear listas duplicadas por código. Conviene
+que `checklist_templates` tenga índice único por `(organization_id, code, version)`
+para que el error sea imposible por construcción.
 
 ---
 
@@ -271,7 +276,7 @@ no como parche aislado). **No avanzar sin verificar la anterior.**
 
 | Fase | Alcance | Entregable verificable |
 |---|---|---|
-| **1** | Modelo de datos, constructor de listas por área, motor de adherencia dinámico con exclusión de NA, semaforización. Sin firmas ni analítica. | Crear una lista de prueba con dominios y criterios, y que calcule adherencia correctamente. |
+| **1** ✅ | Modelo de datos, constructor de listas por área, motor de adherencia dinámico con exclusión de NA, semaforización. Sin firmas ni analítica. | **Entregada.** Ver §10. |
 | **2** | Entorno de diligenciamiento: asignación, cabecera → sujetos → evaluación → guardado con cálculo. Directorio reutilizable de sujetos. | Un profesional asignado completa una auditoría de principio a fin y ve su adherencia semaforizada. |
 | **3** | Firmas digitales en canvas (tablet), asociación al registro, directorio reutilizable de firmantes. | Firmar una auditoría desde pantalla táctil y ver la firma en el registro. |
 | **4** | Analítica: tableros por dominio/criterio/servicio/evolución, informe PDF individual y consolidado. | PDF institucional generado y tablero con datos reales. |
@@ -307,3 +312,69 @@ Para leer un `.xlsx` sin dependencias nuevas: es un ZIP; se expande y se parsean
 `xl/sharedStrings.xml` y `xl/worksheets/sheetN.xml`. **Cuidado:** las celdas
 auto-cerradas (`<c r="A3" s="4"/>`) desplazan las columnas si el parser solo busca el
 par `<c …>…</c>`; hay que contemplar ambas formas.
+
+---
+
+## 10. Fase 1 — entregada
+
+### Archivos
+
+| Archivo | Rol |
+|---|---|
+| `server/checklistScoring.mjs` | **Motor de adherencia**, función pura y sin dependencias |
+| `server/schema.sql` (sección final) | Módulo, permisos, backfill y 11 tablas del dominio |
+| `server/routes/checklists.mjs` | CRUD del constructor + guardado atómico + simulación |
+| `server/auth.mjs` | Permisos de USUARIO del módulo |
+| `server/index.mjs` | Monta `/api/checklists` bajo `requireAuth` |
+| `src/modules/checklists/types.ts` | Tipos compartidos y etiquetas de la escala |
+| `src/modules/checklists/services/checklistsService.ts` | Cliente HTTP |
+| `src/modules/checklists/pages/ChecklistsListPage.tsx` | Listado y alta de listas |
+| `src/modules/checklists/pages/ChecklistBuilderPage.tsx` | Constructor (3 pestañas) |
+| `src/design-system/tokens.ts` | Identidad `checklists` (`#bb4717`) |
+| `src/index.css` (sección final) | Estilos del módulo |
+| `src/App.tsx`, `src/platform/layout/AppLayout.tsx` | Rutas y sidebar |
+
+### Decisiones tomadas al implementar
+
+- **Guardado atómico de estructura.** El constructor manda dominios, criterios y campos
+  en un solo `PUT /:id/structure` dentro de una transacción, en vez de decenas de
+  llamadas granulares. Encaja con el botón "Guardar" explícito y evita dejar la lista a
+  medio guardar si falla una llamada intermedia.
+- **Ids temporales del cliente.** Lo que no es un entero (`new_dom_a1b2`) se trata como
+  alta. Así el constructor arma la estructura completa sin pedirle ids al servidor.
+- **Un criterio ya respondido no se borra**, se marca `active = FALSE`. Borrarlo
+  arrastraría por FK las respuestas de auditorías anteriores. El motor ignora los
+  inactivos, así que los históricos se conservan sin ensuciar el cálculo.
+- **Una lista con auditorías no se elimina**, se archiva (el `DELETE` responde 409).
+- **Catálogo propio de áreas** (`checklist_areas`) en vez de reusar `adherence_areas`:
+  allá un "área" posee una matriz versionada y su ciclo de vida es otro.
+- **Índice único parcial** por `(organization_id, code, version)` cuando el código no
+  está vacío: hace imposible cargar dos veces la misma lista, que es justo el error que
+  traía la carpeta de origen con FO-41.
+
+### Verificación
+
+Motor probado contra cinco escenarios, incluidos los casos límite que la fórmula única
+deja expuestos:
+
+1. Caso normal — general 80 %, por sujeto 66.7 % y 100 %, por dominio 100 % y 0 %.
+2. **Todo NA** → `percent = null` ("sin dato"), **no 0 %**, y sin concepto de semáforo.
+3. **Sin responder ≠ NA** → `pending = 5`, `complete = false`; lo no respondido no
+   infla ni castiga el porcentaje.
+4. Lista vacía y respuestas huérfanas (criterio borrado) → no rompe ni contamina.
+5. Semáforo en los cortes exactos 90 / 80 / 70, y `0 %` real sí recibe concepto
+   (distinto de "sin dato").
+
+La interfaz se verificó con el flujo de Puppeteer de `CLAUDE.md` §6: hero de identidad,
+editor de dominios y criterios, grilla de prueba con encabezado y primera columna
+pegajosos, y el panel de resultado mostrando **"Sin dato" en gris** para el dominio con
+todo NA junto a porcentajes semaforizados.
+
+### Lo que la Fase 1 deliberadamente NO trae
+
+Diligenciamiento real, directorio de sujetos, firmas, analítica e informes PDF. Las
+tablas de esas fases (`checklist_audits`, `checklist_audit_subjects`,
+`checklist_answers`, `checklist_signatures`) ya existen para no reformar el modelo
+después, pero no tienen interfaz. La pestaña "Prueba de cálculo" del constructor es una
+**simulación** que corre contra el motor real del servidor: sirve para validar la
+estructura antes de publicar, no guarda nada.

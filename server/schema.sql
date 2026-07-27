@@ -755,3 +755,188 @@ CREATE TABLE IF NOT EXISTS carbon_quarterly_analyses (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (organization_id, year, quarter)
 );
+
+-- ============================================================================
+-- Listas de Chequeo (auditoria por adherencia) — modulo hermano de Encuestas en
+-- estructura (constructor + diligenciamiento) y de Matrices de Adherencia en logica
+-- (produce un % de adherencia semaforizado). Ver docs/MODULO-LISTAS-DE-CHEQUEO.md.
+--
+-- El constructor es GENERICO: los formatos institucionales reales no comparten
+-- estructura (uno audita pacientes y otro colaboradores, con cabeceras y numeracion
+-- distintas), asi que cabecera, atributos del sujeto, dominios y criterios son datos,
+-- no codigo. Lo unico fijo es la escala: siempre C / NC / NA.
+-- ============================================================================
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('checklists', 'Listas de Chequeo', 'Auditorias por adherencia: constructor generico de listas, diligenciamiento por servicio e indicador de adherencia semaforizado', '/app/listas-chequeo', 'list-checks', 16, TRUE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
+-- Backfill: el auto-enable solo corre al CREAR una organizacion (ver db.mjs bootstrap()),
+-- asi que las entidades ya existentes se habilitan aqui una sola vez.
+INSERT INTO organization_modules (organization_id, module_id, enabled)
+SELECT o.id, m.id, TRUE FROM organizations o, modules m WHERE m.key = 'checklists'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO permissions (key, name, description) VALUES
+  ('checklists.view', 'Ver listas de chequeo', 'Consultar listas, auditorias y resultados de adherencia'),
+  ('checklists.manage', 'Administrar listas de chequeo', 'Crear y editar listas, dominios, criterios y asignaciones'),
+  ('checklists.fill', 'Diligenciar listas de chequeo', 'Ejecutar auditorias sobre las listas asignadas'),
+  ('checklists.export', 'Exportar listas de chequeo', 'Generar informes PDF individuales y consolidados')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+-- Catalogo propio de areas/servicios. No se reusa adherence_areas a proposito: alla un
+-- "area" posee una matriz versionada y su ciclo de vida es otro; aca es solo el servicio
+-- auditado (Urgencias, UCI, Hospitalizacion...).
+CREATE TABLE IF NOT EXISTS checklist_areas (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, name)
+);
+
+-- subject_label: que se audita en esta lista ("Paciente", "Colaborador", "Consultorio"...).
+-- numbered_items: si los criterios se muestran numerados (FO-26 si, FO-24 no).
+CREATE TABLE IF NOT EXISTS checklist_templates (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  area_id BIGINT REFERENCES checklist_areas(id) ON DELETE SET NULL,
+  code TEXT NOT NULL DEFAULT '',
+  version TEXT NOT NULL DEFAULT '01',
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  subject_label TEXT NOT NULL DEFAULT 'Sujeto auditado',
+  numbered_items BOOLEAN NOT NULL DEFAULT FALSE,
+  status TEXT NOT NULL DEFAULT 'BORRADOR' CHECK (status IN ('BORRADOR', 'PUBLICADA', 'ARCHIVADA')),
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_templates_org_idx ON checklist_templates(organization_id, status);
+-- Evita cargar dos veces la misma lista (en la carpeta de origen GCM-SPA-FO-41 venia
+-- duplicado y es el mismo formato). El indice ignora los codigos vacios de un borrador nuevo.
+CREATE UNIQUE INDEX IF NOT EXISTS checklist_templates_code_uidx
+  ON checklist_templates(organization_id, code, version) WHERE code <> '';
+
+-- Campos de la cabecera (datos generales) y atributos del sujeto auditado: ambos son
+-- listas de campos configurables por lista, por eso comparten forma.
+CREATE TABLE IF NOT EXISTS checklist_header_fields (
+  id BIGSERIAL PRIMARY KEY,
+  template_id BIGINT NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  field_type TEXT NOT NULL DEFAULT 'TEXT' CHECK (field_type IN ('TEXT', 'LONG_TEXT', 'DATE', 'NUMBER', 'SELECT')),
+  options JSONB NOT NULL DEFAULT '[]'::jsonb,
+  required BOOLEAN NOT NULL DEFAULT FALSE,
+  order_index INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS checklist_header_fields_idx ON checklist_header_fields(template_id, order_index);
+
+CREATE TABLE IF NOT EXISTS checklist_subject_fields (
+  id BIGSERIAL PRIMARY KEY,
+  template_id BIGINT NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  field_type TEXT NOT NULL DEFAULT 'TEXT' CHECK (field_type IN ('TEXT', 'LONG_TEXT', 'DATE', 'NUMBER', 'SELECT')),
+  options JSONB NOT NULL DEFAULT '[]'::jsonb,
+  required BOOLEAN NOT NULL DEFAULT FALSE,
+  order_index INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS checklist_subject_fields_idx ON checklist_subject_fields(template_id, order_index);
+
+CREATE TABLE IF NOT EXISTS checklist_domains (
+  id BIGSERIAL PRIMARY KEY,
+  template_id BIGINT NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  order_index INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS checklist_domains_idx ON checklist_domains(template_id, order_index);
+
+-- item_number es TEXTO libre, no autogenerado: los formatos reales traen numeraciones con
+-- saltos (FO-26 va 11 -> 13) y hay que poder respetarlas tal cual.
+-- guidance es el instructivo por criterio ("Marque SI si...; Marque NA si no tiene dispositivos").
+CREATE TABLE IF NOT EXISTS checklist_criteria (
+  id BIGSERIAL PRIMARY KEY,
+  domain_id BIGINT NOT NULL REFERENCES checklist_domains(id) ON DELETE CASCADE,
+  item_number TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  guidance TEXT NOT NULL DEFAULT '',
+  order_index INTEGER NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT TRUE
+);
+CREATE INDEX IF NOT EXISTS checklist_criteria_idx ON checklist_criteria(domain_id, order_index);
+
+-- Que membresia puede diligenciar que lista (fase 2).
+CREATE TABLE IF NOT EXISTS checklist_assignments (
+  template_id BIGINT NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  membership_id BIGINT NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (template_id, membership_id)
+);
+
+-- Directorio reutilizable de sujetos auditados: se registran una vez y se traen en auditorias
+-- siguientes sin volver a crearlos (requisito explicito). attributes guarda los valores de
+-- checklist_subject_fields, que varian por lista.
+CREATE TABLE IF NOT EXISTS checklist_subjects (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  template_id BIGINT REFERENCES checklist_templates(id) ON DELETE SET NULL,
+  display_name TEXT NOT NULL,
+  attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_subjects_org_idx ON checklist_subjects(organization_id, template_id);
+
+CREATE TABLE IF NOT EXISTS checklist_audits (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  template_id BIGINT NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  area_id BIGINT REFERENCES checklist_areas(id) ON DELETE SET NULL,
+  audit_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  header_values JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status TEXT NOT NULL DEFAULT 'BORRADOR' CHECK (status IN ('BORRADOR', 'CERRADA')),
+  adherence_percent NUMERIC,
+  concept TEXT,
+  auditor_id BIGINT NOT NULL REFERENCES users(id),
+  closed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_audits_org_idx ON checklist_audits(organization_id, template_id, audit_date DESC);
+
+-- attributes_snapshot: si el sujeto cambia de cargo/cama mas adelante, la auditoria vieja debe
+-- seguir mostrando lo que tenia el dia de la ronda.
+CREATE TABLE IF NOT EXISTS checklist_audit_subjects (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  subject_id BIGINT REFERENCES checklist_subjects(id) ON DELETE SET NULL,
+  display_name TEXT NOT NULL,
+  attributes_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  order_index INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS checklist_audit_subjects_idx ON checklist_audit_subjects(audit_id, order_index);
+
+-- Escala fija en el CHECK: C / NC / NA, igual para todas las listas. Sin fila = sin responder,
+-- que NO es lo mismo que NA (NA es respuesta deliberada; sin responder bloquea el cierre).
+CREATE TABLE IF NOT EXISTS checklist_answers (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  audit_subject_id BIGINT NOT NULL REFERENCES checklist_audit_subjects(id) ON DELETE CASCADE,
+  criterion_id BIGINT NOT NULL REFERENCES checklist_criteria(id) ON DELETE CASCADE,
+  value TEXT NOT NULL CHECK (value IN ('C', 'NC', 'NA')),
+  observation TEXT NOT NULL DEFAULT '',
+  UNIQUE (audit_subject_id, criterion_id)
+);
+CREATE INDEX IF NOT EXISTS checklist_answers_audit_idx ON checklist_answers(audit_id);
+
+-- Firmas (fase 3): imagen del canvas + persona + fecha, por trazabilidad.
+CREATE TABLE IF NOT EXISTS checklist_signatures (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES checklist_audits(id) ON DELETE CASCADE,
+  signer_name TEXT NOT NULL,
+  signer_role TEXT NOT NULL DEFAULT '',
+  signature_image TEXT NOT NULL DEFAULT '',
+  signed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS checklist_signatures_idx ON checklist_signatures(audit_id);

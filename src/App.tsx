@@ -20,6 +20,8 @@ import PublicSurveyPage from '@/modules/surveys/pages/PublicSurveyPage'
 import CarbonDashboardPage from '@/modules/carbon/pages/CarbonDashboardPage'
 import CarbonCapturePage from '@/modules/carbon/pages/CarbonCapturePage'
 import CarbonConfigPage from '@/modules/carbon/pages/CarbonConfigPage'
+import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
+import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -89,6 +91,20 @@ function CarbonConfigRoute() {
   return <CarbonConfigPage />
 }
 
+function ChecklistsRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('checklists.view')) return <Navigate to="/app" replace />
+  return <ChecklistsListPage />
+}
+
+function ChecklistBuilderRoute() {
+  const { session } = useAuth()
+  // Se entra tambien solo con .view: el constructor se muestra en modo lectura para quien no
+  // administra (poder consultar los criterios de una lista es parte de auditar bien).
+  if (!session?.permissions.includes('checklists.view')) return <Navigate to="/app" replace />
+  return <ChecklistBuilderPage />
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -110,6 +126,8 @@ function AppRoutes() {
         <Route path="encuestas/:surveyId/constructor" element={<SurveyBuilderRoute />} />
         <Route path="encuestas/:surveyId/resultados" element={<SurveyResultsRoute />} />
         <Route path="encuestas/:surveyId/respuestas" element={<SurveyResponsesRoute />} />
+        <Route path="listas-chequeo" element={<ChecklistsRoute />} />
+        <Route path="listas-chequeo/:templateId/constructor" element={<ChecklistBuilderRoute />} />
         <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />
         <Route path="huella-carbono/captura" element={<CarbonRoute><CarbonCapturePage /></CarbonRoute>} />
         <Route path="huella-carbono/configuracion" element={<CarbonConfigRoute />} />

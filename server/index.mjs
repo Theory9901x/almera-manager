@@ -11,6 +11,7 @@ import { adherenceRouter } from './routes/adherence.mjs'
 import { surveysRouter } from './routes/surveys.mjs'
 import { surveysPublicRouter } from './routes/surveysPublic.mjs'
 import { carbonRouter } from './routes/carbon.mjs'
+import { checklistsRouter } from './routes/checklists.mjs'
 
 const isDev = process.argv.includes('--dev')
 if (isDev) process.env.NODE_ENV = 'development'
@@ -53,6 +54,7 @@ app.use('/api/almera', requireAuth, almeraRouter)
 app.use('/api/adherence', requireAuth, adherenceRouter)
 app.use('/api/surveys', requireAuth, surveysRouter)
 app.use('/api/carbon', requireAuth, carbonRouter)
+app.use('/api/checklists', requireAuth, checklistsRouter)
 // Sin requireAuth: es la unica superficie publica del sistema, para que cualquiera con el
 // enlace pueda responder una encuesta externa sin iniciar sesion.
 app.use('/api/public/surveys', surveysPublicRouter)

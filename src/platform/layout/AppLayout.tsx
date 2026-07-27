@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck, ClipboardList,
-  FileBarChart2, Headphones, LayoutDashboard, Leaf, LogOut, Menu, Search, Settings,
+  FileBarChart2, Headphones, LayoutDashboard, Leaf, ListChecks, LogOut, Menu, Search, Settings,
   ShieldCheck, Sparkles, Users, X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -20,6 +20,7 @@ const icons = {
   'shield-check': ShieldCheck,
   'bar-chart': BarChart3,
   leaf: Leaf,
+  'list-checks': ListChecks,
   settings: Settings,
   users: Users,
   building: Building2,

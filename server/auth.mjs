@@ -20,6 +20,11 @@ const USUARIO_MODULE_PERMISSIONS = {
   // fuera de este mapa a proposito: solo admin-tier lo recibe (bypassa este mapa por completo),
   // nunca un USUARIO comun aunque se le habilite el modulo.
   'carbon-footprint': ['carbon.view', 'carbon.capture', 'carbon.export'],
+  // Listas de Chequeo: un USUARIO al que se le habilite el modulo es un AUDITOR — consulta y
+  // diligencia las listas que le asignen. checklists.manage (construir y editar las listas
+  // institucionales) se deja fuera a proposito, como carbon.manage: eso es del equipo de calidad,
+  // no de quien sale a hacer la ronda.
+  checklists: ['checklists.view', 'checklists.fill', 'checklists.export'],
 }
 
 // adherence-matrix es un caso especial: el permiso depende de la funcion elegida al habilitar
