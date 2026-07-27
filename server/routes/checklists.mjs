@@ -264,7 +264,10 @@ async function auditPayload(audit) {
   })
   return {
     ...audit,
-    headerFields,
+    // .rows, no el resultado crudo de pg: los demas campos ya lo hacian y este se quedo atras.
+    // Salia un objeto donde el cliente y la plantilla del PDF esperan un array, asi que
+    // reventaban por igual la pantalla de diligenciamiento y el informe.
+    headerFields: headerFields.rows,
     subjectFields: structure.subjectFields,
     domains: structure.domains,
     subjects: subjects.rows,
@@ -746,26 +749,34 @@ function percentOf(row) {
 checklistsRouter.get('/analytics/summary', checklistsModule, view, async (request, response, next) => {
   try {
     const { params, where } = analyticsFilters(request)
-    const join = `FROM checklist_audits a JOIN checklist_answers ans ON ans.audit_id = a.id WHERE ${where}`
+    // El FROM y el WHERE van SEPARADOS a proposito. Antes esto era un solo trozo que ya incluia
+    // el WHERE, y cada consulta le pegaba sus JOIN detras: SQL invalido (`... WHERE ... JOIN ...`)
+    // que reventaba cinco de las siete consultas y dejaba la analitica entera sin cargar.
+    const from = 'FROM checklist_audits a JOIN checklist_answers ans ON ans.audit_id = a.id'
+    const filter = `WHERE ${where}`
 
     const [overall, byTemplate, byArea, byDomain, byMonth, worst, auditCount] = await Promise.all([
-      query(`SELECT ${TALLY} ${join}`, params),
+      query(`SELECT ${TALLY} ${from} ${filter}`, params),
       query(`SELECT t.id, t.name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
-             ${join} JOIN checklist_templates t ON t.id = a.template_id
+             ${from} JOIN checklist_templates t ON t.id = a.template_id
+             ${filter}
              GROUP BY t.id, t.name ORDER BY t.name`, params),
       query(`SELECT COALESCE(ar.name, 'Sin área') AS name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
-             ${join} LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+             ${from} LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+             ${filter}
              GROUP BY ar.name ORDER BY ar.name NULLS LAST`, params),
       query(`SELECT d.id, d.name, ${TALLY}
-             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id
+             ${from} JOIN checklist_criteria c ON c.id = ans.criterion_id
                      JOIN checklist_domains d ON d.id = c.domain_id
+             ${filter}
              GROUP BY d.id, d.name ORDER BY d.name`, params),
       query(`SELECT to_char(a.audit_date, 'YYYY-MM') AS period, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
-             ${join} GROUP BY period ORDER BY period`, params),
+             ${from} ${filter} GROUP BY period ORDER BY period`, params),
       query(`SELECT c.id, c.text, t.name AS template_name, ${TALLY}
-             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id
+             ${from} JOIN checklist_criteria c ON c.id = ans.criterion_id
                      JOIN checklist_domains d ON d.id = c.domain_id
                      JOIN checklist_templates t ON t.id = d.template_id
+             ${filter}
              GROUP BY c.id, c.text, t.name
              HAVING COUNT(*) FILTER (WHERE ans.value IN ('C','NC')) > 0
              ORDER BY (COUNT(*) FILTER (WHERE ans.value = 'C')::numeric
@@ -823,21 +834,28 @@ checklistsRouter.get('/audits/:auditId/report.pdf', checklistsModule, view, asyn
 checklistsRouter.get('/analytics/consolidated.pdf', checklistsModule, view, async (request, response, next) => {
   try {
     const { params, where } = analyticsFilters(request)
-    const join = `FROM checklist_audits a JOIN checklist_answers ans ON ans.audit_id = a.id WHERE ${where}`
+    // Mismo reparto que en /analytics/summary: los JOIN de cada consulta tienen que ir ANTES
+    // del WHERE, no detras.
+    const from = 'FROM checklist_audits a JOIN checklist_answers ans ON ans.audit_id = a.id'
+    const filter = `WHERE ${where}`
 
     const [overall, byTemplate, byArea, byDomain, worst, audits, organization] = await Promise.all([
-      query(`SELECT ${TALLY} ${join}`, params),
+      query(`SELECT ${TALLY} ${from} ${filter}`, params),
       query(`SELECT t.name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
-             ${join} JOIN checklist_templates t ON t.id = a.template_id GROUP BY t.name ORDER BY t.name`, params),
+             ${from} JOIN checklist_templates t ON t.id = a.template_id
+             ${filter} GROUP BY t.name ORDER BY t.name`, params),
       query(`SELECT COALESCE(ar.name, 'Sin área') AS name, COUNT(DISTINCT a.id)::int AS audits, ${TALLY}
-             ${join} LEFT JOIN checklist_areas ar ON ar.id = a.area_id GROUP BY ar.name ORDER BY ar.name NULLS LAST`, params),
+             ${from} LEFT JOIN checklist_areas ar ON ar.id = a.area_id
+             ${filter} GROUP BY ar.name ORDER BY ar.name NULLS LAST`, params),
       query(`SELECT d.name, ${TALLY}
-             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id JOIN checklist_domains d ON d.id = c.domain_id
+             ${from} JOIN checklist_criteria c ON c.id = ans.criterion_id JOIN checklist_domains d ON d.id = c.domain_id
+             ${filter}
              GROUP BY d.name ORDER BY d.name`, params),
       query(`SELECT c.text, t.name AS template_name, ${TALLY}
-             ${join} JOIN checklist_criteria c ON c.id = ans.criterion_id
+             ${from} JOIN checklist_criteria c ON c.id = ans.criterion_id
                      JOIN checklist_domains d ON d.id = c.domain_id
                      JOIN checklist_templates t ON t.id = d.template_id
+             ${filter}
              GROUP BY c.text, t.name
              HAVING COUNT(*) FILTER (WHERE ans.value IN ('C','NC')) > 0
              ORDER BY (COUNT(*) FILTER (WHERE ans.value = 'C')::numeric
