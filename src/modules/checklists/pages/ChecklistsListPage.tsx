@@ -432,7 +432,7 @@ function ChecklistsListContent() {
                       <Select
                         value={form.areaId || 'NONE'}
                         onChange={value => setForm({ ...form, areaId: value === 'NONE' ? '' : value })}
-                        options={[{ value: 'NONE', label: 'Sin asignar' }, ...areas.map(area => ({ value: area.id, label: area.name }))]}
+                        options={[{ value: 'NONE', label: 'Sin asignar' }, ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
                       />
                     </Field>
                   </div>

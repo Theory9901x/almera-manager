@@ -212,7 +212,7 @@ function ChecklistBuilderContent() {
                     <Select
                       value={meta.areaId || 'NONE'} disabled={!canManage}
                       onChange={value => patchMeta({ areaId: value === 'NONE' ? '' : value })}
-                      options={[{ value: 'NONE', label: 'Sin asignar' }, ...areas.map(area => ({ value: area.id, label: area.name }))]}
+                      options={[{ value: 'NONE', label: 'Sin asignar' }, ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
                     />
                   </Field>
                   <Field label="Código" hint="Ej. GCM-SPA-FO-24"><Input value={meta.code} disabled={!canManage} onChange={event => patchMeta({ code: event.target.value })} /></Field>

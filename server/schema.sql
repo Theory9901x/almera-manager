@@ -1105,3 +1105,73 @@ CREATE TABLE IF NOT EXISTS checklist_audit_staff (
 );
 CREATE INDEX IF NOT EXISTS checklist_audit_staff_idx ON checklist_audit_staff(audit_id, order_index);
 CREATE INDEX IF NOT EXISTS checklist_audit_staff_name_idx ON checklist_audit_staff(lower(full_name));
+
+-- ---------------------------------------------------------------------------
+-- Servicios por centro de atencion (ESE Salud Yopal).
+--
+-- El area pasa a tener CENTRO ademas de nombre: "Urgencias" existe en varias sedes y sin el
+-- centro el filtro del tablero las mezcla. La clave unica pasa a ser (organizacion, centro,
+-- nombre) para que se pueda repetir el mismo servicio en sedes distintas.
+-- ---------------------------------------------------------------------------
+ALTER TABLE checklist_areas ADD COLUMN IF NOT EXISTS center TEXT NOT NULL DEFAULT '';
+ALTER TABLE checklist_areas DROP CONSTRAINT IF EXISTS checklist_areas_organization_id_name_key;
+CREATE UNIQUE INDEX IF NOT EXISTS checklist_areas_unq
+  ON checklist_areas(organization_id, center, name);
+
+-- Siembra por defecto, para no tener que parametrizar nada antes de auditar.
+-- HOCY lleva la oferta completa; los demas centros, el nucleo ambulatorio.
+INSERT INTO checklist_areas (organization_id, center, name)
+SELECT o.id, c.center, c.name
+  FROM organizations o
+  CROSS JOIN (VALUES
+    ('Hospital Central de Yopal (HOCY)', 'Urgencias'),
+    ('Hospital Central de Yopal (HOCY)', 'Hospitalización'),
+    ('Hospital Central de Yopal (HOCY)', 'Consulta externa'),
+    ('Hospital Central de Yopal (HOCY)', 'Atención de partos y obstétrica'),
+    ('Hospital Central de Yopal (HOCY)', 'Medicina general'),
+    ('Hospital Central de Yopal (HOCY)', 'Enfermería'),
+    ('Hospital Central de Yopal (HOCY)', 'Odontología general'),
+    ('Hospital Central de Yopal (HOCY)', 'Ginecobstetricia'),
+    ('Hospital Central de Yopal (HOCY)', 'Laboratorio clínico'),
+    ('Hospital Central de Yopal (HOCY)', 'Toma de muestras de laboratorio'),
+    ('Hospital Central de Yopal (HOCY)', 'Radiología e imágenes diagnósticas'),
+    ('Hospital Central de Yopal (HOCY)', 'Ultrasonido'),
+    ('Hospital Central de Yopal (HOCY)', 'Servicio farmacéutico'),
+    ('Hospital Central de Yopal (HOCY)', 'Esterilización'),
+    ('Hospital Central de Yopal (HOCY)', 'Vacunación'),
+    ('Hospital Central de Yopal (HOCY)', 'Tamización de cáncer de cuello uterino'),
+    ('Hospital Central de Yopal (HOCY)', 'Planificación familiar'),
+    ('Hospital Central de Yopal (HOCY)', 'Atención preventiva en salud bucal'),
+    ('Hospital Central de Yopal (HOCY)', 'Detección temprana — crecimiento y desarrollo'),
+    ('Hospital Central de Yopal (HOCY)', 'Detección temprana — joven'),
+    ('Hospital Central de Yopal (HOCY)', 'Detección temprana — embarazo'),
+    ('Hospital Central de Yopal (HOCY)', 'Detección temprana — adulto'),
+    ('Hospital Central de Yopal (HOCY)', 'Detección temprana — cáncer de cuello uterino y mama'),
+    ('Hospital Central de Yopal (HOCY)', 'Detección temprana — agudeza visual'),
+    ('Juan Luis Londoño', 'Consulta externa'),
+    ('Juan Luis Londoño', 'Medicina general'),
+    ('Juan Luis Londoño', 'Enfermería'),
+    ('Juan Luis Londoño', 'Odontología general'),
+    ('Juan Luis Londoño', 'Toma de muestras de laboratorio'),
+    ('Juan Luis Londoño', 'Vacunación'),
+    ('Juan Luis Londoño', 'Planificación familiar'),
+    ('Juan Luis Londoño', 'Atención preventiva en salud bucal'),
+    ('Comuna VI', 'Consulta externa'),
+    ('Comuna VI', 'Medicina general'),
+    ('Comuna VI', 'Enfermería'),
+    ('Comuna VI', 'Odontología general'),
+    ('Comuna VI', 'Toma de muestras de laboratorio'),
+    ('Comuna VI', 'Vacunación'),
+    ('Comuna VI', 'Planificación familiar'),
+    ('Comuna VI', 'Atención preventiva en salud bucal'),
+    ('Cre Ser con Amor', 'Consulta externa'),
+    ('Cre Ser con Amor', 'Medicina general'),
+    ('Cre Ser con Amor', 'Enfermería'),
+    ('Cre Ser con Amor', 'Odontología general'),
+    ('Cre Ser con Amor', 'Vacunación'),
+    ('Cre Ser con Amor', 'Planificación familiar'),
+    ('Cre Ser con Amor', 'Atención preventiva en salud bucal')
+  ) AS c(center, name)
+ WHERE EXISTS (SELECT 1 FROM organization_modules om JOIN modules m ON m.id = om.module_id
+                WHERE om.organization_id = o.id AND m.key = 'checklists')
+ON CONFLICT DO NOTHING;

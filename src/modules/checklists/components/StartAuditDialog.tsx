@@ -83,11 +83,14 @@ export function StartAuditDialog({ open, templateName, templateId, templates, ar
           <Field label="Fecha de la ronda *" hint={touched && missingDate ? 'Elige la fecha' : 'No se asume hoy: confírmala'}>
             <DatePicker value={context.auditDate} onChange={value => setContext({ ...context, auditDate: value })} />
           </Field>
-          <Field label="Servicio o área *" hint={touched && missingArea ? 'Elige el servicio' : undefined}>
+          <Field label="Centro y servicio *" hint={touched && missingArea ? 'Elige el servicio' : undefined}>
             <Select
               value={context.areaId || 'NONE'}
               onChange={value => setContext({ ...context, areaId: value === 'NONE' ? '' : value })}
-              options={[{ value: 'NONE', label: 'Selecciona el servicio' }, ...areas.map(area => ({ value: area.id, label: area.name }))]}
+              // "Centro · Servicio": "Urgencias" existe en varias sedes y sin el centro no se
+              // sabe cual se esta eligiendo.
+              options={[{ value: 'NONE', label: 'Selecciona el servicio' },
+                ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
             />
           </Field>
           <Field label="Turno" hint="Opcional: solo si la ronda es de un turno concreto">

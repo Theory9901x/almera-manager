@@ -12,6 +12,8 @@ export type ChecklistStatus = 'BORRADOR' | 'PUBLICADA' | 'ARCHIVADA'
 
 export interface ChecklistArea {
   id: string
+  /** Centro de atención. El mismo servicio existe en varias sedes. */
+  center: string
   name: string
   active: boolean
 }

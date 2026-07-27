@@ -68,7 +68,13 @@ async function loadStructure(templateId) {
 
 checklistsRouter.get('/areas', checklistsModule, view, async (request, response, next) => {
   try {
-    const result = await query('SELECT * FROM checklist_areas WHERE organization_id = $1 ORDER BY name', [oid(request)])
+    // Ordenado por centro y luego por servicio: es como se busca ("Urgencias del HOCY"), y el
+    // hospital principal va primero.
+    const result = await query(
+      `SELECT * FROM checklist_areas WHERE organization_id = $1 AND active
+        ORDER BY CASE WHEN center LIKE 'Hospital Central%' THEN 0
+                      WHEN center = '' THEN 2 ELSE 1 END, center, name`,
+      [oid(request)])
     response.json(result.rows)
   } catch (error) { next(error) }
 })
@@ -78,9 +84,9 @@ checklistsRouter.post('/areas', checklistsModule, manage, async (request, respon
     const name = String(request.body?.name || '').trim()
     if (!name) fail(400, 'El nombre del área es obligatorio')
     const result = await query(
-      `INSERT INTO checklist_areas (organization_id, name) VALUES ($1, $2)
-       ON CONFLICT (organization_id, name) DO UPDATE SET active = TRUE RETURNING *`,
-      [oid(request), name],
+      `INSERT INTO checklist_areas (organization_id, center, name) VALUES ($1, $2, $3)
+       ON CONFLICT (organization_id, center, name) DO UPDATE SET active = TRUE RETURNING *`,
+      [oid(request), String(request.body?.center || '').trim(), name],
     )
     response.status(201).json(result.rows[0])
   } catch (error) { next(error) }

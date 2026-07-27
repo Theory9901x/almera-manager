@@ -55,7 +55,7 @@ export function AnalyticsPanel({ templates, areas }: { templates: ChecklistTempl
               <Select
                 value={filters.areaId || 'ALL'}
                 onChange={value => setFilters({ ...filters, areaId: value === 'ALL' ? undefined : value })}
-                options={[{ value: 'ALL', label: 'Todas' }, ...areas.map(area => ({ value: area.id, label: area.name }))]}
+                options={[{ value: 'ALL', label: 'Todas' }, ...areas.map(area => ({ value: area.id, label: area.center ? `${area.center} · ${area.name}` : area.name }))]}
               />
             </Field>
           </div>
