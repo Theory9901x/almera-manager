@@ -624,3 +624,64 @@ Al ampliar de dos listas a trece aparecieron dos trampas del papel que valen la 
 
 - El **instructivo de FO-24** (`guidance`) se dejó vacío a propósito: sus criterios no calzan 1:1
   con los de la grilla (§2.5 punto 1) y asignarlos a ojo sería inventar. Falta esa decisión.
+
+---
+
+## 15. Pendiente: Dashboard y Planes de Mejora
+
+Decisiones tomadas por el usuario el 27/07/2026, sobre la maqueta del dashboard
+(tema oscuro, 6 KPIs, gauge, donut, series y feed de actividad).
+
+### 15.1 Planes de mejora — módulo nuevo (SÍ se hace)
+
+Es la pieza grande. Un hallazgo (criterio marcado **NC**) deja de morir en el informe
+y pasa a tener responsable, seguimiento y evidencia de subsanación.
+
+Modelo propuesto:
+
+| Tabla | Para qué |
+|---|---|
+| `checklist_action_plans` | Un plan por hallazgo: `audit_id`, `criterion_id`, `audit_subject_id`, descripción, `assigned_membership_id`, estado (`ABIERTO` / `EN_PROCESO` / `SUBSANADO` / `CERRADO`), fechas |
+| `checklist_action_evidences` | Archivos que sube el colaborador para probar la subsanación. Misma regla que las evidencias de ronda: **no** se sirven como estático, van por ruta autenticada |
+| `checklist_action_log` | Quién lo asignó, quién subió evidencia, quién lo dio por cerrado |
+
+Puntos que hay que resolver al construirlo, no antes:
+
+- **El colaborador entra al sistema.** Hoy los sujetos auditados son texto
+  (`checklist_audit_subjects.display_name`), no usuarios. Para que "entre y suba su
+  evidencia" hay que **enlazar el sujeto con una membresía** — columna
+  `membership_id` en `checklist_subjects`, opcional: no todo paciente es usuario, pero
+  un colaborador sí puede serlo.
+- **Permiso nuevo** `checklists.improve` (o similar) para que un colaborador vea SOLO
+  sus planes, sin darle `fill` ni acceso a rondas ajenas. Mismo criterio de aislamiento
+  que ya rige en `assertAudit`.
+- **Quién cierra el plan no es quien lo subsana.** El colaborador sube evidencia y pasa
+  a `SUBSANADO`; calidad revisa y cierra. Si el mismo que sube cierra, el circuito no
+  vale como verificación.
+- El plan se crea **desde la ronda**: al marcar NC, ofrecer "asignar plan de mejora".
+
+### 15.2 Del molde del dashboard, lo que NO se hace
+
+- **«Parcialmente cumplidas»** en el donut: descartado. La escala es fija C / NC / NA y
+  no existe un estado intermedio. El donut lleva cumplidas, incumplidas y no aplica.
+- **«Vencidas» / plazos**: descartado. Las auditorías no llevan fecha límite.
+
+### 15.3 Panel "Información del sistema"
+
+Se conecta a datos reales de valor, no a adornos (versión, respaldo). Candidatos que el
+sistema ya sabe responder:
+
+- Auditorías **sin cerrar** con más de N días abiertas — trabajo a medias que nadie ve.
+- Listas **publicadas sin ninguna ronda** todavía — formatos cargados que no se usan.
+- Auditores **con listas asignadas y cero rondas** en el periodo.
+- **Hallazgos sin plan de mejora** asignado (una vez exista 15.1). Es el indicador que
+  de verdad mueve: un NC sin responsable es un hallazgo perdido.
+
+### 15.4 Lo que sí sale ya de datos reales
+
+KPIs con comparación contra el periodo anterior, tendencia de adherencia, gauge
+semicircular, adherencia por servicio, cumplimiento por área, evolución temporal,
+resumen por **programa** (el "tipo de lista" del molde) con sparkline, actividad
+reciente desde `checklist_audit_log`, y exportación a PDF/Excel del filtro aplicado.
+Todo esto ya está resuelto en `dataCenterData()`; el dashboard consume lo mismo y no
+duplica el cálculo.
