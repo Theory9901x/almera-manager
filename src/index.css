@@ -2691,7 +2691,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    blanco. Aqui es un marco, no una superficie: se deja casi transparente para que
    el color del fondo llegue hasta las tarjetas. */
 .checklists-page-bg > .surface-panel {
-  background: rgba(255, 255, 255, .30);
+  background: color-mix(in srgb, var(--glass-tint) 30%, transparent);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
 }
@@ -2703,12 +2703,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    de .55 porque debajo hay tablas de texto pequeño y el contraste manda. */
 .checklists-page-bg .ds-card,
 .checklists-page-bg .surface-panel {
-  background: rgba(255, 255, 255, .58);
+  background: color-mix(in srgb, var(--glass-tint) 58%, transparent);
   backdrop-filter: blur(26px) saturate(190%);
   -webkit-backdrop-filter: blur(26px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, .75);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, .9) inset,
+    0 1px 0 color-mix(in srgb, var(--glass-tint) 90%, transparent) inset,
     0 14px 38px rgba(0, 52, 84, .14),
     0 2px 6px rgba(0, 52, 84, .06);
 }
@@ -2724,12 +2724,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   background:
     radial-gradient(760px 420px at 88% -20%, color-mix(in oklch, var(--m-listas-light) 55%, transparent), transparent 62%),
     linear-gradient(140deg, var(--m-listas-deep) 0%, #05263c 58%, #041b2c 100%);
-  border: 1px solid rgba(255, 255, 255, .10);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 10%, transparent);
   box-shadow: 0 18px 46px rgba(0, 48, 78, .30);
 }
 .checklists-hero::before {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, .07) 1px, transparent 1px);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--glass-tint) 7%, transparent) 1px, transparent 1px);
   background-size: 22px 22px;
   mask-image: linear-gradient(135deg, #000, transparent 72%);
   -webkit-mask-image: linear-gradient(135deg, #000, transparent 72%);
@@ -2740,19 +2740,19 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklists-page-bg .ds-button-primary { box-shadow: 0 8px 20px rgba(0, 127, 188, .30); }
 .checklists-page-bg .ds-button-primary:hover:not(:disabled) { box-shadow: 0 10px 26px rgba(0, 127, 188, .40); }
 .checklists-page-bg .ds-button-secondary {
-  background: rgba(255, 255, 255, .55);
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .8);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 80%, transparent);
   color: var(--m-listas-deep);
 }
-.checklists-page-bg .ds-button-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, .78); }
+.checklists-page-bg .ds-button-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--glass-tint) 78%, transparent); }
 
 /* Campos sobre vidrio: el input opaco cortaria el efecto, se translucen. */
 .checklists-page-bg .ds-input,
 .checklists-page-bg .ds-select-trigger,
 .checklists-page-bg .ds-datepicker-trigger {
-  background: rgba(255, 255, 255, .72);
+  background: color-mix(in srgb, var(--glass-tint) 72%, transparent);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border-color: rgba(0, 90, 135, .16);
@@ -2772,8 +2772,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-criteria { display: grid; gap: 12px; }
 .checklist-criterion {
   display: grid; gap: 8px; padding: 14px;
-  border: 1px solid rgba(255, 255, 255, .7); border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255, 255, 255, .5);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 70%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--glass-tint) 50%, transparent);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   border-left: 3px solid color-mix(in srgb, var(--m-listas) 55%, transparent);
 }
@@ -2782,18 +2782,18 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-fields { display: grid; gap: 12px; }
 .checklist-field-row {
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, .7); border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255, 255, 255, .5);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 70%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--glass-tint) 50%, transparent);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 
 /* --- Grilla de prueba (constructor) --- */
-.checklist-sim-wrap { overflow: auto; max-height: 60vh; border: 1px solid rgba(255,255,255,.7); border-radius: var(--radius-card-sm, 14px); background: rgba(255,255,255,.42); }
+.checklist-sim-wrap { overflow: auto; max-height: 60vh; border: 1px solid color-mix(in srgb, var(--glass-tint) 70%, transparent); border-radius: var(--radius-card-sm, 14px); background: color-mix(in srgb, var(--glass-tint) 42%, transparent); }
 .checklist-sim-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
 .checklist-sim-grid th, .checklist-sim-grid td { border-bottom: 1px solid rgba(0,90,135,.10); padding: 8px 10px; text-align: center; }
 .checklist-sim-grid thead th { position: sticky; top: 0; z-index: 2; background: rgba(240,249,255,.94); backdrop-filter: blur(10px); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--m-listas-deep); font-weight: 800; }
 .checklist-sim-grid td.sim-criterion, .checklist-sim-grid th.sim-criterion {
-  position: sticky; left: 0; z-index: 1; background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+  position: sticky; left: 0; z-index: 1; background: color-mix(in srgb, var(--glass-tint) 92%, transparent); backdrop-filter: blur(10px);
   text-align: left; min-width: 280px; max-width: 420px; white-space: normal; line-height: 1.45;
 }
 .checklist-sim-grid thead th.sim-criterion { z-index: 3; background: rgba(240,249,255,.96); }
@@ -2807,20 +2807,20 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .sim-value-group { display: inline-flex; gap: 4px; }
 .sim-value {
   min-width: 34px; height: 30px; border-radius: 8px; border: 1px dashed rgba(0,90,135,.28);
-  background: rgba(255,255,255,.35); color: #7c8b98; font-size: 11px; font-weight: 800; cursor: pointer;
+  background: color-mix(in srgb, var(--glass-tint) 35%, transparent); color: #7c8b98; font-size: 11px; font-weight: 800; cursor: pointer;
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 .sim-value:hover { border-color: var(--m-listas); color: var(--m-listas-deep); }
 .sim-value.is-active { border-style: solid; border-color: transparent; }
 .sim-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 20%, white); color: oklch(0.42 0.15 150); }
 .sim-value--nc.is-active { background: color-mix(in srgb, var(--danger) 16%, white); color: var(--danger); }
-.sim-value--na.is-active { background: rgba(255,255,255,.85); color: var(--ink-soft); }
+.sim-value--na.is-active { background: color-mix(in srgb, var(--glass-tint) 85%, transparent); color: var(--ink-soft); }
 
 /* --- Resultado --- */
 .checklist-result-strip {
   display: flex; flex-wrap: wrap; align-items: center; gap: 28px; padding: 18px 20px;
-  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
-  background: linear-gradient(135deg, rgba(255,255,255,.66), rgba(219,243,255,.5));
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--glass-tint) 66%, transparent), rgba(219,243,255,.5));
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .checklist-result-main { display: flex; flex-direction: column; }
@@ -2834,8 +2834,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-domain-results { display: grid; gap: 8px; }
 .checklist-domain-result {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px;
-  border: 1px solid rgba(255,255,255,.7); border-radius: 10px;
-  background: rgba(255,255,255,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 70%, transparent); border-radius: 10px;
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .checklist-domain-result .name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .checklist-domain-result .value { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -2844,8 +2844,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-subject-chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .checklist-subject-chip {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  border: 1px solid rgba(255,255,255,.8); border-radius: 999px;
-  background: rgba(255,255,255,.62); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 80%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--glass-tint) 62%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 4px 14px rgba(0,62,96,.08);
 }
 .checklist-subject-chip .idx {
@@ -2860,7 +2860,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px;
   border: 1px dashed color-mix(in srgb, var(--m-listas) 45%, transparent);
   border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255,255,255,.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--glass-tint) 45%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
 .signature-capture { display: block; }
 
@@ -2868,8 +2868,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    un backdrop-filter por celda mataria el scroll en una tabla larga. */
 .checklist-fill-wrap {
   overflow: auto; max-height: 72vh;
-  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255,255,255,.42);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--glass-tint) 42%, transparent);
 }
 .checklist-fill-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
 .checklist-fill-grid th, .checklist-fill-grid td { border-bottom: 1px solid rgba(0,90,135,.10); padding: 10px 12px; text-align: center; vertical-align: top; }
@@ -2880,7 +2880,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion {
   position: sticky; left: 0; z-index: 1;
-  background: rgba(255,255,255,.93); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--glass-tint) 93%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   text-align: left; min-width: 320px; max-width: 460px; white-space: normal; line-height: 1.45;
 }
 .checklist-fill-grid thead th.fill-criterion { z-index: 3; background: rgba(240,249,255,.96); }
@@ -2905,7 +2905,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .fill-value-group { display: inline-flex; gap: 5px; }
 .fill-value {
   min-width: 42px; height: 38px; border-radius: 10px; border: 1px dashed rgba(0,90,135,.28);
-  background: rgba(255,255,255,.5); color: #7c8b98; font-size: 12px; font-weight: 800; cursor: pointer;
+  background: color-mix(in srgb, var(--glass-tint) 50%, transparent); color: #7c8b98; font-size: 12px; font-weight: 800; cursor: pointer;
   backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 120ms ease, box-shadow 140ms ease;
 }
@@ -2915,20 +2915,20 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .fill-value.is-active { border-style: solid; border-color: transparent; box-shadow: 0 4px 12px rgba(0,62,96,.12); }
 .fill-value--c.is-active { background: color-mix(in oklch, oklch(0.6 0.15 150) 22%, white); color: oklch(0.42 0.15 150); }
 .fill-value--nc.is-active { background: color-mix(in srgb, var(--danger) 18%, white); color: var(--danger); }
-.fill-value--na.is-active { background: rgba(255,255,255,.9); color: var(--ink-soft); }
+.fill-value--na.is-active { background: color-mix(in srgb, var(--glass-tint) 90%, transparent); color: var(--ink-soft); }
 
 /* --- Asignacion --- */
 .checklist-assign-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 .checklist-assign-row {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;
-  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255,255,255,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 .checklist-assign-row:hover { border-color: color-mix(in srgb, var(--m-listas) 50%, transparent); }
 .checklist-assign-row.is-selected {
   border-color: var(--m-listas);
-  background: linear-gradient(135deg, rgba(255,255,255,.8), color-mix(in srgb, var(--m-listas) 12%, transparent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--glass-tint) 80%, transparent), color-mix(in srgb, var(--m-listas) 12%, transparent));
   box-shadow: 0 6px 18px rgba(0,127,188,.14);
 }
 .checklist-assign-row input { width: 18px; height: 18px; flex: none; accent-color: var(--m-listas); }
@@ -2939,10 +2939,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .signature-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .signature-item {
   position: relative; display: grid; gap: 8px; padding: 12px;
-  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255,255,255,.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--glass-tint) 60%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-.signature-item img { width: 100%; height: 90px; object-fit: contain; background: rgba(255,255,255,.7); border-bottom: 1px solid rgba(0,90,135,.12); border-radius: 8px; }
+.signature-item img { width: 100%; height: 90px; object-fit: contain; background: color-mix(in srgb, var(--glass-tint) 70%, transparent); border-bottom: 1px solid rgba(0,90,135,.12); border-radius: 8px; }
 .signature-item-meta strong { display: block; font-size: 12.5px; color: var(--ink); }
 .signature-item-meta small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 1px; }
 .signature-item-meta time { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
@@ -2952,8 +2952,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .signature-pad { position: relative; }
 .signature-pad-canvas {
   display: block; width: 100%; max-width: 600px; aspect-ratio: 600 / 180;
-  border: 1px solid rgba(255,255,255,.85); border-radius: 12px;
-  background: rgba(255,255,255,.85);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 85%, transparent); border-radius: 12px;
+  background: color-mix(in srgb, var(--glass-tint) 85%, transparent);
   box-shadow: 0 6px 18px rgba(0,62,96,.10) inset;
   /* Sin esto, arrastrar el dedo para firmar hace scroll de la pagina en vez de trazar. */
   touch-action: none; cursor: crosshair;
@@ -2961,7 +2961,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .signature-pad-hint { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #93a3b1; font-size: 12.5px; font-weight: 600; max-width: 600px; }
 .signature-pad-clear {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
-  border: 1px solid rgba(255,255,255,.8); border-radius: 8px; background: rgba(255,255,255,.6);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 80%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--glass-tint) 60%, transparent);
   backdrop-filter: blur(6px); padding: 6px 12px; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer;
 }
 .signature-pad-clear:hover { color: var(--m-listas-deep); border-color: var(--m-listas); }
@@ -2979,7 +2979,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 @media (prefers-reduced-motion: reduce) {
   .checklists-page-bg .ds-card, .checklists-page-bg .surface-panel,
   .checklist-criterion, .checklist-field-row, .checklist-assign-row, .signature-item {
-    backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(255,255,255,.92);
+    backdrop-filter: none; -webkit-backdrop-filter: none; background: color-mix(in srgb, var(--glass-tint) 92%, transparent);
   }
 }
 
@@ -2987,8 +2987,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-seed-grid { display: grid; gap: 10px; }
 .checklist-seed-row {
   display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px;
-  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255,255,255,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: var(--radius-card-sm, 14px);
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .checklist-seed-row.is-done { opacity: .7; }
 .checklist-seed-row strong { display: block; font-size: 12.5px; color: var(--ink); }
@@ -3074,10 +3074,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
     padding: 1px;
     background: linear-gradient(
       145deg,
-      rgba(255, 255, 255, .95) 0%,
-      rgba(255, 255, 255, .35) 34%,
+      color-mix(in srgb, var(--glass-tint) 95%, transparent) 0%,
+      color-mix(in srgb, var(--glass-tint) 35%, transparent) 34%,
       color-mix(in oklch, var(--m-listas) 30%, transparent) 68%,
-      rgba(255, 255, 255, .55) 100%);
+      color-mix(in srgb, var(--glass-tint) 55%, transparent) 100%);
     /* El orden importa: el shorthand -webkit-mask REINICIA mask-composite. Cada
        shorthand va antes de su propio composite, y el estandar cierra. */
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -3096,7 +3096,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   z-index: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: radial-gradient(120% 80% at 8% -10%, rgba(255, 255, 255, .72), transparent 58%);
+  background: radial-gradient(120% 80% at 8% -10%, color-mix(in srgb, var(--glass-tint) 72%, transparent), transparent 58%);
 }
 
 /* Elevacion al pasar por encima. Solo transform y box-shadow: son las dos que el
@@ -3107,7 +3107,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklists-page-bg .ds-card:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, .9) inset,
+    0 1px 0 color-mix(in srgb, var(--glass-tint) 90%, transparent) inset,
     0 18px 44px rgba(0, 62, 96, .14),
     0 4px 10px rgba(0, 62, 96, .06);
 }
@@ -3130,7 +3130,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
       from var(--cl-angle),
       transparent 0deg,
       color-mix(in oklch, var(--m-listas-light) 85%, white) 40deg,
-      rgba(255, 255, 255, .9) 80deg,
+      color-mix(in srgb, var(--glass-tint) 90%, transparent) 80deg,
       transparent 150deg,
       transparent 210deg,
       color-mix(in oklch, var(--m-listas-light) 70%, white) 280deg,
@@ -3183,7 +3183,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .38) 48%, transparent 66%);
+  background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--glass-tint) 38%, transparent) 48%, transparent 66%);
   translate: -140% 0;
   transition: translate 620ms cubic-bezier(.2, .8, .2, 1);
 }
@@ -3212,7 +3212,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-criterion:has(:focus-visible),
 .checklist-criterion:has(.ds-input:focus) {
   border-left-color: var(--m-listas);
-  background: rgba(255, 255, 255, .78);
+  background: color-mix(in srgb, var(--glass-tint) 78%, transparent);
   box-shadow: 0 6px 20px rgba(0, 127, 188, .12);
 }
 /* En tres columnas la fila del formato queda estrecha y el distintivo "Ya cargada"
@@ -3290,7 +3290,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .checklist-criterion,
   .checklist-assign-row,
   .checklist-seed-row,
-  .signature-item { background: rgba(255, 255, 255, .94); }
+  .signature-item { background: color-mix(in srgb, var(--glass-tint) 94%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .checklists-hero::after { animation: none; }
@@ -3354,12 +3354,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px;
   border-radius: 999px; cursor: pointer;
   border: 1px solid color-mix(in oklch, var(--m-listas) 26%, transparent);
-  background: rgba(255, 255, 255, .62);
+  background: color-mix(in srgb, var(--glass-tint) 62%, transparent);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   font-size: 12.5px; font-weight: 650; color: var(--m-listas-deep);
   transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
 }
-.checklist-domain-nav button:hover { background: rgba(255, 255, 255, .85); border-color: var(--m-listas); }
+.checklist-domain-nav button:hover { background: color-mix(in srgb, var(--glass-tint) 85%, transparent); border-color: var(--m-listas); }
 .checklist-domain-nav button:active { transform: scale(.97); }
 .checklist-domain-nav b { font-variant-numeric: tabular-nums; font-weight: 800; }
 
@@ -3402,7 +3402,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-confirm {
   position: relative; width: min(460px, 100%);
   border-radius: 20px; padding: 26px 26px 22px;
-  background: #fff; border: 1px solid rgba(255, 255, 255, .8);
+  background: #fff; border: 1px solid color-mix(in srgb, var(--glass-tint) 80%, transparent);
   box-shadow: 0 24px 60px rgba(0, 40, 70, .28), 0 2px 8px rgba(0, 40, 70, .12);
   animation: ds-confirm-pop 200ms cubic-bezier(.2, .9, .3, 1) both;
   text-wrap: pretty;
@@ -3488,10 +3488,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .dc-kpi {
   display: grid; gap: 4px; padding: 18px 20px;
   border-radius: var(--radius-card, 18px);
-  background: rgba(255, 255, 255, .62);
+  background: color-mix(in srgb, var(--glass-tint) 62%, transparent);
   backdrop-filter: blur(20px) saturate(170%); -webkit-backdrop-filter: blur(20px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, .75);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 10px 30px rgba(0, 52, 84, .10);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--glass-tint) 90%, transparent) inset, 0 10px 30px rgba(0, 52, 84, .10);
 }
 .dc-kpi-value { font-size: 2rem; font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--ink); }
 .dc-kpi-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 750; }
@@ -3546,18 +3546,18 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .eval-toolbar {
   display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
   padding: 12px 16px; border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255, 255, 255, .55);
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, .7);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 70%, transparent);
 }
 
 /* --- Dominio como acordeon --- */
 .eval-domain {
   border-radius: var(--radius-card, 18px); overflow: hidden;
-  background: rgba(255, 255, 255, .62);
+  background: color-mix(in srgb, var(--glass-tint) 62%, transparent);
   backdrop-filter: blur(20px) saturate(170%); -webkit-backdrop-filter: blur(20px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, .75);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 10px 28px rgba(0, 52, 84, .10);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--glass-tint) 90%, transparent) inset, 0 10px 28px rgba(0, 52, 84, .10);
 }
 .eval-domain-head {
   display: flex; align-items: center; gap: 12px; width: 100%;
@@ -3565,7 +3565,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   /* 56px: el encabezado tambien es un objetivo tactil, y es el que mas se toca al navegar. */
   min-height: 56px; color: var(--m-listas-deep);
 }
-.eval-domain-head:hover { background: rgba(255, 255, 255, .45); }
+.eval-domain-head:hover { background: color-mix(in srgb, var(--glass-tint) 45%, transparent); }
 .eval-domain-num {
   display: grid; place-items: center; width: 28px; height: 28px; flex: none;
   border-radius: 999px; color: #fff; font-size: 12.5px; font-weight: 800;
@@ -3586,10 +3586,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   position: sticky; top: 12px;
   display: grid; gap: 14px; padding: 20px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, .72);
+  background: color-mix(in srgb, var(--glass-tint) 72%, transparent);
   backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
   box-shadow: 0 1px 2px rgba(0, 52, 84, .05), 0 8px 22px rgba(0, 52, 84, .10);
-  border: 1px solid rgba(255, 255, 255, .8);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 80%, transparent);
 }
 .eval-ring { position: relative; display: grid; place-items: center; }
 .eval-ring-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
@@ -3656,7 +3656,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   margin-top: 14px; padding: 24px 18px;
   border: 2px dashed color-mix(in oklch, var(--m-listas) 38%, transparent);
   border-radius: var(--radius-card-sm, 14px);
-  background: rgba(255, 255, 255, .45);
+  background: color-mix(in srgb, var(--glass-tint) 45%, transparent);
   color: var(--m-listas-deep);
   transition: background 160ms ease, border-color 160ms ease;
 }
@@ -3672,8 +3672,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .eval-evidences { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
 .eval-evidences li {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, .75); border-radius: 12px;
-  background: rgba(255, 255, 255, .6);
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: 12px;
+  background: color-mix(in srgb, var(--glass-tint) 60%, transparent);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .eval-evidence-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-decoration: none; color: inherit; }
@@ -3683,3 +3683,125 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .eval-evidences strong { display: block; font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eval-evidences small { display: block; font-size: 10.5px; color: var(--muted); }
+
+/* ================================================================
+   TEMA CLARO / OSCURO
+   El sistema nacio solo en claro y con los colores escritos a mano en muchas
+   reglas. Aqui se define la capa de tokens que ambos temas comparten: cada
+   regla consume el token y el tema decide su valor, en vez de duplicar reglas.
+   `color-scheme` no es decorativo: es lo que hace que los controles nativos
+   (barras de scroll, selectores de fecha, autocompletado) salgan del color
+   correcto — sin el, un tema oscuro tiene scrollbars blancas.
+   ================================================================ */
+:root {
+  --glass-tint: #ffffff;
+  --theme-elevate: 0;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0b1220;
+  --canvas-soft: #0f1728;
+  --surface: #131c2e;
+  --surface-soft: #18233a;
+  --surface-glass: rgba(22, 32, 52, 0.72);
+  --ink: #e8edf6;
+  --ink-soft: #c2cbdb;
+  --muted: #93a1b8;
+  --muted-light: #6d7c95;
+  --line: #24314b;
+  --line-strong: #35456580;
+
+  --color-surface-page: #0b1220;
+  --color-surface-card: #131c2e;
+  --color-surface-soft: #18233a;
+  --color-border: #24314b;
+  --color-text: #e8edf6;
+  --color-text-muted: #93a1b8;
+  --border-hairline: #24314b;
+
+  /* El vidrio deja de ser blanco translucido y pasa a ser oscuro translucido: en
+     oscuro, un velo blanco no parece cristal, parece niebla. */
+  --glass-tint: #1b2740;
+  --theme-elevate: 1;
+
+  /* Los tonos suaves de identidad estaban pensados sobre papel blanco. */
+  --m-listas-soft: oklch(0.28 0.06 230);
+  --m-asistencias-soft: oklch(0.28 0.06 25);
+  --m-matrices-soft: oklch(0.28 0.06 300);
+  --m-encuestas-soft: oklch(0.28 0.06 195);
+  --m-huella-soft: oklch(0.28 0.06 155);
+  --m-usuarios-soft: oklch(0.28 0.06 350);
+}
+
+/* El fondo del modulo: en oscuro la misma malla saturada quemaria la pantalla.
+   Se baja la luminosidad de la base y se dejan los radiales como brillo. */
+:root[data-theme="dark"] .checklists-page-bg {
+  background:
+    radial-gradient(1200px 680px at 6% -8%, color-mix(in oklch, oklch(0.45 0.14 212) 55%, transparent), transparent 58%),
+    radial-gradient(1000px 580px at 98% 4%, color-mix(in oklch, oklch(0.38 0.15 258) 48%, transparent), transparent 56%),
+    radial-gradient(880px 720px at 72% 96%, color-mix(in oklch, oklch(0.42 0.13 192) 42%, transparent), transparent 60%),
+    linear-gradient(168deg, #0b1524 0%, #0a1220 46%, #0b1726 100%);
+}
+:root[data-theme="dark"] .checklists-page-bg::after { opacity: .22; mix-blend-mode: soft-light; }
+
+/* Texto sobre vidrio oscuro: los grises pensados para papel blanco se pierden. */
+:root[data-theme="dark"] .dc-kpi-value,
+:root[data-theme="dark"] .eval-domain-name,
+:root[data-theme="dark"] .eval-counters b { color: var(--ink); }
+:root[data-theme="dark"] .eval-domain-head { color: var(--ink); }
+:root[data-theme="dark"] .checklist-fill-grid thead th,
+:root[data-theme="dark"] .checklists-page-bg .ds-table th { color: color-mix(in oklch, var(--m-listas-light) 80%, white); }
+:root[data-theme="dark"] .checklist-fill-grid td.fill-criterion,
+:root[data-theme="dark"] .checklist-sim-grid td.sim-criterion { color: var(--ink-soft); }
+:root[data-theme="dark"] .ds-confirm { background: var(--surface); }
+:root[data-theme="dark"] .fill-value { color: var(--muted); }
+:root[data-theme="dark"] .fill-value--na.is-active { background: color-mix(in srgb, var(--glass-tint) 90%, transparent); color: var(--ink); }
+
+/* Conmutador. Va en la barra lateral, junto a la sesion: es una preferencia de la
+   persona, no un ajuste del modulo en el que este. */
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 40px; padding: 8px 12px; width: 100%;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: transparent; color: var(--muted);
+  font-size: 12.5px; font-weight: 650; cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--line-strong); }
+.theme-toggle svg { flex: none; }
+
+
+/* --- Componentes con el color escrito a mano: se corrigen en oscuro ---
+   Son del sistema, no del modulo, y por eso fallaban en TODAS las pantallas a la vez:
+   el titulo de panel llevaba un blanco fijo y el boton secundario tambien, asi que en
+   oscuro quedaban un recuadro blanco y unos botones invisibles. */
+:root[data-theme="dark"] .almera-panel-title {
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .almera-panel-title h2 { color: var(--ink); }
+:root[data-theme="dark"] .almera-panel-title p { color: var(--muted); }
+
+:root[data-theme="dark"] .ds-button-secondary {
+  background: color-mix(in srgb, var(--glass-tint) 70%, transparent);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .ds-button-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--glass-tint) 95%, transparent);
+  border-color: var(--line-strong);
+}
+:root[data-theme="dark"] .ds-input,
+:root[data-theme="dark"] .ds-select-trigger,
+:root[data-theme="dark"] .ds-datepicker-trigger,
+:root[data-theme="dark"] .ds-textarea {
+  background: color-mix(in srgb, var(--glass-tint) 65%, transparent);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .ds-table thead th { background: color-mix(in srgb, var(--glass-tint) 55%, transparent); }
+:root[data-theme="dark"] .ds-table tbody tr:hover td { background: color-mix(in srgb, var(--m-listas) 16%, transparent); }
+:root[data-theme="dark"] .ds-empty-state { color: var(--muted); }
+:root[data-theme="dark"] .ds-empty-state strong { color: var(--ink); }

@@ -1,11 +1,12 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck, ClipboardList,
-  FileBarChart2, Headphones, LayoutDashboard, Leaf, ListChecks, LogOut, Menu, Search, Settings,
-  ShieldCheck, Sparkles, Users, X,
+  FileBarChart2, Headphones, LayoutDashboard, Leaf, ListChecks, LogOut, Menu, Moon, Search,
+  Settings, ShieldCheck, Sparkles, Sun, Users, X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/platform/auth/AuthContext'
+import { useTheme } from '@/platform/theme/ThemeContext'
 import { BrandMark } from '@/shared/ui'
 import { Badge, moduleIdentity } from '@/design-system'
 
@@ -28,6 +29,7 @@ const icons = {
 
 export default function AppLayout() {
   const { session, logout } = useAuth()
+  const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
@@ -187,6 +189,10 @@ export default function AppLayout() {
             </div>
             <ChevronDown size={14} />
           </Link>
+          <button onClick={toggle} className="theme-toggle" title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            {theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+          </button>
           <button onClick={endSession} className="sidebar-logout"><LogOut size={15} /> Cerrar sesión</button>
         </div>
       </aside>
