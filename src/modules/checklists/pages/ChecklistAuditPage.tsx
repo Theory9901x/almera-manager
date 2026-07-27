@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronUp,
-  CircleDashed, Clock, CreditCard, MessageSquare, Paperclip, Settings2, User, UserCheck,
+  CircleDashed, ClipboardCheck, Clock, CreditCard, MessageSquare, Paperclip, Settings2,
+  User, UserCheck,
   Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
 } from 'lucide-react'
 import {
@@ -311,37 +312,41 @@ function ChecklistAuditContent() {
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 checklists-page-bg">
-      <button className="row-action" style={{ color: identity.color }} onClick={() => navigate('/app/listas-chequeo')}>
-        <ArrowLeft size={15} /> Volver a auditorías
-      </button>
+      <div className="crumbs">
+        <ArrowLeft size={13} />
+        <button onClick={() => navigate('/app/listas-chequeo')}>Listas de Chequeo</button>
+        <span>›</span><b>{audit.template_name}</b>
+      </div>
 
-      <ModuleHero
-        badge={audit.code ? `${audit.code} · v${audit.version}` : 'Auditoría'}
-        title={audit.template_name}
-        subtitle={`${audit.area_name || 'Sin área'} · ${new Date(`${audit.audit_date}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })} · ${audit.auditor_name}`}
-        accent={identity.color}
-        className="checklists-hero"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {dirty && <span className="survey-unsaved-dot">Cambios sin guardar</span>}
-            <SaveStatusIndicator state={saveState} />
-            <Badge tone={closed ? 'info' : 'neutral'}>{closed ? 'Cerrada' : 'Borrador'}</Badge>
-            {!closed && <Button identity={identity} onClick={() => void saveAll()} disabled={!dirty || saveState === 'saving'}><Save size={15} /> Guardar</Button>}
-            <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => void exportPdf()} disabled={exporting}>
-              <Download size={15} /> {exporting ? 'Generando…' : 'Informe PDF'}
-            </Button>
-            {!closed
-              ? <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => void closeAudit()} disabled={busy}><Lock size={15} /> Cerrar auditoría</Button>
-              : <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => void reopenAudit()} disabled={busy}><Unlock size={15} /> Reabrir</Button>}
+      <div className="topbar">
+        <div className="title-wrap">
+          <div className="title-ic"><ClipboardCheck size={22} /></div>
+          <div>
+            <h1>{audit.template_name}</h1>
+            <div className="subtitle">
+              {audit.code ? `${audit.code} · v${audit.version} · ` : ''}
+              {audit.area_name || 'Sin servicio'}
+              {audit.shift ? ` · turno ${audit.shift.toLowerCase()}` : ''}
+            </div>
           </div>
-        }
-      >
-        <div className="hero-stat-inline">
-          <div><div className="num">{audit.subjects.length}</div><div className="lbl">{audit.subject_label}s</div></div>
-          <div><div className="num" style={{ color: percent === null ? undefined : semaphoreColor(percent) }}>{percent === null ? '—' : `${Number(percent).toFixed(1)}%`}</div><div className="lbl">Adherencia</div></div>
-          <div><div className="num">{closed ? 0 : localPending}</div><div className="lbl">Sin marcar</div></div>
         </div>
-      </ModuleHero>
+        <div className="actions">
+          {!closed && (
+            <button className="btn col" onClick={() => void saveAll()} disabled={!dirty || saveState === 'saving'}>
+              <span><Save size={15} /> Guardar borrador</span>
+              <span className="sub">
+                {saveState === 'saving' ? 'Guardando…' : dirty ? 'Hay cambios sin guardar' : 'Todo guardado'}
+              </span>
+            </button>
+          )}
+          {!closed
+            ? <button className="btn pri" onClick={() => void closeAudit()} disabled={busy}><Lock size={15} /> Finalizar evaluación</button>
+            : <button className="btn pri" onClick={() => void reopenAudit()} disabled={busy}><Unlock size={15} /> Reabrir evaluación</button>}
+          <button className="btn" onClick={() => void exportPdf()} disabled={exporting}>
+            <Download size={15} /> {exporting ? 'Generando…' : 'Descargar PDF'}
+          </button>
+        </div>
+      </div>
 
       <div className="eval-context">
         <div className="eval-context-grid">
@@ -409,63 +414,54 @@ function ChecklistAuditContent() {
             <span className="eval-clock"><Clock size={14} /> {clock}</span>
           </div>
         </div>
-      </div>
 
-      {audit.headerFields.length > 0 && (
-        <Card accent={identity.color} className="p-5">
-          <p className="ds-eyebrow">Datos generales</p>
-          <h2 className="mt-1 text-xl font-black">Cabecera de la auditoría</h2>
-          <div className="dialog-form mt-4">
+        {/* Campos propios de la lista y sujetos de la ronda: van en la MISMA banda. Antes eran
+            dos tarjetas grandes para tres datos, y en una sola hoja eso es ruido. */}
+        {audit.headerFields.length > 0 && (
+          <div className="eval-fields">
             {audit.headerFields.map(field => (
-              <Field key={field.id} label={field.label + (field.required ? ' *' : '')}>
+              <label key={field.id} className="eval-field">
+                <span>{field.label}{field.required ? ' *' : ''}</span>
                 {field.field_type === 'SELECT' ? (
-                  <Select
+                  <select
                     value={header[field.id] || ''} disabled={closed}
-                    onChange={value => { setHeader(current => ({ ...current, [field.id]: value })); headerDirty.current = true; setDirty(true) }}
-                    options={(field.options || []).map(option => ({ value: option, label: option }))}
-                  />
+                    onChange={event => { setHeader(c => ({ ...c, [field.id]: event.target.value })); headerDirty.current = true; setDirty(true) }}
+                  >
+                    <option value="">—</option>
+                    {(field.options || []).map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
                 ) : (
-                  <Input
+                  <input
                     type={field.field_type === 'DATE' ? 'date' : field.field_type === 'NUMBER' ? 'number' : 'text'}
                     value={header[field.id] || ''} disabled={closed}
-                    onChange={event => { setHeader(current => ({ ...current, [field.id]: event.target.value })); headerDirty.current = true; setDirty(true) }}
+                    onChange={event => { setHeader(c => ({ ...c, [field.id]: event.target.value })); headerDirty.current = true; setDirty(true) }}
                   />
                 )}
-              </Field>
+              </label>
             ))}
-          </div>
-        </Card>
-      )}
-
-      <Card accent={identity.color} className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="ds-eyebrow">Sujetos auditados</p>
-            <h2 className="mt-1 text-xl font-black">{audit.subject_label}s de esta ronda</h2>
-          </div>
-          {!closed && <Button identity={identity} onClick={() => setShowSubjectForm(true)}><UserPlus size={15} /> Agregar {audit.subject_label.toLowerCase()}</Button>}
-        </div>
-
-        {audit.subjects.length ? (
-          <div className="checklist-subject-chips mt-4">
-            {audit.subjects.map((subject, index) => (
-              <div key={subject.id} className="checklist-subject-chip">
-                <span className="idx">{index + 1}</span>
-                <div className="min-w-0">
-                  <strong>{subject.display_name}</strong>
-                  {Object.entries(subject.attributes_snapshot || {}).filter(([, value]) => value).length > 0 && (
-                    <small>{Object.entries(subject.attributes_snapshot).filter(([, value]) => value).map(([, value]) => value).join(' · ')}</small>
-                  )}
-                </div>
-                {!closed && <button className="survey-icon-button is-danger is-tiny" title="Quitar" onClick={() => void removeSubject(subject.id)}><Trash2 size={12} /></button>}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-4">
-            <EmptyState icon={UserPlus} title={`Aún no hay ${audit.subject_label.toLowerCase()}s`} description="Agrega al menos uno para poder empezar a calificar los criterios." />
           </div>
         )}
+
+        <div className="eval-subjects">
+          <span className="eval-strip-label">{audit.subject_label}s de esta ronda</span>
+          {audit.subjects.map((subject, index) => (
+            <span className="eval-subject" key={subject.id}>
+              <b>{index + 1}</b>
+              <span>
+                {subject.display_name}
+                <small>{Object.values(subject.attributes_snapshot || {}).filter(Boolean).join(' · ') || '—'}</small>
+              </span>
+              {!closed && (
+                <button title="Quitar" onClick={() => void removeSubject(subject.id)}><Trash2 size={13} /></button>
+              )}
+            </span>
+          ))}
+          {!closed && (
+            <button className="eval-subject-add" onClick={() => setShowSubjectForm(true)}>
+              <UserPlus size={14} /> Agregar {audit.subject_label.toLowerCase()}
+            </button>
+          )}
+        </div>
 
         {showSubjectForm && !closed && (
           <SubjectForm
@@ -477,7 +473,7 @@ function ChecklistAuditContent() {
             onSubmit={addSubject}
           />
         )}
-      </Card>
+      </div>
 
       {audit.subjects.length > 0 && criteria.length > 0 && (
         <div className="eval-shell">
@@ -623,6 +619,32 @@ function ChecklistAuditContent() {
                 </section>
               )
             })}
+            <EvidencesCard
+              auditId={audit.id}
+              evidences={audit.evidences || []}
+              notes={notes}
+              closed={closed}
+              evidenceUrl={checklistsService.evidenceUrl}
+              onUpload={addEvidence}
+              onRemove={removeEvidence}
+              onNotesChange={value => { setNotes(value); setDirty(true) }}
+            />
+
+            {/* La firma va AQUI, en la misma hoja: cerrar es el ultimo gesto de la ronda y
+                obligar a bajar a otra tarjeta para firmar era un paso de mas. */}
+            <SignaturesCard
+              signatures={audit.signatures}
+              signers={signers}
+              closed={closed}
+              busy={busy}
+              onAdd={addSignature}
+              onRemove={removeSignature}
+            />
+
+            <div className="scale-note">
+              <Info size={14} /> Escala: <strong>C</strong> = Cumple · <strong>NC</strong> = No cumple ·
+              {' '}<strong>NA</strong> = No aplica. NA se excluye del cálculo.
+            </div>
           </div>
 
           {/* Panel de resumen. Va pegado al scroll: el auditor tiene que ver el impacto de lo que
@@ -635,8 +657,8 @@ function ChecklistAuditContent() {
                   <b>Resumen ejecutivo</b>
                   <span className="cfg" title="La escala y los cortes del semáforo son fijos en todo el sistema"><Settings2 size={14} /></span>
                 </div>
-                <div className="ring-wrap">
-                  <div className="ring">
+                <div className="gauge-wrap">
+                  <div className="gauge">
                     {/* Anillo propio y no ProgressRing: la maqueta pide 170 px con degradado
                         violeta -> cian y tres lineas dentro, que el componente compartido no
                         dibuja. El valor sigue saliendo del mismo calculo. */}
@@ -719,34 +741,6 @@ function ChecklistAuditContent() {
         </div>
       )}
 
-      <EvidencesCard
-        auditId={audit.id}
-        evidences={audit.evidences || []}
-        notes={notes}
-        closed={closed}
-        evidenceUrl={checklistsService.evidenceUrl}
-        onUpload={addEvidence}
-        onRemove={removeEvidence}
-        onNotesChange={value => { setNotes(value); setDirty(true) }}
-      />
-
-      <div className="scale-note">
-        <Info size={14} /> Escala: <strong>C</strong> = Cumple · <strong>NC</strong> = No cumple ·
-        {' '}<strong>NA</strong> = No aplica. NA se excluye del cálculo.
-      </div>
-
-      <SignaturesCard
-        signatures={audit.signatures}
-        signers={signers}
-        closed={closed}
-        busy={busy}
-        onAdd={addSignature}
-        onRemove={removeSignature}
-      />
-
-      {/* Mientras se diligencia, esto lo cubre el panel lateral fijo; repetirlo abajo era ruido.
-          Al cerrar, el panel deja de tener sentido (ya no se marca nada) y este bloque pasa a ser
-          el resultado final, que es lo que se lee y se firma. */}
       {closed && (
       <Card accent={identity.color} className="p-5">
         <p className="ds-eyebrow">Resultado</p>
