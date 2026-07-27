@@ -1843,12 +1843,30 @@ async function dataCenterData(request) {
                       COUNT(*) FILTER (WHERE ans.value = 'NC') DESC
              LIMIT 25`, params),
 
+      // active_days y avg_seconds alimentan las metricas operativas del tablero: listas por dia
+      // y duracion promedio (created_at -> closed_at). Se calculan aqui, sobre el MISMO recorte,
+      // para que no contradigan a los KPIs de arriba.
       query(`SELECT COUNT(DISTINCT a.id)::int AS audits,
                     COUNT(DISTINCT a.area_id)::int AS areas,
                     COUNT(DISTINCT ans.audit_subject_id)::int AS subjects,
-                    COUNT(DISTINCT a.auditor_id)::int AS auditors
+                    COUNT(DISTINCT a.auditor_id)::int AS auditors,
+                    COUNT(DISTINCT a.audit_date)::int AS active_days,
+                    AVG(EXTRACT(EPOCH FROM (a.closed_at - a.created_at)))
+                      FILTER (WHERE a.closed_at IS NOT NULL) AS avg_seconds
              ${DC_FROM} WHERE ${where}`, params),
     ])
+
+    // Planes de mejora del mismo recorte. COUNT(DISTINCT p.id) porque el grafo por respuestas
+    // multiplica filas; sin el DISTINCT un plan contaria una vez por cada respuesta de su ronda.
+    const plansTally = await query(
+      `SELECT COUNT(DISTINCT p.id) FILTER (WHERE p.status <> 'CERRADO')::int AS open,
+              COUNT(DISTINCT p.id) FILTER (WHERE p.status = 'CERRADO')::int AS closed
+         FROM checklist_action_plans p
+         JOIN checklist_audits a ON a.id = p.audit_id
+         JOIN checklist_answers ans ON ans.audit_id = a.id
+         JOIN checklist_criteria c ON c.id = ans.criterion_id
+         JOIN checklist_domains d ON d.id = c.domain_id
+        WHERE ${where}`, params)
 
     const shape = rows => rows.map(row => {
       const applicable = Number(row.c) + Number(row.nc)
@@ -1917,6 +1935,10 @@ async function dataCenterData(request) {
         areas: kpis.rows[0].areas,
         subjects: kpis.rows[0].subjects,
         auditors: kpis.rows[0].auditors,
+        activeDays: kpis.rows[0].active_days,
+        avgSeconds: kpis.rows[0].avg_seconds === null ? null : Number(kpis.rows[0].avg_seconds),
+        plansOpen: plansTally.rows[0].open,
+        plansClosed: plansTally.rows[0].closed,
         // "Critico" = por debajo del corte mas bajo del semaforo, el mismo que pinta la pantalla
         // y el PDF. No es un numero elegido aparte.
         criticalCriteria: criteria.filter(row => row.percent !== null && row.percent < 70).length,

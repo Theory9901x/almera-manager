@@ -196,14 +196,23 @@ export interface DonutDatum { label: string; value: number; color: string }
 /** Donut con el total en numero grande al centro — la leyenda (color + nombre + % + valor) se
  * arma en HTML real al lado, no como leyenda nativa de ECharts, para tener control total del
  * estilo (tipografia tabular, wrap del nombre, etc). */
-export function DonutChart({ data, height = 220, centerLabel }: { data: DonutDatum[]; height?: number; centerLabel?: string }) {
+export function DonutChart({ data, height = 220, centerLabel, unit = '' }: {
+  data: DonutDatum[]; height?: number; centerLabel?: string
+  /** Unidad del tooltip y del centro (ej. "kg CO2e"). Antes estaba escrita fija y el donut de
+   *  cualquier otro modulo decia kg CO2e en el tooltip. */
+  unit?: string
+}) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
+  // Un total entero se muestra entero: "1.303,0 criterios" es un decimal inventado.
+  const centerValue = Number.isInteger(total)
+    ? total.toLocaleString('es-CO')
+    : total.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const option: ECOption = {
     tooltip: {
       trigger: 'item', ...tooltipStyle(),
       formatter: (params: unknown) => {
         const item = params as { name: string; value: number; percent: number }
-        return `<strong>${item.name}</strong><br/>${item.value.toLocaleString('es-CO')} kg CO2e (${item.percent}%)`
+        return `<strong>${item.name}</strong><br/>${item.value.toLocaleString('es-CO')}${unit ? ` ${unit}` : ''} (${item.percent}%)`
       },
     },
     series: [{
@@ -224,7 +233,7 @@ export function DonutChart({ data, height = 220, centerLabel }: { data: DonutDat
       <ReactEChartsCore echarts={echarts} option={option} style={{ height, width: '100%' }} opts={{ renderer: 'svg' }} />
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none', textAlign: 'center' }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: '1.6rem', fontVariantNumeric: 'tabular-nums' }}>{total.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
+          <div style={{ fontWeight: 800, fontSize: '1.6rem', fontVariantNumeric: 'tabular-nums' }}>{centerValue}</div>
           {centerLabel && <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginTop: 2 }}>{centerLabel}</div>}
         </div>
       </div>

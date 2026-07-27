@@ -751,3 +751,29 @@ título del detalle pegado a su línea de contexto.
 idempotente y sigue los patrones de las secciones anteriores, pero el primer arranque tras
 desplegar debe mirarse. El dashboard (§15.2–15.4) sigue pendiente y ya puede consumir
 `checklist_action_plans` para «hallazgos sin plan».
+
+---
+
+## 17. Centro de datos — rediseño glass/clay (entregado)
+
+El molde es `referencia_centro_datos_general.html` (glassmorphism + claymorphism, OKLCH) y se
+replicó en React sobre el `dataCenterData()` existente, sin duplicar cálculo. Tres alcances con
+la misma estética, definidos por los filtros (no son vistas aparte): **general**, **por lista**
+y **por servicio** — el topbar dice el alcance con palabras.
+
+- `DataCenterPanel.tsx` reescrito: topbar glass, 5 KPIs clay con tile de gradiente y variación
+  vs. período anterior (solo con rango de fechas: sin rango, «el período anterior» no existe),
+  fila 1 (filtros compactos · tendencia ECharts · donut de distribución · barras por dominio),
+  fila 2 (tabla con búsqueda y paginación en cliente sobre el recorte ya acotado · top
+  profesionales · NC por servicio), criterios más incumplidos y 5 métricas operativas del pie.
+- **El donut va C / NC / NA** — sin «parcialmente», que sigue descartado (§15.2). Todo
+  porcentaje usa el semáforo del sistema; el gradiente de marca es la identidad violeta.
+- `dataCenterData()` ganó en `kpis`: `activeDays`, `avgSeconds` (creada→cerrada) y
+  `plansOpen`/`plansClosed` (planes de mejora del MISMO recorte, `COUNT(DISTINCT p.id)` porque
+  el grafo por respuestas multiplica filas).
+- **Bug compartido corregido**: `DonutChart` tenía el tooltip fijo en «kg CO2e» (fuga del módulo
+  de carbono) y el centro con un decimal inventado («1.303,0»). Ahora recibe `unit` y muestra
+  enteros como enteros; el dashboard de carbono pasa su unidad explícita.
+- CSS en `index.css` sección `.dcx-*`, con overrides `:root[data-theme="dark"]`.
+- Verificado con Puppeteer en los tres alcances, cambiando el filtro por interacción real
+  (Radix Select). El PDF/Excel exportan el recorte actual como antes.

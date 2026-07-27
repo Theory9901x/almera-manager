@@ -4399,3 +4399,202 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .plan-remember input { margin-top: 2px; accent-color: var(--m-listas); }
 .plan-remember strong { color: var(--ink); }
+
+/* ============================================================================
+   Centro de datos de Listas — rediseno glass/clay (molde referencia_centro_datos_general).
+   Dos recursos que el resto del sistema reserva y aqui son la base:
+   - vidrio: fondo translucido + blur, con la malla de radiales del modulo detras;
+   - clay: sombra doble (exterior difusa + luz interior arriba) que "infla" la tarjeta.
+   Colores en OKLCH; el gradiente de marca ES la identidad del modulo (violeta),
+   y todo porcentaje sigue llevando el semaforo del sistema, no la paleta decorativa.
+   ============================================================================ */
+.dcx {
+  --dcx-clay: 0 8px 24px rgba(90, 100, 140, .12), 0 2px 6px rgba(90, 100, 140, .08),
+              inset 0 1px 0 rgba(255, 255, 255, .9);
+  --dcx-clay-lg: 0 18px 48px rgba(90, 100, 140, .16), 0 4px 12px rgba(90, 100, 140, .10),
+                 inset 0 1px 0 rgba(255, 255, 255, .95);
+  --dcx-glass-brd: inset 0 0 0 1px rgba(255, 255, 255, .6);
+  --dcx-card: rgba(255, 255, 255, .72);
+  display: grid;
+  gap: 14px;
+}
+:root[data-theme="dark"] .dcx {
+  --dcx-clay: 0 8px 24px rgba(0, 0, 0, .38), 0 2px 6px rgba(0, 0, 0, .3),
+              inset 0 1px 0 rgba(255, 255, 255, .07);
+  --dcx-clay-lg: 0 18px 48px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .09);
+  --dcx-glass-brd: inset 0 0 0 1px rgba(255, 255, 255, .08);
+  --dcx-card: color-mix(in srgb, var(--glass-tint) 62%, transparent);
+}
+
+.dcx-card, .dcx-topbar, .dcx-kpi, .dcx-fstat {
+  border-radius: 20px;
+  background: var(--dcx-card);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--dcx-clay), var(--dcx-glass-brd);
+  border: 0;
+}
+.dcx-card { padding: 16px 18px; min-width: 0; }
+
+/* topbar */
+.dcx-topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; }
+.dcx-tb-l { display: flex; align-items: center; gap: 13px; }
+.dcx-tb-ic {
+  width: 44px; height: 44px; border-radius: 14px; flex: none;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--m-listas), #8B5CF6);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--m-listas) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+.dcx-tb-l h2 { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.dcx-tb-l p { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.dcx-tb-r { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.dcx-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 13px;
+  border: 0; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ink);
+  background: color-mix(in srgb, var(--dcx-card) 80%, #fff 20%);
+  box-shadow: var(--dcx-clay);
+}
+:root[data-theme="dark"] .dcx-chip { background: var(--dcx-card); }
+.dcx-chip:disabled { opacity: .5; cursor: default; }
+.dcx-chip.is-pri { background: linear-gradient(135deg, var(--m-listas), #8B5CF6); color: #fff;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--m-listas) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); }
+.dcx-chip.is-col { flex-direction: column; align-items: flex-start; gap: 0; line-height: 1.35; cursor: default; }
+.dcx-chip.is-col span { font-size: 9px; color: var(--muted); font-weight: 600; }
+.dcx-chip.is-col b { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+/* KPIs clay con tile de gradiente por tono */
+.dcx-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.dcx-kpi { padding: 16px; display: flex; gap: 13px; align-items: flex-start; min-width: 0; }
+.dcx-ki {
+  width: 50px; height: 50px; border-radius: 16px; flex: none;
+  display: grid; place-items: center; color: #fff;
+}
+.dcx-ki.is-b { background: linear-gradient(135deg, oklch(0.62 0.18 255), oklch(0.62 0.18 265)); box-shadow: 0 8px 18px oklch(0.62 0.18 255/.4), inset 0 1px 0 rgba(255,255,255,.4); }
+.dcx-ki.is-g { background: linear-gradient(135deg, oklch(0.68 0.17 150), oklch(0.68 0.16 165)); box-shadow: 0 8px 18px oklch(0.68 0.17 150/.4), inset 0 1px 0 rgba(255,255,255,.4); }
+.dcx-ki.is-v { background: linear-gradient(135deg, var(--m-listas), #8B5CF6); box-shadow: 0 8px 18px color-mix(in srgb, var(--m-listas) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.4); }
+.dcx-ki.is-a { background: linear-gradient(135deg, oklch(0.75 0.15 75), oklch(0.75 0.15 55)); box-shadow: 0 8px 18px oklch(0.75 0.15 75/.4), inset 0 1px 0 rgba(255,255,255,.4); }
+.dcx-ki.is-t { background: linear-gradient(135deg, oklch(0.62 0.15 190), oklch(0.70 0.14 200)); box-shadow: 0 8px 18px oklch(0.62 0.15 195/.4), inset 0 1px 0 rgba(255,255,255,.4); }
+.dcx-kl { font-size: 11px; color: var(--muted); font-weight: 600; }
+.dcx-kv { font-size: 25px; font-weight: 900; letter-spacing: -.03em; margin: 2px 0; font-variant-numeric: tabular-nums; color: var(--ink); }
+.dcx-kd { font-size: 10px; }
+.dcx-kd-up { color: oklch(0.55 0.15 150); font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+.dcx-kd-down { color: oklch(0.55 0.2 25); font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+.dcx-kd-none { color: var(--muted); }
+
+/* filas del molde */
+/* Sin align-items: start — las tarjetas se estiran a la altura de la fila (la marca el panel
+   de filtros) y el vidrio cubre la fila completa, como en el molde. */
+.dcx-row1 { display: grid; grid-template-columns: 236px 1.25fr 1fr 1.1fr; gap: 14px; }
+.dcx-row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; }
+.dcx-col { display: grid; gap: 14px; }
+.dcx-span3 { grid-column: span 3; }
+@media (max-width: 1280px) {
+  .dcx-kpis { grid-template-columns: repeat(2, 1fr); }
+  .dcx-row1 { grid-template-columns: 1fr 1fr; }
+  .dcx-row2 { grid-template-columns: 1fr; }
+  .dcx-span3 { grid-column: auto; }
+}
+
+.dcx-ph { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 13px; flex-wrap: wrap; }
+.dcx-pt { font-size: 13.5px; font-weight: 700; }
+.dcx-pt.is-caps { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.dcx-hint { font-size: 11px; color: var(--muted); }
+
+/* filtros: inputs "hundidos" del molde */
+.dcx-fgroup { margin-bottom: 11px; }
+.dcx-fgroup label { font-size: 10.5px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px; }
+.dcx-fgroup .ds-select-trigger, .dcx-fgroup .ds-datepicker-trigger {
+  background: rgba(255, 255, 255, .85);
+  border: 0;
+  box-shadow: inset 0 2px 5px rgba(90, 100, 140, .10), 0 1px 0 rgba(255, 255, 255, .8);
+}
+:root[data-theme="dark"] .dcx-fgroup .ds-select-trigger,
+:root[data-theme="dark"] .dcx-fgroup .ds-datepicker-trigger {
+  background: color-mix(in srgb, var(--glass-tint) 70%, transparent);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .4);
+}
+.dcx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.dcx-fchip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 99px;
+  border: 0; cursor: pointer; font-family: inherit; font-size: 10.5px; font-weight: 700;
+  background: var(--m-listas-soft); color: var(--m-listas-deep);
+}
+
+/* donut leyenda */
+.dcx-dleg { display: grid; gap: 7px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.dcx-dleg div { display: flex; align-items: center; gap: 8px; }
+.dcx-dleg b { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dcx-sw { width: 11px; height: 11px; border-radius: 4px; flex: none; }
+
+/* barras clay: riel hundido, relleno redondeado */
+.dcx-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; font-size: 11.5px; }
+.dcx-bar-rank {
+  width: 22px; height: 22px; border-radius: 8px; flex: none;
+  display: grid; place-items: center; font-weight: 800; font-size: 10px; color: var(--m-listas);
+  background: rgba(255, 255, 255, .8); box-shadow: var(--dcx-clay);
+}
+:root[data-theme="dark"] .dcx-bar-rank { background: var(--dcx-card); }
+.dcx-bar-name { width: 132px; flex: none; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dcx-bar-track {
+  flex: 1; height: 9px; border-radius: 99px; overflow: hidden;
+  background: rgba(90, 100, 140, .12);
+  box-shadow: inset 0 1px 3px rgba(90, 100, 140, .15);
+}
+:root[data-theme="dark"] .dcx-bar-track { background: rgba(0, 0, 0, .35); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .5); }
+.dcx-bar-track i { display: block; height: 100%; border-radius: 99px; transition: width .5s ease; }
+.dcx-bar-value { width: 46px; flex: none; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dcx-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); padding-left: 142px; margin-top: 2px; }
+
+/* tabla */
+.dcx-search {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 11px;
+  background: rgba(255, 255, 255, .85); box-shadow: inset 0 2px 5px rgba(90, 100, 140, .1);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .dcx-search { background: color-mix(in srgb, var(--glass-tint) 70%, transparent); box-shadow: inset 0 2px 5px rgba(0, 0, 0, .4); }
+.dcx-search input { border: 0; background: transparent; outline: none; font-family: inherit; font-size: 11.5px; width: 190px; color: var(--ink); }
+.dcx-table-wrap { overflow-x: auto; }
+.dcx-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.dcx-table th {
+  text-align: left; color: var(--muted); font-size: 9.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; padding: 8px;
+}
+.dcx-table td { padding: 10px 8px; border-top: 1px solid color-mix(in srgb, var(--border-hairline) 70%, transparent); vertical-align: middle; }
+.dcx-table td small { display: block; color: var(--muted); font-size: 10px; }
+.dcx-res { padding: 3px 10px; border-radius: 99px; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+.dcx-tac { display: inline-flex; gap: 6px; }
+.dcx-tac button, .dcx-tac a {
+  width: 26px; height: 26px; border-radius: 8px; border: 0; cursor: pointer;
+  display: grid; place-items: center; color: var(--muted);
+  background: rgba(255, 255, 255, .8); box-shadow: var(--dcx-clay);
+}
+:root[data-theme="dark"] .dcx-tac button, :root[data-theme="dark"] .dcx-tac a { background: var(--dcx-card); }
+.dcx-tac button:hover, .dcx-tac a:hover { color: var(--m-listas); }
+.dcx-pgs { display: flex; gap: 5px; align-items: center; margin-top: 12px; font-size: 11px; }
+.dcx-pgs-info { color: var(--muted); margin-right: auto; }
+.dcx-pg {
+  width: 28px; height: 28px; border-radius: 9px; border: 0; cursor: pointer;
+  display: grid; place-items: center; color: var(--muted); font-family: inherit; font-weight: 600;
+  background: rgba(255, 255, 255, .7); box-shadow: var(--dcx-clay);
+}
+:root[data-theme="dark"] .dcx-pg { background: var(--dcx-card); }
+.dcx-pg:disabled { opacity: .4; cursor: default; }
+.dcx-pg.is-on { background: linear-gradient(135deg, var(--m-listas), #8B5CF6); color: #fff; }
+
+/* metricas operativas del pie */
+.dcx-fstats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+@media (max-width: 1280px) { .dcx-fstats { grid-template-columns: repeat(2, 1fr); } }
+.dcx-fstat { padding: 15px; display: flex; gap: 12px; align-items: center; border-radius: 18px; }
+.dcx-fic {
+  width: 42px; height: 42px; border-radius: 13px; flex: none;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, oklch(0.62 0.15 190), oklch(0.70 0.14 200));
+  box-shadow: 0 6px 14px oklch(0.62 0.15 195/.35), inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+.dcx-fl { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+.dcx-fv { font-size: 19px; font-weight: 900; margin: 1px 0; font-variant-numeric: tabular-nums; }
+.dcx-fd { font-size: 9.5px; color: var(--muted); }
+
+/* pareja de campos compactos del panel de filtros */
+.dcx-fpair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dcx-fgroup { min-width: 0; }

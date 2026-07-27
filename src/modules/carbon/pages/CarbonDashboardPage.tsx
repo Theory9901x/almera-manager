@@ -233,6 +233,7 @@ function CarbonDashboardContent() {
               <div className="carbon-donut-chart">
                 <DonutChart
                   height={220}
+                  unit="kg CO2e"
                   centerLabel="kg CO2e total"
                   data={stats.byBlock.map((item, i) => ({ label: item.name, value: item.kgco2e, color: VARIABLE_PALETTE[i % VARIABLE_PALETTE.length] }))}
                 />
