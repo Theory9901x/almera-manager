@@ -4598,3 +4598,298 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* pareja de campos compactos del panel de filtros */
 .dcx-fpair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dcx-fgroup { min-width: 0; }
+
+/* ============================================================================
+   TEMA OSCURO FUTURISTA — capa final de la cascada.
+   La maqueta clara del modulo fijo blancos a mano (#fff, #FAFBFE, #EAEDF3...)
+   en selectores sin tema, asi que en oscuro las tarjetas se quedaban claras con
+   el texto ya cambiado a casi blanco: ilegible. Esta seccion va AL FINAL del
+   archivo a proposito: reescribe esas superficies cuando el tema es oscuro.
+   Lenguaje: espacio profundo azul-violeta, bordes de degradado neon
+   (violeta -> cian), foco con anillo luminoso y botones con barrido de luz.
+   ============================================================================ */
+
+:root[data-theme="dark"] {
+  --neo-panel: linear-gradient(165deg, rgba(26, 33, 60, .92), rgba(14, 19, 38, .96));
+  --neo-panel-soft: rgba(20, 27, 50, .75);
+  --neo-line: rgba(129, 140, 248, .16);
+  --neo-line-strong: rgba(129, 140, 248, .34);
+  --neo-edge: linear-gradient(135deg, rgba(139, 92, 246, .55), rgba(56, 189, 248, .30) 45%, rgba(139, 92, 246, .08));
+  --neo-glow: 0 0 0 1px rgba(129, 140, 248, .14), 0 10px 34px rgba(2, 6, 18, .55),
+              0 2px 10px rgba(2, 6, 18, .4), inset 0 1px 0 rgba(148, 163, 255, .10);
+  --neo-glow-hover: 0 0 0 1px rgba(139, 92, 246, .38), 0 14px 44px rgba(76, 29, 149, .35),
+                    0 4px 14px rgba(2, 6, 18, .5), inset 0 1px 0 rgba(148, 163, 255, .16);
+  --neo-input: rgba(10, 15, 30, .6);
+}
+
+/* --- Shell: cabecera superior. Tenia blanco fijo y el texto (ya claro) se fundia. --- */
+:root[data-theme="dark"] .shell-header {
+  border-color: var(--neo-line);
+  background: rgba(13, 18, 36, .82);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 10px 30px rgba(2, 6, 18, .5), inset 0 1px 0 rgba(148, 163, 255, .08);
+}
+:root[data-theme="dark"] .topbar-title { color: var(--ink); }
+:root[data-theme="dark"] .topbar-description { color: var(--muted); }
+:root[data-theme="dark"] .topbar-search,
+:root[data-theme="dark"] .topbar-system {
+  border-color: var(--neo-line);
+  background: rgba(20, 27, 50, .6);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .topbar-system { color: #A5B4FC; }
+:root[data-theme="dark"] .topbar-profile:hover { background: rgba(129, 140, 248, .10); }
+:root[data-theme="dark"] .topbar-profile-info strong { color: var(--ink); }
+
+/* --- Lienzo del modulo: espacio profundo con brillos violeta/cian. --- */
+:root[data-theme="dark"] .checklists-page-bg {
+  background:
+    radial-gradient(1100px 640px at 4% -6%, rgba(91, 75, 232, .32), transparent 58%),
+    radial-gradient(900px 560px at 100% 2%, rgba(56, 189, 248, .16), transparent 55%),
+    radial-gradient(860px 700px at 70% 100%, rgba(139, 92, 246, .18), transparent 60%),
+    linear-gradient(170deg, #0a0f22 0%, #090d1d 48%, #0b1126 100%);
+}
+
+/* --- Superficies: panel oscuro con borde de degradado neon. El truco de doble fondo
+   (padding-box + border-box) pinta el degradado SOLO en el hilo del borde. --- */
+:root[data-theme="dark"] .checklists-page-bg .ds-card,
+:root[data-theme="dark"] .checklists-page-bg .surface-panel,
+:root[data-theme="dark"] .checklists-page-bg > .surface-panel,
+:root[data-theme="dark"] .eval-context,
+:root[data-theme="dark"] .eval-domain,
+:root[data-theme="dark"] .scard,
+:root[data-theme="dark"] .eval-toolbar {
+  border: 1px solid transparent;
+  background: var(--neo-panel) padding-box, var(--neo-edge) border-box;
+  box-shadow: var(--neo-glow);
+}
+:root[data-theme="dark"] .checklists-page-bg .ds-card:hover {
+  box-shadow: var(--neo-glow-hover);
+}
+:root[data-theme="dark"] .scale-note,
+:root[data-theme="dark"] .eval-evidences li,
+:root[data-theme="dark"] .signature-item,
+:root[data-theme="dark"] .checklist-seed-row,
+:root[data-theme="dark"] .plan-row,
+:root[data-theme="dark"] .plan-finding {
+  background: var(--neo-panel-soft);
+  border-color: var(--neo-line);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 255, .06);
+}
+:root[data-theme="dark"] .plan-row:hover { border-color: var(--neo-line-strong); }
+
+/* --- Tipografia que quedaba gris-sobre-gris. --- */
+:root[data-theme="dark"] .checklists-page-bg h1,
+:root[data-theme="dark"] .checklists-page-bg h2,
+:root[data-theme="dark"] .checklists-page-bg h3,
+:root[data-theme="dark"] .shead b,
+:root[data-theme="dark"] .gauge .pct,
+:root[data-theme="dark"] .stat3 .n,
+:root[data-theme="dark"] .alert .tx b { color: var(--ink); }
+:root[data-theme="dark"] .topbar .subtitle,
+:root[data-theme="dark"] .ctext span,
+:root[data-theme="dark"] .crumbs,
+:root[data-theme="dark"] .crumbs button,
+:root[data-theme="dark"] .eval-strip-label,
+:root[data-theme="dark"] .eval-domain-state,
+:root[data-theme="dark"] .eval-domain-pct,
+:root[data-theme="dark"] .gauge .lbl,
+:root[data-theme="dark"] .stat3 .l,
+:root[data-theme="dark"] .alert .tx span,
+:root[data-theme="dark"] .catrow .top > span:first-child,
+:root[data-theme="dark"] .eval-context-cell dt,
+:root[data-theme="dark"] .eval-context-cell dd small,
+:root[data-theme="dark"] .eval-subject small,
+:root[data-theme="dark"] .eval-field > span,
+:root[data-theme="dark"] .btn .sub { color: var(--muted); }
+:root[data-theme="dark"] .eval-domain-pct { color: var(--ink-soft) !important; }
+:root[data-theme="dark"] .eval-context-cell dd,
+:root[data-theme="dark"] .eval-subject > span,
+:root[data-theme="dark"] .ctext b { color: var(--ink); }
+:root[data-theme="dark"] .eval-context-icon,
+:root[data-theme="dark"] .cnum { background: rgba(129, 140, 248, .14); color: #A5B4FC; }
+:root[data-theme="dark"] .title-ic {
+  background: linear-gradient(135deg, rgba(91, 75, 232, .35), rgba(139, 92, 246, .2));
+  color: #A5B4FC;
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, .3);
+}
+
+/* --- Divisorias con degradado: las claras usaban #EDEFF6 y en oscuro parecian rayones. --- */
+:root[data-theme="dark"] .checklists-page-bg .ds-table tbody td {
+  background-image: linear-gradient(90deg, transparent, rgba(129, 140, 248, .14) 12%, rgba(129, 140, 248, .14) 88%, transparent);
+}
+:root[data-theme="dark"] .crit {
+  background-image: linear-gradient(90deg, transparent, rgba(129, 140, 248, .13) 4%, rgba(129, 140, 248, .13) 96%, transparent);
+}
+:root[data-theme="dark"] .crit:last-child { background-image: none; }
+:root[data-theme="dark"] .eval-context .eval-fields,
+:root[data-theme="dark"] .eval-context .eval-subjects,
+:root[data-theme="dark"] .eval-strip {
+  border-top-color: transparent;
+  background-image: linear-gradient(90deg, transparent, rgba(129, 140, 248, .16) 3%, rgba(129, 140, 248, .16) 97%, transparent);
+}
+:root[data-theme="dark"] .dbody,
+:root[data-theme="dark"] .eval-domain-body,
+:root[data-theme="dark"] .stat3,
+:root[data-theme="dark"] .eval-legend,
+:root[data-theme="dark"] .eval-counters { border-color: var(--neo-line); }
+
+/* --- Tabla: cabecera de cristal violeta, hover con halo. --- */
+:root[data-theme="dark"] .checklists-page-bg .ds-table thead th {
+  background: linear-gradient(180deg, rgba(26, 33, 60, .9), rgba(17, 23, 44, .9)) padding-box,
+              linear-gradient(90deg, transparent, rgba(139, 92, 246, .5), transparent) border-box;
+  color: #A5B4FC;
+}
+:root[data-theme="dark"] .checklists-table .ds-table tbody tr:hover td,
+:root[data-theme="dark"] .checklists-page-bg .ds-table tbody tr:hover td { background-color: rgba(129, 140, 248, .08); }
+:root[data-theme="dark"] .checklist-fill-grid thead th { background: rgba(17, 23, 44, .92); color: #A5B4FC; }
+:root[data-theme="dark"] .checklist-fill-grid td { border-bottom-color: rgba(129, 140, 248, .12); background: transparent; }
+:root[data-theme="dark"] .checklist-fill-grid td.fill-criterion { background: transparent; }
+:root[data-theme="dark"] .ds-bulk-bar { background: rgba(20, 27, 50, .8); border-color: var(--neo-line); }
+/* La banda del titulo de tabla traia #eef2f7 fijo y quedaba como un bloque gris claro. */
+:root[data-theme="dark"] .table-toolbar {
+  border-color: var(--neo-line);
+  background: linear-gradient(135deg, rgba(26, 33, 60, .9), rgba(17, 23, 44, .85));
+}
+:root[data-theme="dark"] .table-toolbar .almera-panel-title,
+:root[data-theme="dark"] .almera-panel-title {
+  background: transparent;
+  border-color: var(--neo-line);
+}
+
+/* --- Inputs del modulo: pozo oscuro con anillo neon al foco. --- */
+:root[data-theme="dark"] .checklists-page-bg .ds-input,
+:root[data-theme="dark"] .checklists-page-bg .ds-select-trigger,
+:root[data-theme="dark"] .checklists-page-bg .ds-datepicker-trigger,
+:root[data-theme="dark"] .checklists-page-bg .ds-textarea,
+:root[data-theme="dark"] .cobs,
+:root[data-theme="dark"] .fill-note,
+:root[data-theme="dark"] .eval-field input,
+:root[data-theme="dark"] .eval-field select,
+:root[data-theme="dark"] .eval-staff-add input {
+  background: var(--neo-input);
+  border: 1px solid var(--neo-line);
+  color: var(--ink);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .35);
+}
+:root[data-theme="dark"] .checklists-page-bg .ds-input:focus,
+:root[data-theme="dark"] .checklists-page-bg .ds-textarea:focus,
+:root[data-theme="dark"] .cobs:focus,
+:root[data-theme="dark"] .fill-note:focus,
+:root[data-theme="dark"] .eval-field input:focus,
+:root[data-theme="dark"] .eval-field select:focus,
+:root[data-theme="dark"] .eval-staff-add input:focus {
+  background: rgba(10, 15, 30, .85);
+  border-color: rgba(139, 92, 246, .6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, .22), inset 0 2px 6px rgba(0, 0, 0, .35);
+}
+:root[data-theme="dark"] .cobs::placeholder,
+:root[data-theme="dark"] .fill-note::placeholder,
+:root[data-theme="dark"] .eval-staff-add input::placeholder { color: var(--muted-light); }
+
+/* --- Controles C / NC / NA: base de cristal oscuro; el estado activo conserva su color
+   semantico y gana halo. El semaforo manda tambien de noche. --- */
+:root[data-theme="dark"] .seg,
+:root[data-theme="dark"] .fill-value,
+:root[data-theme="dark"] .cico,
+:root[data-theme="dark"] .fill-icon-btn {
+  background: rgba(20, 27, 50, .7);
+  border-color: var(--neo-line);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .seg:hover:not(:disabled),
+:root[data-theme="dark"] .cico:hover:not(:disabled) { border-color: var(--neo-line-strong); color: var(--ink); }
+:root[data-theme="dark"] .seg.C.on  { background: #16A34A; border-color: #16A34A; color: #fff; box-shadow: 0 0 18px rgba(22, 163, 74, .45); }
+:root[data-theme="dark"] .seg.NC.on { background: #DC2626; border-color: #DC2626; color: #fff; box-shadow: 0 0 18px rgba(220, 38, 38, .45); }
+:root[data-theme="dark"] .seg.NA.on { background: #64748B; border-color: #64748B; color: #fff; }
+:root[data-theme="dark"] .eval-risk-chip.is-c  { background: rgba(22, 163, 74, .16); color: #4ADE80; }
+:root[data-theme="dark"] .eval-risk-chip.is-nc { background: rgba(220, 38, 38, .16); color: #F87171; }
+:root[data-theme="dark"] .eval-risk-chip.is-na { background: rgba(100, 116, 139, .2); color: #94A3B8; }
+:root[data-theme="dark"] .checklist-progress-bar,
+:root[data-theme="dark"] .catrow .bar { background: rgba(10, 15, 30, .7); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .5); }
+:root[data-theme="dark"] .shead .cfg { border-color: var(--neo-line); color: var(--muted); }
+
+/* --- Alertas del resumen: mismas semanticas, en vidrio oscuro. --- */
+:root[data-theme="dark"] .alert.crit { background: linear-gradient(135deg, rgba(220, 38, 38, .14), rgba(220, 38, 38, .05)); border-color: rgba(220, 38, 38, .3); }
+:root[data-theme="dark"] .alert.ev { background: linear-gradient(135deg, rgba(139, 92, 246, .14), rgba(139, 92, 246, .05)); border-color: rgba(139, 92, 246, .3); }
+:root[data-theme="dark"] .alert.crit .ic { background: rgba(220, 38, 38, .18); color: #F87171; }
+:root[data-theme="dark"] .alert.ev .ic { background: rgba(139, 92, 246, .18); color: #C4B5FD; }
+:root[data-theme="dark"] .alert.crit .big { color: #F87171; }
+:root[data-theme="dark"] .alert.ev .big { color: #C4B5FD; }
+
+/* --- Botones dinamicos: cristal con borde neon; el primario, gradiente con
+   barrido de luz al pasar y halo violeta. --- */
+:root[data-theme="dark"] .btn,
+:root[data-theme="dark"] .checklists-page-bg .ds-button-secondary,
+:root[data-theme="dark"] .eval-subject,
+:root[data-theme="dark"] .program-tab,
+:root[data-theme="dark"] .eval-staff-add button,
+:root[data-theme="dark"] .eval-subject-add,
+:root[data-theme="dark"] .signature-pad-clear {
+  background: rgba(20, 27, 50, .72);
+  border-color: var(--neo-line);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 255, .08);
+}
+:root[data-theme="dark"] .btn:hover:not(:disabled),
+:root[data-theme="dark"] .checklists-page-bg .ds-button-secondary:hover:not(:disabled) {
+  border-color: var(--neo-line-strong);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, .25), 0 8px 24px rgba(76, 29, 149, .3);
+}
+:root[data-theme="dark"] .eval-staff-add button,
+:root[data-theme="dark"] .eval-subject-add { color: #A5B4FC; border-style: dashed; }
+:root[data-theme="dark"] .eval-subject-add:hover { background: rgba(129, 140, 248, .12); border-color: var(--neo-line-strong); }
+:root[data-theme="dark"] .program-tab { color: var(--muted); }
+:root[data-theme="dark"] .program-tab span { background: rgba(129, 140, 248, .15); color: #A5B4FC; }
+:root[data-theme="dark"] .program-tab.is-active { color: #fff; }
+:root[data-theme="dark"] .program-tab.is-active span { background: rgba(255, 255, 255, .25); color: #fff; }
+
+/* Barrido de luz de los primarios: una franja diagonal que cruza al pasar el puntero. */
+:root[data-theme="dark"] .btn.pri,
+:root[data-theme="dark"] .checklists-page-bg .ds-button-primary,
+:root[data-theme="dark"] .dcx-chip.is-pri {
+  position: relative; overflow: hidden; border: 0; color: #fff;
+  background: linear-gradient(135deg, #5B4BE8, #8B5CF6 55%, #7C5CFA);
+  box-shadow: 0 6px 22px rgba(91, 75, 232, .45), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+:root[data-theme="dark"] .btn.pri::after,
+:root[data-theme="dark"] .checklists-page-bg .ds-button-primary::after,
+:root[data-theme="dark"] .dcx-chip.is-pri::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: -75%; width: 50%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .35), transparent);
+  transform: skewX(-18deg);
+  transition: left .45s ease;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .btn.pri:hover:not(:disabled)::after,
+:root[data-theme="dark"] .checklists-page-bg .ds-button-primary:hover:not(:disabled)::after,
+:root[data-theme="dark"] .dcx-chip.is-pri:hover:not(:disabled)::after { left: 125%; }
+:root[data-theme="dark"] .btn.pri:hover:not(:disabled) {
+  box-shadow: 0 10px 30px rgba(91, 75, 232, .6), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+/* --- Evidencias, firmas y zonas de arrastre. --- */
+:root[data-theme="dark"] .eval-drop {
+  background: rgba(13, 18, 36, .55);
+  border-color: rgba(129, 140, 248, .3);
+  color: #A5B4FC;
+}
+:root[data-theme="dark"] .eval-drop.is-over { background: rgba(129, 140, 248, .12); border-color: #8B5CF6; }
+:root[data-theme="dark"] .eval-evidence-icon { background: rgba(129, 140, 248, .15); color: #A5B4FC; }
+:root[data-theme="dark"] .signature-pad-canvas { background: #EDEFF6; }  /* la firma se traza en claro: tinta sobre papel */
+:root[data-theme="dark"] .eval-uploads {
+  background: rgba(129, 140, 248, .1);
+  border-color: rgba(129, 140, 248, .25);
+  color: #C7D2FE;
+}
+
+/* --- Repositorio y paginadores. --- */
+:root[data-theme="dark"] .repo-pager { border-color: var(--neo-line); }
+:root[data-theme="dark"] .code-pill { background: rgba(129, 140, 248, .14); color: #A5B4FC; }
+:root[data-theme="dark"] .plan-chip { background: rgba(129, 140, 248, .14); color: #C7D2FE; border-color: rgba(139, 92, 246, .35); }
+:root[data-theme="dark"] .plan-chip.is-new { background: transparent; color: #A5B4FC; }
+
+/* KPIs numericos del centro de datos con leve brillo de neon. */
+:root[data-theme="dark"] .dcx-kv { text-shadow: 0 0 22px rgba(139, 92, 246, .35); }
+:root[data-theme="dark"] .gauge .pct { text-shadow: 0 0 26px rgba(56, 189, 248, .3); }

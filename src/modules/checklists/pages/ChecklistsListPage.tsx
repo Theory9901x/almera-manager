@@ -348,7 +348,9 @@ function ChecklistsListContent() {
                             )}
                             <td><strong>{audit.template_name}</strong></td>
                             <td>{audit.area_name || '—'}</td>
-                            <td className="tabular-col">{new Date(`${audit.audit_date}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                            {/* slice(0,10): la fecha llega como ISO con hora y pegarle T00:00:00
+                                entero daba "Invalid Date" en la tabla. */}
+                            <td className="tabular-col">{new Date(`${String(audit.audit_date).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                             <td>{audit.shift || '—'}</td>
                             <td className="tabular-col">{audit.subject_count}</td>
                             <td className="tabular-col">
