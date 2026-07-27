@@ -1,9 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus } from 'lucide-react'
 import {
-  Badge, Button, Card, EmptyState, Field, Input, ModuleHero, SaveStatusIndicator, Select,
-  ToastProvider, moduleIdentity, semaphoreColor, useToast,
+  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, CircleDashed, Clock,
+  Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
+} from 'lucide-react'
+import {
+  Badge, Button, Card, EmptyState, Field, Input, ModuleHero, ProgressRing, SaveStatusIndicator,
+  Select, ToastProvider, moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
 import { SignaturePad } from '../components/SignaturePad'
@@ -41,6 +44,11 @@ function ChecklistAuditContent() {
   const [signers, setSigners] = useState<SignerSuggestion[]>([])
   const [exporting, setExporting] = useState(false)
   const headerDirty = useRef(false)
+  // Dominios plegados. Se guarda lo CERRADO, no lo abierto: una lista recien abierta debe
+  // mostrarse entera, y con el set invertido habria que rellenarlo al cargar.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const startedAt = useRef(Date.now())
+  const [elapsed, setElapsed] = useState(0)
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -81,6 +89,11 @@ function ChecklistAuditContent() {
     const timeout = window.setTimeout(() => setSaveState('idle'), 2500)
     return () => window.clearTimeout(timeout)
   }, [saveState])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt.current) / 1000)), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const criteria = useMemo(() => audit ? audit.domains.flatMap(domain => domain.criteria) : [], [audit])
   const closed = audit?.status === 'CERRADA'
@@ -220,16 +233,39 @@ function ChecklistAuditContent() {
   const totalCells = criteria.length * audit.subjects.length
   const markedCells = Object.keys(marks).length
   const progress = totalCells ? Math.round((markedCells / totalCells) * 100) : 0
-  const livePercent = (domain: typeof audit.domains[number]) => {
-    let c = 0, nc = 0
+  const domainTally = (domain: typeof audit.domains[number]) => {
+    let c = 0, nc = 0, na = 0, marked = 0
     for (const criterion of domain.criteria) {
       for (const subject of audit.subjects) {
         const value = marks[answerKey(subject.id, criterion.id)]
-        if (value === 'C') c++
-        else if (value === 'NC') nc++
+        if (value === 'C') { c++; marked++ }
+        else if (value === 'NC') { nc++; marked++ }
+        else if (value === 'NA') { na++; marked++ }
       }
     }
+    const cells = domain.criteria.length * audit.subjects.length
+    return { c, nc, na, marked, cells, percent: c + nc > 0 ? (c / (c + nc)) * 100 : null }
+  }
+  const livePercent = (domain: typeof audit.domains[number]) => domainTally(domain).percent
+
+  // Hallazgos: los NC marcados en pantalla. Son los que exigen accion, y el auditor tiene que
+  // verlos crecer mientras marca, no al final.
+  const findings = Object.values(marks).filter(value => value === 'NC').length
+  const liveOverall = (() => {
+    let c = 0, nc = 0
+    for (const value of Object.values(marks)) { if (value === 'C') c++; else if (value === 'NC') nc++ }
     return c + nc > 0 ? (c / (c + nc)) * 100 : null
+  })()
+  const shownPercent = closed ? (percent === null ? null : Number(percent)) : liveOverall
+  const clock = `${String(Math.floor(elapsed / 3600)).padStart(2, '0')}:${String(Math.floor(elapsed / 60) % 60).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
+
+  function toggleDomain(id: string) {
+    setCollapsed(current => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   return (
@@ -335,102 +371,164 @@ function ChecklistAuditContent() {
       </Card>
 
       {audit.subjects.length > 0 && criteria.length > 0 && (
-        <Card accent={identity.color} className="p-5">
-          <p className="ds-eyebrow">Calificación</p>
-          <h2 className="mt-1 text-xl font-black">Criterios por {audit.subject_label.toLowerCase()}</h2>
-          <p className="survey-config-hint mt-2">
-            Marca <strong>C</strong> (cumple), <strong>NC</strong> (no cumple) o <strong>NA</strong> (no aplica).
-            NA no penaliza: se excluye del cálculo. Toca de nuevo para deshacer la marca.
-          </p>
+        <div className="eval-shell">
+          {/* Cuerpo: un acordeon por dominio. Dentro de cada uno se conserva la MATRIZ
+              criterio x sujeto — con un solo sujeto se ve como una lista de criterios, que es el
+              caso comun, y con varios sigue sirviendo. Pasar a una fila por criterio habria roto
+              las rondas de varios pacientes, que es la mitad de los formatos. */}
+          <div className="eval-body">
+            <div className="eval-toolbar">
+              <p className="survey-config-hint" style={{ margin: 0 }}>
+                Marca <strong>C</strong> (cumple), <strong>NC</strong> (no cumple) o <strong>NA</strong> (no aplica).
+                NA no penaliza: se excluye del cálculo. Toca de nuevo para deshacer.
+              </p>
+              <button
+                className="row-action"
+                onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(audit.domains.map(d => String(d.id))))}
+              >
+                {collapsed.size ? <><ChevronDown size={14} /> Expandir todo</> : <><ChevronUp size={14} /> Colapsar todo</>}
+              </button>
+            </div>
 
-          <div className="checklist-progress mt-4">
-            <div className="checklist-progress-bar"><i style={{ width: `${progress}%`, background: identity.color }} /></div>
-            <span className="checklist-progress-label">
-              {markedCells} de {totalCells} marcas · <strong>{progress}%</strong>
-            </span>
-          </div>
-
-          {audit.domains.length > 1 && (
-            <nav className="checklist-domain-nav" aria-label="Ir a un dominio">
-              {audit.domains.map(domain => {
-                const value = livePercent(domain)
-                return (
-                  <button
-                    key={domain.id} type="button"
-                    onClick={() => document.getElementById(`dom-${domain.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  >
-                    <span>{domain.name}</span>
-                    <b style={{ color: value === null ? 'var(--muted)' : semaphoreColor(value) }}>
-                      {value === null ? '—' : `${value.toFixed(0)}%`}
-                    </b>
+            {audit.domains.map((domain, domainIndex) => {
+              const tally = domainTally(domain)
+              const isCollapsed = collapsed.has(String(domain.id))
+              const complete = tally.marked === tally.cells && tally.cells > 0
+              return (
+                <section key={domain.id} id={`dom-${domain.id}`} className={`eval-domain ${isCollapsed ? 'is-collapsed' : ''}`}>
+                  <button className="eval-domain-head" onClick={() => toggleDomain(String(domain.id))} aria-expanded={!isCollapsed}>
+                    <span className="eval-domain-num" style={{ background: identity.color }}>{domainIndex + 1}</span>
+                    <span className="eval-domain-name">{domain.name}</span>
+                    <span className={`eval-domain-state ${complete ? 'is-done' : ''}`} title={complete ? 'Dominio completo' : 'Faltan marcas'}>
+                      {complete ? <CheckCircle2 size={16} /> : <CircleDashed size={16} />}
+                      {tally.marked}/{tally.cells}
+                    </span>
+                    <span className="eval-domain-pct" style={{ color: tally.percent === null ? 'var(--muted)' : semaphoreColor(tally.percent) }}>
+                      {tally.percent === null ? 'Sin marcar' : `${tally.percent.toFixed(0)} %`}
+                    </span>
+                    {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                   </button>
-                )
-              })}
-            </nav>
-          )}
 
-          <div className="checklist-fill-wrap mt-4">
-            <table className="checklist-fill-grid">
-              <thead>
-                <tr>
-                  <th className="fill-criterion">Criterio</th>
-                  {audit.subjects.map((subject, index) => (
-                    <th key={subject.id}><span className="fill-subject-head">{index + 1}. {subject.display_name}</span></th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {audit.domains.map(domain => (
-                  <Fragment key={domain.id}>
-                    <tr className="fill-domain-row" id={`dom-${domain.id}`}>
-                      <td colSpan={audit.subjects.length + 1}>
-                        {domain.name}
-                        {(() => {
-                          const value = livePercent(domain)
-                          return (
-                            <em style={{ color: value === null ? 'var(--muted)' : semaphoreColor(value) }}>
-                              {value === null ? 'sin marcar' : `${value.toFixed(1)}%`}
-                            </em>
-                          )
-                        })()}
-                      </td>
-                    </tr>
-                    {domain.criteria.map(criterion => (
-                      <tr key={criterion.id}>
-                        <td className="fill-criterion">
-                          <div className="fill-criterion-text">
-                            {audit.numbered_items && criterion.item_number ? <span className="fill-num">{criterion.item_number}.</span> : null}
-                            <span>{criterion.text}</span>
-                            {criterion.guidance ? <span className="fill-guidance" title={criterion.guidance}><Info size={13} /></span> : null}
-                          </div>
-                          {criterion.guidance ? <p className="fill-guidance-text">{criterion.guidance}</p> : null}
-                        </td>
-                        {audit.subjects.map(subject => {
-                          const key = answerKey(subject.id, criterion.id)
-                          const current = marks[key]
-                          return (
-                            <td key={subject.id} className={current ? '' : 'is-unanswered'}>
-                              <div className="fill-value-group">
-                                {VALUES.map(value => (
-                                  <button
-                                    key={value} type="button" disabled={closed}
-                                    title={CHECKLIST_VALUE_LABELS[value]}
-                                    className={`fill-value fill-value--${value.toLowerCase()} ${current === value ? 'is-active' : ''}`}
-                                    onClick={() => toggle(subject.id, criterion.id, value)}
-                                  >{value}</button>
-                                ))}
-                              </div>
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+                  {!isCollapsed && (
+                    <div className="checklist-fill-wrap eval-domain-body">
+                      <table className="checklist-fill-grid">
+                        <thead>
+                          <tr>
+                            <th className="fill-criterion">Criterio</th>
+                            {audit.subjects.map((subject, index) => (
+                              <th key={subject.id}><span className="fill-subject-head">{index + 1}. {subject.display_name}</span></th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {domain.criteria.map((criterion, criterionIndex) => (
+                            <tr key={criterion.id}>
+                              <td className="fill-criterion">
+                                <div className="fill-criterion-text">
+                                  <span className="fill-num">
+                                    {audit.numbered_items && criterion.item_number
+                                      ? `${criterion.item_number}.`
+                                      : `${domainIndex + 1}.${criterionIndex + 1}`}
+                                  </span>
+                                  <span>{criterion.text}</span>
+                                </div>
+                                {criterion.guidance ? <p className="fill-guidance-text">{criterion.guidance}</p> : null}
+                              </td>
+                              {audit.subjects.map(subject => {
+                                const key = answerKey(subject.id, criterion.id)
+                                const current = marks[key]
+                                return (
+                                  <td key={subject.id} className={current ? '' : 'is-unanswered'}>
+                                    <div className="fill-value-group">
+                                      {VALUES.map(value => (
+                                        <button
+                                          key={value} type="button" disabled={closed}
+                                          title={CHECKLIST_VALUE_LABELS[value]}
+                                          className={`fill-value fill-value--${value.toLowerCase()} ${current === value ? 'is-active' : ''}`}
+                                          onClick={() => toggle(subject.id, criterion.id, value)}
+                                        >{value}</button>
+                                      ))}
+                                    </div>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
-        </Card>
+
+          {/* Panel de resumen. Va pegado al scroll: el auditor tiene que ver el impacto de lo que
+              marca sin dejar de marcar. En pantalla angosta se pliega arriba (ver CSS) para no
+              robarle ancho a la grilla, que es donde se trabaja. */}
+          <aside className="eval-summary">
+            <div className="eval-summary-inner">
+              <div className="eval-ring">
+                <ProgressRing percent={shownPercent} size={132} strokeWidth={12} showLabel={false} />
+                <div className="eval-ring-center">
+                  <strong style={{ color: shownPercent === null ? 'var(--muted)' : semaphoreColor(shownPercent) }}>
+                    {shownPercent === null ? '—' : `${shownPercent.toFixed(0)}%`}
+                  </strong>
+                  <span>Cumplimiento</span>
+                </div>
+              </div>
+              <p className="eval-ring-sub">{markedCells} de {totalCells} marcas</p>
+
+              <div className="eval-counters">
+                <div><b>{markedCells}</b><span>Respuestas</span></div>
+                <div><b className={findings ? 'is-bad' : ''}>{findings}</b><span>Hallazgos</span></div>
+                <div><b>{closed ? 0 : localPending}</b><span>Pendientes</span></div>
+              </div>
+
+              <div className="eval-meta">
+                <span><Badge tone={closed ? 'info' : 'neutral'}>{closed ? 'Finalizada' : 'En proceso'}</Badge></span>
+                <span className="eval-clock"><Clock size={13} /> {clock}</span>
+              </div>
+
+              <h4 className="eval-summary-title">Cumplimiento por dominio</h4>
+              <div className="eval-domain-bars">
+                {audit.domains.map(domain => {
+                  const tally = domainTally(domain)
+                  return (
+                    <div key={domain.id} className="eval-domain-bar">
+                      <span className="nm" title={domain.name}>{domain.name}</span>
+                      <span className="tk">
+                        <i style={{
+                          width: `${tally.percent ?? 0}%`,
+                          background: tally.percent === null ? 'var(--muted)' : semaphoreColor(tally.percent),
+                        }} />
+                      </span>
+                      <span className="pv" style={{ color: tally.percent === null ? 'var(--muted)' : semaphoreColor(tally.percent) }}>
+                        {tally.percent === null ? '—' : `${tally.percent.toFixed(0)}%`}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {findings > 0 && (
+                <div className="eval-findings">
+                  <AlertTriangle size={17} />
+                  <div>
+                    <strong>{findings} hallazgo{findings === 1 ? '' : 's'}</strong>
+                    <small>Marcados como NC: requieren acción</small>
+                  </div>
+                </div>
+              )}
+
+              <div className="eval-legend">
+                <span><i className="is-c" /> Cumple</span>
+                <span><i className="is-nc" /> No cumple</span>
+                <span><i className="is-na" /> No aplica</span>
+              </div>
+            </div>
+          </aside>
+        </div>
       )}
 
       <SignaturesCard
@@ -442,9 +540,13 @@ function ChecklistAuditContent() {
         onRemove={removeSignature}
       />
 
+      {/* Mientras se diligencia, esto lo cubre el panel lateral fijo; repetirlo abajo era ruido.
+          Al cerrar, el panel deja de tener sentido (ya no se marca nada) y este bloque pasa a ser
+          el resultado final, que es lo que se lee y se firma. */}
+      {closed && (
       <Card accent={identity.color} className="p-5">
         <p className="ds-eyebrow">Resultado</p>
-        <h2 className="mt-1 text-xl font-black">Adherencia {closed ? 'final' : 'en curso'}</h2>
+        <h2 className="mt-1 text-xl font-black">Adherencia final</h2>
         <div className="checklist-result-strip mt-4">
           <div className="checklist-result-main">
             <span className="num" style={{ color: semaphoreColor(percent === null ? null : Number(percent)) }}>
@@ -484,6 +586,7 @@ function ChecklistAuditContent() {
           </>
         )}
       </Card>
+      )}
     </div>
   )
 }
