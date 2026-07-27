@@ -289,7 +289,7 @@ guardar algo sensible.
 | Matrices de Adherencia | `adherence-matrix` | `/app/adherencia/*` | Operativo, rediseñado |
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
-| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-4**; falta cargar las 13 listas reales |
+| Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | **Fases 1-4**; faltan 11 listas reales por cargar |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -344,7 +344,7 @@ página y visor propio de PDF.
 ## 11. Trabajo pendiente
 
 **Módulo "Listas de Chequeo" (auditoría por adherencia)** — plan de 5 fases.
-**Fases 1 a 4 entregadas**; **solo falta la fase 5**:
+**Fases 1 a 4 entregadas**, fase 5 a medias:
 
 | Fase | Alcance | Estado |
 |---|---|---|
@@ -352,7 +352,7 @@ página y visor propio de PDF.
 | 2 | Entorno de diligenciamiento (tablet) + directorio de sujetos | **Hecha** |
 | 3 | Firmas digitales en canvas + directorio de firmantes | **Hecha** |
 | 4 | Analítica, gráficas e informes PDF | **Hecha** |
-| 5 | Migración de las 13 listas reales de seguridad del paciente | Pendiente |
+| 5 | Migración de las 13 listas reales | **Parcial**: FO-24 y FO-26 cargadas; faltan 11 |
 
 Pieza clave ya disponible: `server/checklistScoring.mjs` (motor puro; cubre los cuatro
 niveles de agregación y el conteo de pendientes). La tabla `checklist_signatures` existe

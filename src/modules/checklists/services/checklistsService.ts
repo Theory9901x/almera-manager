@@ -1,7 +1,7 @@
 import type {
   AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditSummary,
   ChecklistArea, ChecklistMembership, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
-  ChecklistValue, DirectorySubject, SignerSuggestion,
+  ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
 } from '../types'
 
 function toQueryString(filters: Record<string, string | undefined>) {
@@ -109,6 +109,13 @@ export const checklistsService = {
 
   downloadAuditReport: (auditId: string) =>
     download(`/audits/${auditId}/report.pdf`, `lista-chequeo-${auditId}.pdf`),
+
+  // ---- Fase 5: carga de listas institucionales ----
+
+  seedAvailable: () => call<SeedTemplate[]>('/seed/available'),
+  importSeeds: (codes?: string[]) =>
+    call<{ results: { code: string; status: string; domains?: number; criteria?: number }[] }>(
+      '/seed/import', { method: 'POST', body: JSON.stringify({ codes: codes || [] }) }),
 
   downloadConsolidated: (filters: AnalyticsFilters = {}) =>
     download(`/analytics/consolidated.pdf${toQueryString(filters as Record<string, string | undefined>)}`, 'consolidado-listas-chequeo.pdf'),

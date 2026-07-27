@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardCheck, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
+import { BarChart3, ClipboardCheck, Download, ListChecks, Loader2, Pencil, Play, Plus } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
@@ -8,7 +8,7 @@ import {
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
 import { AnalyticsPanel } from '../components/AnalyticsPanel'
-import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate } from '../types'
+import type { AssignedTemplate, AuditSummary, ChecklistArea, ChecklistTemplate, SeedTemplate } from '../types'
 
 const identity = moduleIdentity('checklists')
 
@@ -42,6 +42,7 @@ function ChecklistsListContent() {
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ name: '', code: '', version: '01', areaId: '' })
   const [newAudit, setNewAudit] = useState({ templateId: '', auditDate: new Date().toISOString().slice(0, 10) })
+  const [seeds, setSeeds] = useState<SeedTemplate[]>([])
 
   async function load() {
     try {
@@ -56,6 +57,7 @@ function ChecklistsListContent() {
       const [list, areaList] = await Promise.all([checklistsService.list(), checklistsService.areas()])
       setTemplates(list)
       setAreas(areaList)
+      if (canManage) setSeeds(await checklistsService.seedAvailable().catch(() => []))
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar el módulo') }
     finally { setLoading(false) }
   }
@@ -72,6 +74,18 @@ function ChecklistsListContent() {
       toast.push('success', 'Lista creada')
       navigate(`/app/listas-chequeo/${created.id}/constructor`)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible crear la lista') }
+    finally { setBusy(false) }
+  }
+
+  async function importSeeds() {
+    setBusy(true)
+    try {
+      const { results } = await checklistsService.importSeeds()
+      const nuevas = results.filter(row => row.status === 'importada')
+      toast.push(nuevas.length ? 'success' : 'info',
+        nuevas.length ? `${nuevas.length} lista${nuevas.length === 1 ? '' : 's'} cargada${nuevas.length === 1 ? '' : 's'} en borrador` : 'Ya estaban todas cargadas')
+      await load()
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar las listas') }
     finally { setBusy(false) }
   }
 
@@ -222,6 +236,33 @@ function ChecklistsListContent() {
 
           {section === 'listas' && canManage && (
             <>
+              {seeds.some(seed => !seed.imported) && (
+                <Card accent={identity.color} className="p-5">
+                  <p className="ds-eyebrow">Formatos institucionales</p>
+                  <h2 className="mt-1 text-xl font-black">Cargar listas de seguridad del paciente</h2>
+                  <p className="survey-config-hint mt-2">
+                    Se cargan con sus dominios y criterios tal como vienen del formato original, en
+                    <strong> borrador</strong>: revísalas y publícalas cuando estén listas.
+                  </p>
+                  <div className="checklist-seed-grid mt-4">
+                    {seeds.map(seed => (
+                      <div key={seed.code} className={`checklist-seed-row ${seed.imported ? 'is-done' : ''}`}>
+                        <div className="min-w-0">
+                          <strong>{seed.name}</strong>
+                          <small>{seed.code} v{seed.version} · audita {seed.subjectLabel.toLowerCase()} · {seed.domains} dominios · {seed.criteria} criterios</small>
+                        </div>
+                        {seed.imported && <Badge tone="info">Ya cargada</Badge>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4">
+                    <Button identity={identity} onClick={() => void importSeeds()} disabled={busy}>
+                      <Download size={15} /> Cargar las pendientes
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
               <Card accent={identity.color} className="p-5">
                 <p className="ds-eyebrow">Registro</p>
                 <h2 className="mt-1 text-xl font-black">Nueva lista</h2>

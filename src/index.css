@@ -2963,3 +2963,14 @@ h1, h2, h3, strong, th { text-wrap: balance; }
     backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(255,255,255,.92);
   }
 }
+
+/* Carga de listas institucionales (fase 5) */
+.checklist-seed-grid { display: grid; gap: 10px; }
+.checklist-seed-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius-card-sm, 14px);
+  background: rgba(255,255,255,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.checklist-seed-row.is-done { opacity: .7; }
+.checklist-seed-row strong { display: block; font-size: 12.5px; color: var(--ink); }
+.checklist-seed-row small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }

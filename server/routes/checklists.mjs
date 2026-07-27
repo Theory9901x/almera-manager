@@ -4,6 +4,7 @@ import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { computeAdherence, conceptFromPercent, isChecklistValue } from '../checklistScoring.mjs'
 import { renderPdf } from '../pdf.mjs'
 import { renderChecklistAuditReportHtml, renderChecklistConsolidatedHtml } from '../templates/checklistReport.mjs'
+import { CHECKLIST_SEEDS } from '../checklistSeed.mjs'
 
 export const checklistsRouter = Router()
 
@@ -874,4 +875,100 @@ checklistsRouter.get('/analytics/consolidated.pdf', checklistsModule, view, asyn
     response.setHeader('Content-Disposition', 'attachment; filename="consolidado-listas-chequeo.pdf"')
     response.send(pdf)
   } catch (error) { next(error) }
+})
+
+// ===========================================================================
+// FASE 5 — Carga de las listas institucionales reales
+// ===========================================================================
+// Prueba de fuego del constructor generico: las listas entran SOLO como datos
+// (server/checklistSeed.mjs), sin una linea de codigo por lista. Reutiliza los mismos
+// INSERT que usa el constructor, asi que si algo no cupiera aqui tampoco cabria a mano.
+
+checklistsRouter.get('/seed/available', checklistsModule, manage, async (request, response, next) => {
+  try {
+    const codes = CHECKLIST_SEEDS.map(seed => seed.code)
+    const existing = await query(
+      'SELECT code, version FROM checklist_templates WHERE organization_id = $1 AND code = ANY($2::text[])',
+      [oid(request), codes],
+    )
+    const already = new Set(existing.rows.map(row => `${row.code}|${row.version}`))
+    response.json(CHECKLIST_SEEDS.map(seed => ({
+      code: seed.code,
+      version: seed.version,
+      name: seed.name,
+      subjectLabel: seed.subjectLabel,
+      domains: seed.domains.length,
+      criteria: seed.domains.reduce((total, domain) => total + domain.criteria.length, 0),
+      imported: already.has(`${seed.code}|${seed.version}`),
+    })))
+  } catch (error) { next(error) }
+})
+
+checklistsRouter.post('/seed/import', checklistsModule, manage, async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    const only = Array.isArray(request.body?.codes) && request.body.codes.length
+      ? new Set(request.body.codes.map(String))
+      : null
+    const results = []
+
+    await client.query('BEGIN')
+    for (const seed of CHECKLIST_SEEDS) {
+      if (only && !only.has(seed.code)) continue
+      // Idempotente: si ya esta cargada no se duplica ni se pisa lo que el equipo de calidad
+      // haya ajustado despues. El indice unico (organizacion, codigo, version) lo respalda.
+      const existing = await client.query(
+        'SELECT id FROM checklist_templates WHERE organization_id = $1 AND code = $2 AND version = $3',
+        [oid(request), seed.code, seed.version],
+      )
+      if (existing.rows[0]) { results.push({ code: seed.code, status: 'ya-existia' }); continue }
+
+      const template = await client.query(
+        `INSERT INTO checklist_templates (organization_id, code, version, name, subject_label, numbered_items, status, created_by_id)
+         VALUES ($1,$2,$3,$4,$5,$6,'BORRADOR',$7) RETURNING id`,
+        [oid(request), seed.code, seed.version, seed.name, seed.subjectLabel, Boolean(seed.numberedItems), uid(request)],
+      )
+      const templateId = template.rows[0].id
+
+      for (const [index, field] of (seed.headerFields || []).entries()) {
+        await client.query(
+          `INSERT INTO checklist_header_fields (template_id, label, field_type, options, required, order_index)
+           VALUES ($1,$2,$3,$4::jsonb,$5,$6)`,
+          [templateId, field.label, field.field_type || 'TEXT', JSON.stringify(field.options || []), Boolean(field.required), index],
+        )
+      }
+      for (const [index, field] of (seed.subjectFields || []).entries()) {
+        await client.query(
+          `INSERT INTO checklist_subject_fields (template_id, label, field_type, options, required, order_index)
+           VALUES ($1,$2,$3,$4::jsonb,$5,$6)`,
+          [templateId, field.label, field.field_type || 'TEXT', JSON.stringify(field.options || []), Boolean(field.required), index],
+        )
+      }
+      for (const [domainIndex, domain] of seed.domains.entries()) {
+        const inserted = await client.query(
+          'INSERT INTO checklist_domains (template_id, name, order_index) VALUES ($1,$2,$3) RETURNING id',
+          [templateId, domain.name, domainIndex],
+        )
+        for (const [criterionIndex, criterion] of domain.criteria.entries()) {
+          await client.query(
+            `INSERT INTO checklist_criteria (domain_id, item_number, text, guidance, order_index)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [inserted.rows[0].id, criterion.item_number || '', criterion.text, criterion.guidance || '', criterionIndex],
+          )
+        }
+      }
+      results.push({
+        code: seed.code, status: 'importada', templateId: String(templateId),
+        domains: seed.domains.length,
+        criteria: seed.domains.reduce((total, domain) => total + domain.criteria.length, 0),
+      })
+    }
+    await client.query('COMMIT')
+    // Quedan en BORRADOR a proposito: el equipo de calidad revisa, ajusta y publica. Importar no
+    // deberia poner en circulacion una lista que nadie ha mirado.
+    response.json({ results })
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {})
+    next(error)
+  } finally { client.release() }
 })

@@ -182,6 +182,17 @@ export interface AnalyticsFilters {
   dateTo?: string
 }
 
+/** Lista institucional disponible para importar (fase 5). */
+export interface SeedTemplate {
+  code: string
+  version: string
+  name: string
+  subjectLabel: string
+  domains: number
+  criteria: number
+  imported: boolean
+}
+
 export interface ChecklistSignature {
   id: string
   signer_name: string

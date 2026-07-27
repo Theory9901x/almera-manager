@@ -1,7 +1,7 @@
 # Módulo "Listas de Chequeo" — Auditoría por Adherencia
 
-Estado: **Fases 1 a 4 entregadas** (modelo, constructor, motor, diligenciamiento, firmas,
-analítica e informes PDF); **solo falta la fase 5** (cargar las 13 listas reales). Este documento
+Estado: **Fases 1 a 4 entregadas**; **fase 5 a medias**: el mecanismo de carga existe y las dos
+listas tipo (FO-24 y FO-26) ya entran solo con configuración, quedan las 11 restantes. Este documento
 es el plan completo — ver §8 para las fases y §10-§13 para lo ya construido. Leer primero `CLAUDE.md` (arquitectura,
 sistema de diseño y reglas de trabajo).
 
@@ -281,7 +281,7 @@ no como parche aislado). **No avanzar sin verificar la anterior.**
 | **2** ✅ | Entorno de diligenciamiento: asignación, cabecera → sujetos → evaluación → guardado con cálculo. Directorio reutilizable de sujetos. | Un profesional asignado completa una auditoría de principio a fin y ve su adherencia semaforizada. |
 | **3** ✅ | Firmas digitales en canvas (tablet), asociación al registro, directorio reutilizable de firmantes. | Firmar una auditoría desde pantalla táctil y ver la firma en el registro. |
 | **4** ✅ | Analítica: tableros por dominio/criterio/servicio/evolución, informe PDF individual y consolidado. | PDF institucional generado y tablero con datos reales. |
-| **5** | Migración de las listas reales de seguridad del paciente. | FO-24 y FO-26 cargadas **solo con configuración, sin código nuevo por lista**. |
+| **5** ◐ | Migración de las listas reales de seguridad del paciente. | FO-24 y FO-26 cargadas **solo con configuración, sin código nuevo por lista**. |
 
 La Fase 5 es **la prueba de fuego del constructor genérico**: empezar por FO-24 (ronda,
 audita pacientes) y FO-26 (farmacovigilancia, audita colaboradores, ítems numerados)
@@ -534,3 +534,57 @@ visualmente renderizando el mismo HTML del que salen:
   en NA aparece como **«Sin dato»**.
 - **Consolidado**: 71.7 % con tallies, desglose por lista, por área y por dominio con
   barras semaforizadas, y ranking de criterios más incumplidos.
+
+---
+
+## 14. Fase 5 — carga de las listas institucionales
+
+| Archivo | Rol |
+|---|---|
+| `server/checklistSeed.mjs` | Las listas como **datos** (nuevo), generado desde los `.xlsx` |
+| `server/routes/checklists.mjs` | `GET /seed/available`, `POST /seed/import` |
+| `src/modules/checklists/pages/ChecklistsListPage.tsx` | Tarjeta «Cargar listas de seguridad del paciente» |
+
+### La prueba de fuego, superada
+
+Las dos listas tipo entraron **solo con configuración, sin una línea de código por lista**, que
+era el criterio de éxito declarado del constructor genérico:
+
+| | FO-24 | FO-26 |
+|---|---|---|
+| Audita | Paciente | Colaborador |
+| Dominios / criterios | 7 / 17 | 3 / 16 |
+| Numerado | No | Sí, **saltando el 12** |
+| Cabecera | 3 campos | 5 campos |
+| Atributos del sujeto | 4 (uno de selección) | 2 |
+
+### Decisiones
+
+- **El seed se generó leyendo los `.xlsx`, no transcribiendo a mano.** Un `.xlsx` es un ZIP; se
+  parsean `sharedStrings.xml` y la hoja. Transcribir 33 criterios clínicos a mano es justo donde
+  se cuelan las erratas.
+- **Los textos se conservan tal cual vienen del formato**, incluidas sus faltas de tilde
+  («identificacion», «Atencion», «caida») y erratas («aslto riesgo»). Es un documento
+  institucional con código y versión: corregirlo por cuenta propia lo desalinea del papel que
+  firma el auditor. Si calidad quiere corregirlo, lo hace desde el constructor y queda registrado.
+- **Solo se normalizó la MAYÚSCULA SOSTENIDA** de los encabezados a capitalización normal: en una
+  grilla densa, todo en mayúscula es notablemente más difícil de leer.
+- **La importación deja las listas en BORRADOR.** Importar no debería poner en circulación una
+  lista que nadie ha revisado; calidad la ajusta y la publica.
+- **Es idempotente**: si la lista ya está cargada no se duplica ni se pisa lo que se haya
+  ajustado después. Lo respalda el índice único `(organización, código, versión)`.
+
+### Verificación
+
+Ensayo de la importación **contra el esquema real de producción**, dentro de una transacción
+revertida (no se escribió nada): 7/7 dominios y 17/17 criterios en FO-24; 3/3 y 16/16 en FO-26,
+con la numeración `10,11,13,14,15,16,17` intacta —el salto del 12 se conserva— y los acentos y
+comillas sobreviviendo el viaje a la base («daño», «conservación», `"LASA"`). Cero plantillas de
+ensayo residuales.
+
+### Pendiente
+
+- Las **11 listas restantes** siguen sin cargar: el generador ya existe, es cuestión de correrlo
+  sobre los otros `.xlsx` una vez confirmados los puntos de §2.5.
+- El **instructivo de FO-24** (`guidance`) se dejó vacío a propósito: sus criterios no calzan 1:1
+  con los de la grilla (§2.5 punto 1) y asignarlos a ojo sería inventar. Falta esa decisión.
