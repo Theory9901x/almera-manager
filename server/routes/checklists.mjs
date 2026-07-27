@@ -248,6 +248,14 @@ async function assertAudit(request, { requireOpen = false } = {}) {
   )
   const audit = result.rows[0]
   if (!audit) fail(404, 'Auditoría no encontrada')
+  // AISLAMIENTO POR AUTOR. Una auditoria lleva nombre de paciente, documento, cama y firmas: es
+  // dato sensible. El listado ya filtraba por auditor, pero el DETALLE no, asi que bastaba pedir
+  // /audits/<id> con otro id para leer la ronda de un companero. Ocultarlo en la interfaz no es
+  // proteger nada; la comprobacion tiene que estar aqui, que es por donde pasan todas las rutas
+  // de una auditoria (ver, editar, firmar, cerrar, PDF).
+  if (!request.auth.permissions.includes('checklists.manage') && String(audit.auditor_id) !== String(uid(request))) {
+    fail(403, 'Esta auditoría es de otro auditor')
+  }
   // Una auditoria cerrada es un registro firmado: no se le tocan respuestas ni sujetos.
   if (requireOpen && audit.status === 'CERRADA') fail(409, 'La auditoría está cerrada. Reábrela para modificarla.')
   return audit
@@ -1007,6 +1015,12 @@ function dataCenterFilters(request) {
   const where = ['a.organization_id = $1', "a.status = 'CERRADA'"]
   const q = request.query || {}
   const add = (value, sql) => { params.push(value); where.push(sql.replace('$$', `$${params.length}`)) }
+
+  // Quien no administra solo agrega LO SUYO, tambien en el tablero y en las exportaciones: de
+  // nada sirve tapar el detalle si el CSV se lleva la entidad entera.
+  if (!request.auth.permissions.includes('checklists.manage')) {
+    add(uid(request), 'a.auditor_id = $$')
+  }
 
   if (q.templateId) add(Number(q.templateId), 'a.template_id = $$')
   if (q.areaId) add(Number(q.areaId), 'a.area_id = $$')
