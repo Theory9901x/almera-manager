@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, Layers, ListChecks, Lock,
-  Maximize2, Plus, Save, Search, Send, Sparkles, Unlock, X,
+  AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, ExternalLink, Layers,
+  ListChecks, Lock, Maximize2, Minimize2, Plus, Save, Search, Send, Sparkles, Unlock, X,
 } from 'lucide-react'
 import { Badge, Button, Card, DatePicker, Field, ModuleHero, Select, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
@@ -54,6 +54,11 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   // Modo ampliado y filtros de la matriz. El filtro de sección y la búsqueda recortan LO QUE SE
   // MUESTRA, nunca lo calificado: el cálculo sigue corriendo sobre la matriz completa.
   const [fullscreen, setFullscreen] = useState(false)
+  // Ventana aparte abierta: mientras lo este, ESTA pantalla no muestra la matriz. Una sola
+  // superficie de calificacion a la vez — dos copias editables del mismo buffer es como se
+  // pierde trabajo sin que nadie sepa cual version quedo.
+  const [poppedOut, setPoppedOut] = useState(false)
+  const matrixWindow = useRef<Window | null>(null)
   const [scopeFilter, setScopeFilter] = useState('')
   const [matrixSearch, setMatrixSearch] = useState('')
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null)
@@ -269,11 +274,38 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       if (!isClosedById(selectedId)) await adherenceService.saveScores(selectedId, scoresToPayload(scores))
       const url = `${window.location.origin}/app/adherencia/matriz/${selectedId}`
       const opened = window.open(url, `sgimr-matriz-${selectedId}`, 'width=1600,height=1000')
-      if (!opened) setError('El navegador bloqueó la ventana. Permite las ventanas emergentes de sgimr.cloud e inténtalo de nuevo.')
-      else notify('Calificaciones guardadas y matriz abierta en una ventana aparte')
+      if (!opened) {
+        setError('El navegador bloqueó la ventana. Permite las ventanas emergentes de sgimr.cloud e inténtalo de nuevo.')
+        return
+      }
+      // La matriz se MUDA a la otra ventana: aqui se cierra el modo ampliado y la rejilla queda
+      // bloqueada. Que la misma evaluacion sea editable en dos sitios es como se pierde trabajo.
+      matrixWindow.current = opened
+      setPoppedOut(true)
+      setFullscreen(false)
+      notify('Calificaciones guardadas. La matriz se abrió en una ventana aparte.')
     } catch (caught) { fail(caught, 'No fue posible guardar antes de abrir la ventana') }
     finally { setBusy(false) }
   }
+
+  /** Devuelve la matriz a esta pantalla: cierra la ventana y recarga lo que se guardo alli. */
+  const bringMatrixBack = async () => {
+    try { matrixWindow.current?.close() } catch { /* si ya la cerro el usuario, da igual */ }
+    matrixWindow.current = null
+    setPoppedOut(false)
+    if (selectedId) await openEvaluation(selectedId)
+  }
+
+  // Si el auditor cierra la ventana a mano, esta pantalla lo detecta y recupera la matriz con lo
+  // que se haya guardado alla. `closed` es lo unico que se puede consultar de una ventana propia
+  // sin depender de que ella avise.
+  useEffect(() => {
+    if (!poppedOut) return
+    const timer = window.setInterval(() => {
+      if (matrixWindow.current && matrixWindow.current.closed) void bringMatrixBack()
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [poppedOut, selectedId])
 
   /** Una evaluacion cerrada no acepta escrituras: abrir su ventana no debe intentar guardar. */
   const isClosedById = (id: string) => detail?.evaluation.id === id && detail.evaluation.status === 'CLOSED'
@@ -386,7 +418,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                 </p>
               </div>
               <div className="hcop-macts">
-                {!isClosed && (
+                {!isClosed && !poppedOut && (
                   <div className="hcop-addhc">
                     <input className="ds-input" value={newRecordNumber} onChange={event => setNewRecordNumber(event.target.value)} placeholder="Nueva HC (No.)" />
                     <GradientButton onClick={() => void addRecord()} disabled={busy}><Plus size={15} />Agregar</GradientButton>
@@ -394,13 +426,29 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                 )}
                 {/* B1: la misma matriz con más espacio. No duplica estado, así que al volver
                     no se pierde ninguna calificación. */}
-                <Button identity={identity} onClick={() => setFullscreen(true)} disabled={!detail.records.length}>
-                  <Maximize2 size={15} /> Pantalla completa
-                </Button>
+                {!poppedOut && (
+                  <Button identity={identity} onClick={() => setFullscreen(true)} disabled={!detail.records.length}>
+                    <Maximize2 size={15} /> Pantalla completa
+                  </Button>
+                )}
               </div>
             </div>
 
-            {detail.records.length ? (
+            {poppedOut ? (
+              /* La matriz esta en la otra ventana. Aqui no se muestra ni se puede calificar: la
+                 evaluacion se edita en un solo sitio a la vez. */
+              <div className="hcop-popped">
+                <span className="ic"><ExternalLink size={22} /></span>
+                <h3>La matriz está abierta en otra ventana</h3>
+                <p>
+                  Sigue calificando allí. Cuando cierres esa ventana, esta pantalla recupera la
+                  matriz con todo lo que hayas guardado.
+                </p>
+                <Button identity={identity} onClick={() => void bringMatrixBack()}>
+                  <Minimize2 size={15} /> Traer la matriz de vuelta aquí
+                </Button>
+              </div>
+            ) : detail.records.length ? (
               <>
                 <div className="hcop-tablewrap">
                   <HcMatrix
@@ -600,17 +648,26 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             <span className="tk"><i style={{ width: `${live.totalCells ? (live.graded / live.totalCells) * 100 : 0}%` }} /></span>
             <b>{live.totalCells ? Math.round((live.graded / live.totalCells) * 100) : 0}%</b>
           </div>
-          <div className="hcop-fbtns">
-            <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
-              <Save size={15} /> Guardar borrador
-            </Button>
-            <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
-              <ClipboardCheck size={15} /> Guardar calificaciones
-            </Button>
-            {!isClosed
-              ? <GradientButton onClick={() => void closeEvaluationAction()} disabled={busy}><Lock size={15} />Finalizar evaluación</GradientButton>
-              : <Button variant="secondary" onClick={() => void reopenEvaluationAction()} disabled={busy}><Unlock size={15} />Reabrir</Button>}
-          </div>
+          {/* Con la matriz en otra ventana, guardar desde aqui escribiria el buffer VIEJO de esta
+              pantalla encima de lo que se esta calificando alla. Se bloquea el pie entero:
+              cerrar una evaluacion sin ver la matriz tampoco tiene sentido. */}
+          {poppedOut ? (
+            <p className="hcop-foot-locked">
+              <ExternalLink size={14} /> Guardar y finalizar están en la otra ventana mientras la matriz esté allí.
+            </p>
+          ) : (
+            <div className="hcop-fbtns">
+              <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
+                <Save size={15} /> Guardar borrador
+              </Button>
+              <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
+                <ClipboardCheck size={15} /> Guardar calificaciones
+              </Button>
+              {!isClosed
+                ? <GradientButton onClick={() => void closeEvaluationAction()} disabled={busy}><Lock size={15} />Finalizar evaluación</GradientButton>
+                : <Button variant="secondary" onClick={() => void reopenEvaluationAction()} disabled={busy}><Unlock size={15} />Reabrir</Button>}
+            </div>
+          )}
         </div>
       </div>
     )

@@ -410,7 +410,12 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   (`HcMatrixWindowPage`). Es solo para CALIFICAR — sin cierre, firmas ni plan de mejora, que
   siguen en operacion donde tienen contexto. Carga su propia copia del servidor porque una
   ventana no puede leer el estado de React de la otra, y por eso el boton «Ventana nueva»
-  **guarda antes de abrir**; si el guardado falla no abre nada. Las conversiones del buffer
+  **guarda antes de abrir**; si el guardado falla no abre nada.
+- **Solo UNA matriz visible a la vez.** Al abrir la ventana, el panel cierra el modo ampliado,
+  esconde la rejilla y bloquea guardar/finalizar del pie: con la matriz fuera, guardar desde el
+  panel escribiria su buffer viejo encima de lo que se esta calificando alla. El panel vigila
+  `window.closed` cada segundo y, al cerrarse la ventana, recupera la matriz recargando del
+  servidor. Las conversiones del buffer
   (`design/scoreMap.ts`) son compartidas para que no haya dos definiciones del payload.
 
 ## 13. Vidrio del módulo de Listas de Chequeo
