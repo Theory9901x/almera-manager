@@ -335,6 +335,14 @@ página y visor propio de PDF.
   elemento solo en una fila. Patrón `.ds-bento-split` + `.ds-bento-secondary-grid`.
 - **Caché del navegador** tras arreglar un header/asset: pide `Ctrl+Shift+R` antes de
   volver a diagnosticar.
+- **Tema oscuro: medir el contraste NO basta.** Reconducir la superficie de un contenedor deja
+  igual a los textos HIJOS que fijan su propio gris de papel (`#101828`, `#1d2939`…), y el
+  numero de contraste del contenedor no lo delata porque el hijo lo pisa. Hay que MIRAR la
+  captura. Ojo tambien con los recursos de papel: `text-shadow: 0 1px 0 #fff` en una cifra
+  dibuja un contorno claro alrededor de cada numero, y `inset 0 1px 0 #fff` una linea arriba.
+- Fuera del tema oscuro quedan a proposito la **encuesta publica** (`/e/:slug`), el **login** y
+  los **visores de documento** (PDF, lienzo de firma): ahi el blanco es el papel, o el publico
+  es externo y no tiene la preferencia.
 - **Carpeta nueva que el servidor importe en runtime = hay que sumarla a `PAYLOAD` en
   `scripts/deploy-manual.sh`.** Añadí `shared/adherenceScoring.mjs`, el deploy no lo empaquetó y
   el arranque murió en `ERR_MODULE_NOT_FOUND` con la app en **502**. `npm run check` y
@@ -376,8 +384,8 @@ arranque tras el proximo deploy. Ademas, el dialogo de inicio de ronda pide ahor
    Ya puede alimentar «hallazgos sin plan» desde `checklist_action_plans`.
 2. Formulario para crear programas y mover listas — hoy solo por API.
 3. Escala C/NC sin NA por lista, si el usuario lo confirma.
-4. Repasar el tema oscuro en los **demas modulos**: heredan los tokens, pero pueden tener
-   blancos escritos a mano sin detectar.
+4. **Instructivo de FO-24**: sigue vacio a la espera de la decision sobre su granularidad
+   (§2.5 del doc del modulo). Es lo unico pendiente que necesita respuesta del usuario.
 
 ---
 
