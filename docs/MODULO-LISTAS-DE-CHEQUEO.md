@@ -119,9 +119,9 @@ aunque hay criterios que no aplican a todo colaborador. Al unificar:
 
 ### 2.5 Puntos aún por confirmar con la usuaria antes de la Fase 5
 
-1. **Granularidad del instructivo de FO-24.** Los criterios del instructivo no calzan
-   1:1 con los de la grilla (el instructivo separa "manilla con datos correctos" y
-   "manilla con datos legibles"; la grilla los une). Hay que decidir cuál manda.
+1. ~~**Granularidad del instructivo de FO-24.**~~ **RESUELTO (27/07/2026): no se hace.** El
+   instructivo no calzaba 1:1 con la grilla y el usuario decidió que no hace falta cargarlo.
+   `guidance` se queda vacío en esa lista.
 2. **Numeración con saltos** (FO-26 va 11 → 13): ¿se corrige o se respeta el formato
    institucional? Mientras no se decida, el número debe ser **texto libre**, no
    autogenerado.
@@ -620,10 +620,10 @@ Al ampliar de dos listas a trece aparecieron dos trampas del papel que valen la 
   de otro formato y no tiene que ver con su contenido. Se les puso el nombre de dominio que
   corresponde en vez de arrastrar el error.
 
-### Pendiente
+### Sin pendientes
 
-- El **instructivo de FO-24** (`guidance`) se dejó vacío a propósito: sus criterios no calzan 1:1
-  con los de la grilla (§2.5 punto 1) y asignarlos a ojo sería inventar. Falta esa decisión.
+- El **instructivo de FO-24** (`guidance`) se queda vacío: sus criterios no calzaban 1:1 con los
+  de la grilla y el usuario decidió el 27/07/2026 que **no es necesario**. Cerrado, no reabrir.
 
 ---
 

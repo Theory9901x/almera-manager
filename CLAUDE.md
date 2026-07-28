@@ -384,8 +384,8 @@ arranque tras el proximo deploy. Ademas, el dialogo de inicio de ronda pide ahor
    Ya puede alimentar «hallazgos sin plan» desde `checklist_action_plans`.
 2. Formulario para crear programas y mover listas — hoy solo por API.
 3. Escala C/NC sin NA por lista, si el usuario lo confirma.
-4. **Instructivo de FO-24**: sigue vacio a la espera de la decision sobre su granularidad
-   (§2.5 del doc del modulo). Es lo unico pendiente que necesita respuesta del usuario.
+4. **Instructivo de FO-24: CERRADO, no se hace.** El usuario decidio el 27/07/2026 que no hace
+   falta. `guidance` se queda vacio en esa lista; no volver a proponerlo.
 
 ---
 
