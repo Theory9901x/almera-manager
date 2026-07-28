@@ -65,6 +65,7 @@ export interface BarDatum { label: string; value: number | null; color?: string;
  * Recharts BarChart. Si un dato no trae color propio, usa `color`/`identity` como degradado base. */
 export function BarChart({
   data, orientation = 'vertical', color = '#4F46E5', height = 260, valueFormatter, valueSuffix = '',
+  hideValueAxis = false,
 }: {
   data: BarDatum[]
   orientation?: 'vertical' | 'horizontal'
@@ -72,11 +73,14 @@ export function BarChart({
   height?: number
   valueFormatter?: (value: number) => string
   valueSuffix?: string
+  /** Oculta el eje de valores. En una tarjeta estrecha sus etiquetas se encabalgan («20.40.60»)
+   *  y no aportan: el valor exacto ya sale en el tooltip. */
+  hideValueAxis?: boolean
 }) {
   const format = valueFormatter || (value => `${value.toLocaleString('es-CO')}${valueSuffix}`)
   const isHorizontal = orientation === 'horizontal'
   const categoryAxis = { type: 'category' as const, data: data.map(item => item.label), axisTick: { show: false }, axisLine: { lineStyle: { color: AXIS_LINE_COLOR } }, axisLabel: { ...AXIS_LABEL, interval: 0, rotate: !isHorizontal && data.length > 5 ? -20 : 0 } }
-  const valueAxis = { type: 'value' as const, axisLabel: { ...AXIS_LABEL, formatter: (value: number) => format(value) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: SPLIT_LINE }
+  const valueAxis = { type: 'value' as const, axisLabel: { ...AXIS_LABEL, show: !hideValueAxis, formatter: (value: number) => format(value) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: SPLIT_LINE }
 
   const option: ECOption = {
     textStyle: { fontFamily: FONT_FAMILY },

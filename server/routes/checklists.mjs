@@ -1902,15 +1902,17 @@ async function dataCenterData(request) {
       query(`SELECT ${DC_TALLY} ${DC_FROM} WHERE ${where}`, params),
 
       query(`SELECT a.id, a.audit_date, a.shift, a.adherence_percent, a.concept,
-                    a.template_code, t.name AS template_name, ar.name AS area_name,
-                    u.full_name AS auditor_name, ${DC_TALLY}
+                    a.template_code, t.name AS template_name, t.subject_label, ar.name AS area_name,
+                    ar.center AS area_center, u.full_name AS auditor_name, ${DC_TALLY},
+                    (SELECT string_agg(s2.display_name, ' · ' ORDER BY s2.order_index)
+                       FROM checklist_audit_subjects s2 WHERE s2.audit_id = a.id) AS subjects
              ${DC_FROM}
              JOIN checklist_templates t ON t.id = a.template_id
              LEFT JOIN checklist_areas ar ON ar.id = a.area_id
              JOIN users u ON u.id = a.auditor_id
              WHERE ${where}
              GROUP BY a.id, a.audit_date, a.shift, a.adherence_percent, a.concept, a.template_code,
-                      t.name, ar.name, u.full_name
+                      t.name, t.subject_label, ar.name, ar.center, u.full_name
              ORDER BY a.audit_date DESC, a.id DESC LIMIT 300`, params),
 
       query(`SELECT u.id, u.full_name AS name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
@@ -1920,9 +1922,13 @@ async function dataCenterData(request) {
       // Profesional EVALUADO, que no es lo mismo que el auditor. Se agrupa por nombre y no por
       // id porque el mismo profesional puede haberse registrado suelto en una ronda y desde el
       // directorio en otra.
-      query(`SELECT s.display_name AS name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+      // subject_label distingue a QUIEN se auditó (Paciente / Colaborador / ...): es lo que
+      // permite las vistas separadas del tablero sin inventar una tabla nueva.
+      query(`SELECT s.display_name AS name, t2.subject_label,
+                    COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
              ${DC_FROM} JOIN checklist_audit_subjects s ON s.id = ans.audit_subject_id
-             WHERE ${where} GROUP BY s.display_name ORDER BY s.display_name`, params),
+                        JOIN checklist_templates t2 ON t2.id = a.template_id
+             WHERE ${where} GROUP BY s.display_name, t2.subject_label ORDER BY s.display_name`, params),
 
       query(`SELECT to_char(date_trunc('${period}', a.audit_date), 'YYYY-MM-DD') AS period,
                     COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}

@@ -6,7 +6,7 @@ import {
   SlidersHorizontal, TrendingDown, TrendingUp, Users, X,
 } from 'lucide-react'
 import {
-  Button, DatePicker, DonutChart, EmptyState, LineChart, Select,
+  BarChart, Button, DatePicker, DonutChart, EmptyState, LineChart, Select,
   moduleIdentity, semaphoreColor, useCountUp, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
@@ -80,25 +80,6 @@ function Kpi({ tone, icon, label, value, suffix = '', delta }: {
   )
 }
 
-/** Barra clay: riel hundido + relleno. El color del relleno lo decide quien la usa (semaforo
- *  para porcentajes, rojo para conteos de NC), nunca una paleta decorativa propia. */
-function ClayBar({ label, percent, display, color, rank }: {
-  label: string
-  percent: number
-  display: string
-  color: string
-  rank?: number
-}) {
-  return (
-    <div className="dcx-bar">
-      {rank !== undefined && <span className="dcx-bar-rank">{rank}</span>}
-      <span className="dcx-bar-name" title={label}>{short(label)}</span>
-      <span className="dcx-bar-track"><i style={{ width: `${Math.max(2, Math.min(100, percent))}%`, background: color }} /></span>
-      <span className="dcx-bar-value" style={{ color }}>{display}</span>
-    </div>
-  )
-}
-
 /**
  * Centro de datos en tres alcances con la misma estetica: general, por lista y por servicio.
  * El alcance NO es una vista aparte: lo definen los filtros, que viajan al servidor y
@@ -115,6 +96,9 @@ export function DataCenterPanel() {
   const [exporting, setExporting] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  // Vistas dedicadas del molde. NO son otro recorte de datos: son otra lectura del MISMO
+  // `dataCenterData` ya filtrado, para no tener dos verdades sobre el mismo periodo.
+  const [view, setView] = useState<'general' | 'paciente' | 'colaborador' | 'criterio'>('general')
   const charts = useRef<HTMLDivElement>(null)
 
   useEffect(() => { checklistsService.dataCenterOptions().then(setOptions).catch(() => setOptions(null)) }, [])
@@ -171,7 +155,7 @@ export function DataCenterPanel() {
     const needle = search.trim().toLowerCase()
     if (!needle) return data.byAudit
     return data.byAudit.filter(row =>
-      [row.template_name, row.template_code, row.area_name, row.auditor_name, row.shift]
+      [row.template_name, row.template_code, row.area_name, row.auditor_name, row.shift, row.subjects, row.id]
         .some(field => String(field || '').toLowerCase().includes(needle)))
   }, [data, search])
   const pages = Math.max(1, Math.ceil(tableRows.length / PAGE_SIZE))
@@ -221,10 +205,17 @@ export function DataCenterPanel() {
   const topSubjects = data
     ? [...data.bySubject].filter(row => row.percent !== null).sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0)).slice(0, 5)
     : []
+  /** Sujetos por tipo. `subject_label` lo define cada lista ("Paciente", "Colaborador"…), asi que
+   *  se clasifica por esa etiqueta y no por una lista fija de palabras del sistema. */
+  const subjectsByKind = (kind: 'paciente' | 'colaborador') => (data?.bySubject || [])
+    .filter(row => {
+      const label = (row.subject_label || '').toLowerCase()
+      return kind === 'paciente' ? label.includes('paciente') : !label.includes('paciente')
+    })
+    .sort((a, b) => (a.percent ?? 101) - (b.percent ?? 101))
   const ncAreas = data
     ? [...data.byArea].filter(row => row.nc > 0).sort((a, b) => b.nc - a.nc).slice(0, 5)
     : []
-  const maxNc = ncAreas[0]?.nc || 1
 
   return (
     <div className="dcx">
@@ -370,12 +361,21 @@ export function DataCenterPanel() {
 
                 <div className="dcx-card">
                   <div className="dcx-ph"><span className="dcx-pt">Cumplimiento por dominio</span></div>
-                  {data.byDomain.slice(0, 7).map(row => (
-                    <ClayBar key={row.name} label={row.name || ''} percent={row.percent ?? 0}
-                      display={row.percent === null ? '—' : `${row.percent.toFixed(1)} %`}
-                      color={row.percent === null ? '#94A3B8' : semaphoreColor(row.percent)} />
-                  ))}
-                  <div className="dcx-axis"><span>0 %</span><span>50 %</span><span>100 %</span></div>
+                  {/* ECharts, como el resto de graficas del sistema. El color lo pone el
+                      SEMAFORO barra a barra: aqui se comunica "que tan bien va", no identidad. */}
+                  <div data-chart="Cumplimiento por dominio">
+                    <BarChart
+                      orientation="horizontal"
+                      height={200}
+                      hideValueAxis
+                      data={data.byDomain.slice(0, 7).map(row => ({
+                        label: short(row.name || '', 22),
+                        value: row.percent,
+                        color: row.percent === null ? '#94A3B8' : semaphoreColor(row.percent),
+                      }))}
+                      valueFormatter={value => `${value.toFixed(1)} %`}
+                    />
+                  </div>
                 </div>
               </>
             ) : (
@@ -392,30 +392,103 @@ export function DataCenterPanel() {
 
           {hasData && (
             <>
+              {/* Vistas dedicadas del molde: la misma data ya filtrada, leida por otro eje. */}
+              <div className="dcx-views">
+                {([['general', 'Resumen general'], ['paciente', 'Por paciente'],
+                   ['colaborador', 'Por colaborador auditado'], ['criterio', 'Por criterios auditados']] as const)
+                  .map(([key, label]) => (
+                    <button key={key} className={`dcx-view ${view === key ? 'is-on' : ''}`} onClick={() => setView(key)}>
+                      {label}
+                    </button>
+                  ))}
+              </div>
+
+              {view !== 'general' && (
+                <div className="dcx-card">
+                  <div className="dcx-ph">
+                    <span className="dcx-pt">
+                      {view === 'criterio' ? 'Criterios auditados' : view === 'paciente' ? 'Pacientes auditados' : 'Colaboradores auditados'}
+                    </span>
+                    <span className="dcx-hint">Del mismo recorte de filtros · ordenado de menor a mayor cumplimiento</span>
+                  </div>
+                  <div className="dcx-table-wrap">
+                    <table className="dcx-table">
+                      {view === 'criterio' ? (
+                        <>
+                          <thead><tr><th>Criterio</th><th>Dominio</th><th>Lista</th><th>C</th><th>NC</th><th>NA</th><th>Adherencia</th></tr></thead>
+                          <tbody>
+                            {data.byCriterion.map(row => (
+                              <tr key={row.id}>
+                                <td>{row.item_number ? <strong>{row.item_number}. </strong> : null}{row.text}</td>
+                                <td>{short(row.domain_name || '', 26)}</td>
+                                <td>{short(row.template_name || '', 26)}</td>
+                                <td className="tabular-col">{row.c}</td>
+                                <td className="tabular-col">{row.nc}</td>
+                                <td className="tabular-col">{row.na}</td>
+                                <td className="tabular-col"><strong style={{ color: semaphoreColor(row.percent) }}>{fmt(row.percent)}</strong></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      ) : (
+                        <>
+                          <thead><tr><th>{view === 'paciente' ? 'Paciente' : 'Colaborador'}</th><th>Auditado en</th><th>C</th><th>NC</th><th>NA</th><th>Adherencia</th></tr></thead>
+                          <tbody>
+                            {subjectsByKind(view).map(row => (
+                              <tr key={`${row.name}-${row.subject_label}`}>
+                                <td><strong>{row.name}</strong></td>
+                                <td className="tabular-col">{row.audits} ronda{row.audits === 1 ? '' : 's'}</td>
+                                <td className="tabular-col">{row.c}</td>
+                                <td className="tabular-col">{row.nc}</td>
+                                <td className="tabular-col">{row.na}</td>
+                                <td className="tabular-col"><strong style={{ color: semaphoreColor(row.percent) }}>{fmt(row.percent)}</strong></td>
+                              </tr>
+                            ))}
+                            {!subjectsByKind(view).length && (
+                              <tr><td colSpan={6}><p className="dcx-hint" style={{ padding: '18px 0' }}>
+                                Ninguna lista de este recorte audita {view === 'paciente' ? 'pacientes' : 'colaboradores'}.
+                              </p></td></tr>
+                            )}
+                          </tbody>
+                        </>
+                      )}
+                    </table>
+                  </div>
+                </div>
+              )}
+
               <div className="dcx-row2">
                 <div className="dcx-card">
                   <div className="dcx-ph">
                     <span className="dcx-pt">Auditorías del recorte</span>
                     <div className="dcx-search">
                       <Search size={13} />
-                      <input placeholder="Buscar lista, auditor, servicio…" value={search}
+                      <input placeholder="Buscar por ID, evaluado, lista, auditor o servicio…" value={search}
                         onChange={event => { setSearch(event.target.value); setPage(1) }} />
                     </div>
                   </div>
                   <div className="dcx-table-wrap">
                     <table className="dcx-table">
                       <thead>
-                        <tr><th>Fecha</th><th>Lista</th><th>Servicio</th><th>Auditor</th><th>Cumpl.</th><th>Resultado</th><th>NC</th><th></th></tr>
+                        <tr><th>ID</th><th>Fecha</th><th>Evaluado</th><th>Lista</th><th>Servicio</th><th>Auditor</th><th>Cumpl.</th><th>Resultado</th><th>NC</th><th></th></tr>
                       </thead>
                       <tbody>
                         {pageRows.map((row: DataCenterRow) => (
                           <tr key={row.id}>
+                            {/* El ID de la ronda es con lo que se la referencia fuera del sistema. */}
+                            <td className="tabular-col"><span className="code-pill">A-{row.id}</span></td>
                             <td className="tabular-col">{fecha(row.audit_date)}</td>
                             <td>
-                              <strong>{short(row.template_name || '', 34)}</strong>
+                              {row.subjects ? <>{short(row.subjects, 26)}<small>{row.subject_label || 'Evaluado'}</small></> : '—'}
+                            </td>
+                            <td>
+                              <strong>{short(row.template_name || '', 30)}</strong>
                               {row.template_code ? <small>{row.template_code}</small> : null}
                             </td>
-                            <td>{short(row.area_name || '—', 22)}</td>
+                            <td>
+                              {short(row.area_name || '—', 20)}
+                              {row.area_center ? <small>{short(row.area_center, 24)}</small> : null}
+                            </td>
                             <td>{short(row.auditor_name || '', 20)}</td>
                             <td className="tabular-col"><strong style={{ color: semaphoreColor(row.percent) }}>{fmt(row.percent)}</strong></td>
                             <td>
@@ -457,18 +530,36 @@ export function DataCenterPanel() {
                 <div className="dcx-col">
                   <div className="dcx-card">
                     <div className="dcx-ph"><span className="dcx-pt">Top profesionales auditados</span></div>
-                    {topSubjects.length ? topSubjects.map((row, index) => (
-                      <ClayBar key={row.name} rank={index + 1} label={row.name || ''} percent={row.percent ?? 0}
-                        display={`${(row.percent ?? 0).toFixed(1)} %`}
-                        color={semaphoreColor(row.percent)} />
-                    )) : <p className="dcx-hint">Este recorte no evalúa profesionales.</p>}
+                    {topSubjects.length ? (
+                      <div data-chart="Top profesionales auditados">
+                        <BarChart
+                          orientation="horizontal"
+                          height={Math.max(150, topSubjects.length * 34)}
+                          hideValueAxis
+                          data={topSubjects.map(row => ({
+                            label: short(row.name || '', 20),
+                            value: row.percent,
+                            color: semaphoreColor(row.percent),
+                          }))}
+                          valueFormatter={value => `${value.toFixed(1)} %`}
+                        />
+                      </div>
+                    ) : <p className="dcx-hint">Este recorte no evalúa profesionales.</p>}
                   </div>
                   <div className="dcx-card">
                     <div className="dcx-ph"><span className="dcx-pt">No conformidades por servicio</span></div>
-                    {ncAreas.length ? ncAreas.map(row => (
-                      <ClayBar key={row.name} label={row.name || ''} percent={(row.nc / maxNc) * 100}
-                        display={String(row.nc)} color="#DC2626" />
-                    )) : <p className="dcx-hint">Sin no conformidades en este recorte.</p>}
+                    {ncAreas.length ? (
+                      <div data-chart="No conformidades por servicio">
+                        <BarChart
+                          orientation="horizontal"
+                          height={Math.max(150, ncAreas.length * 34)}
+                          hideValueAxis
+                          color="#DC2626"
+                          data={ncAreas.map(row => ({ label: short(row.name || '', 20), value: row.nc }))}
+                          valueFormatter={value => String(Math.round(value))}
+                        />
+                      </div>
+                    ) : <p className="dcx-hint">Sin no conformidades en este recorte.</p>}
                   </div>
                 </div>
               </div>

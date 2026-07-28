@@ -5337,3 +5337,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    siguiente o quedaria un hueco (o peor, se solaparia con la de criterio). */
 .hc-matrix.no-weights th.hcm-pct,
 .hc-matrix.no-weights td.hcm-pct { left: 260px; }
+
+/* Vistas dedicadas del centro de datos */
+.dcx-views { display: flex; gap: 8px; flex-wrap: wrap; }
+.dcx-view {
+  padding: 8px 15px; border-radius: 11px; border: 0; cursor: pointer; font: inherit;
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  background: var(--dcx-card); box-shadow: var(--dcx-clay);
+}
+.dcx-view:hover { color: var(--ink); }
+.dcx-view.is-on { background: linear-gradient(135deg, var(--m-listas), #8B5CF6); color: #fff; }

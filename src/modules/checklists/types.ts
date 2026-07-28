@@ -298,6 +298,11 @@ export interface DataCenterFilters {
 export interface DataCenterRow {
   id?: string
   name?: string
+  /** A quién se auditó en esa lista (Paciente / Colaborador / …). Separa las vistas dedicadas. */
+  subject_label?: string
+  /** Sujetos evaluados de la ronda, ya concatenados por el servidor. */
+  subjects?: string | null
+  area_center?: string | null
   period?: string
   text?: string
   item_number?: string
