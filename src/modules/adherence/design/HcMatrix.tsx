@@ -18,8 +18,13 @@ import type { LiveCompliance, ScoreMap } from './useLiveCompliance'
 export function HcMatrix({
   variant, scopes, criteria, records, scores, live, disabled,
   activeRecordId, onFocusRecord, onScore, onRemoveRecord, pinnedRecordIds,
+  showWeights = true, showPercent = true, compact = false,
 }: {
   variant: 'embedded' | 'fullscreen'
+  /** «Configurar vista»: en una matriz densa, poder quitar columnas accesorias da aire. */
+  showWeights?: boolean
+  showPercent?: boolean
+  compact?: boolean
   scopes: Scope[]
   criteria: Criterion[]
   records: EvaluationRecord[]
@@ -37,12 +42,12 @@ export function HcMatrix({
   const full = variant === 'fullscreen'
 
   return (
-    <table className={`hc-matrix ${full ? 'is-full' : 'is-embedded'}`}>
+    <table className={`hc-matrix ${full ? 'is-full' : 'is-embedded'}${compact ? ' is-compact' : ''}${showWeights ? '' : ' no-weights'}${showPercent ? '' : ' no-percent'}`}>
       <thead>
         <tr>
           <th className="hcm-criterion">{full ? 'Dimensión / Criterio' : 'Criterio'}</th>
-          <th className="hcm-weight">Peso</th>
-          <th className="hcm-pct">% Cumpl.</th>
+          {showWeights && <th className="hcm-weight">Peso</th>}
+          {showPercent && <th className="hcm-pct">% Cumpl.</th>}
           {records.map(record => (
             <th
               key={record.id}
@@ -76,12 +81,14 @@ export function HcMatrix({
                   <span className="hcm-scope-name">{scope.name}</span>
                   <span className="hcm-scope-count">{scopeCriteria.length} criterios</span>
                 </td>
-                <td className="hcm-weight"><span className="hcm-wchip">{scopeWeight.toFixed(1)}</span></td>
-                <td className="hcm-pct">
-                  {full
-                    ? <b style={{ color: colorForPercent(scopePercent) }}>{scopePercent === null ? '—' : `${scopePercent.toFixed(1)}%`}</b>
-                    : <ComplianceRing percent={scopePercent} size={30} strokeWidth={3.5} />}
-                </td>
+                {showWeights && <td className="hcm-weight"><span className="hcm-wchip">{scopeWeight.toFixed(1)}</span></td>}
+                {showPercent && (
+                  <td className="hcm-pct">
+                    {full
+                      ? <b style={{ color: colorForPercent(scopePercent) }}>{scopePercent === null ? '—' : `${scopePercent.toFixed(1)}%`}</b>
+                      : <ComplianceRing percent={scopePercent} size={30} strokeWidth={3.5} />}
+                  </td>
+                )}
                 {records.map(record => (
                   <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''} />
                 ))}
@@ -91,12 +98,14 @@ export function HcMatrix({
                 return (
                   <tr key={criterion.id} className="hcm-criterion-row" style={{ borderLeftColor: color.from }}>
                     <td className="hcm-criterion is-sub">{criterion.text}</td>
-                    <td className="hcm-weight"><span className="hcm-w">{Number(criterion.weight).toFixed(0)}</span></td>
-                    <td className="hcm-pct">
-                      {full
-                        ? <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(1)}%`}</b>
-                        : <ComplianceRing percent={percent} size={28} strokeWidth={3.5} />}
-                    </td>
+                    {showWeights && <td className="hcm-weight"><span className="hcm-w">{Number(criterion.weight).toFixed(0)}</span></td>}
+                    {showPercent && (
+                      <td className="hcm-pct">
+                        {full
+                          ? <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(1)}%`}</b>
+                          : <ComplianceRing percent={percent} size={28} strokeWidth={3.5} />}
+                      </td>
+                    )}
                     {records.map(record => (
                       <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''}>
                         <ScoreSelector
@@ -118,12 +127,14 @@ export function HcMatrix({
             pero es en el modo ampliado donde responde la pregunta de las 25 columnas. */}
         <tr className="hcm-total-row">
           <td className="hcm-criterion">% Cumplimiento total por HC</td>
-          <td className="hcm-weight" />
-          <td className="hcm-pct">
-            <b style={{ color: colorForPercent(live.overall) }}>
-              {live.overall === null ? '—' : `${live.overall.toFixed(1)}%`}
-            </b>
-          </td>
+          {showWeights && <td className="hcm-weight" />}
+          {showPercent && (
+            <td className="hcm-pct">
+              <b style={{ color: colorForPercent(live.overall) }}>
+                {live.overall === null ? '—' : `${live.overall.toFixed(1)}%`}
+              </b>
+            </td>
+          )}
           {records.map(record => {
             const percent = live.byRecord.get(record.id) ?? null
             return (

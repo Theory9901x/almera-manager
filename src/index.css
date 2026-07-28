@@ -5308,3 +5308,32 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted);
   padding: 8px 13px; border-radius: 10px; background: var(--m-matrices-soft);
 }
+
+/* «Configurar vista» de la matriz */
+.hcop-viewcfg { position: relative; }
+.hcop-viewcfg-veil { position: fixed; inset: 0; z-index: 40; border: 0; background: transparent; cursor: default; }
+.hcop-viewcfg-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; min-width: 232px;
+  display: grid; gap: 9px; padding: 13px 15px; border-radius: 13px;
+  background: var(--color-surface-card); border: 1px solid var(--border-hairline);
+  box-shadow: 0 6px 14px rgba(16, 24, 40, .08), 0 18px 40px rgba(16, 24, 40, .14);
+}
+.hcop-viewcfg-menu p {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+}
+.hcop-viewcfg-menu label { display: flex; align-items: center; gap: 9px; font-size: 12.5px; cursor: pointer; }
+.hcop-viewcfg-menu input { accent-color: var(--m-matrices); }
+
+/* Filas compactas: la misma matriz con menos aire, para ver mas criterios de una vez. */
+.hc-matrix.is-compact td { padding: 3px 6px; }
+.hc-matrix.is-compact td.hcm-criterion { padding: 5px 12px 5px 16px; font-size: 11px; line-height: 1.3; }
+
+/* Filtros del listado de evaluaciones */
+.hcop-listfilters { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.hcop-listfilters > * { min-width: 170px; }
+.hcop-listfilters > button { min-width: 0; }
+
+/* Los `left` del sticky estan en px, asi que al ocultar una columna hay que recolocar la
+   siguiente o quedaria un hueco (o peor, se solaparia con la de criterio). */
+.hc-matrix.no-weights th.hcm-pct,
+.hc-matrix.no-weights td.hcm-pct { left: 260px; }

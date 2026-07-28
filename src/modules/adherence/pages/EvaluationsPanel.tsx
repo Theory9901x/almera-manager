@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, ExternalLink, Layers,
-  ListChecks, Lock, Maximize2, Minimize2, Plus, Save, Search, Send, Sparkles, Unlock, X,
+  ListChecks, Lock, Maximize2, Minimize2, Plus, Save, Search, Send, Settings2, Sparkles,
+  Unlock, X,
 } from 'lucide-react'
 import { Badge, Button, Card, DatePicker, Field, ModuleHero, Select, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
@@ -12,6 +13,7 @@ import { GradientButton } from '../design/GradientButton'
 import { HcMatrix } from '../design/HcMatrix'
 import { HcMatrixFullscreen } from '../design/HcMatrixFullscreen'
 import { ToastStack } from '../design/Toast'
+import { SaveStatusIndicator, type SaveState } from '@/design-system'
 import { buildScoreMap, scoresToPayload } from '../design/scoreMap'
 import { useLiveCompliance, type ScoreMap } from '../design/useLiveCompliance'
 import { colorForPercent, conceptFromPercent, CONCEPT_LABELS, type Concept } from '../design/scopeColors'
@@ -62,6 +64,17 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   const [scopeFilter, setScopeFilter] = useState('')
   const [matrixSearch, setMatrixSearch] = useState('')
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null)
+  // Autoguardado: `dirty` marca que el buffer tiene algo que el servidor aun no sabe.
+  const [dirty, setDirty] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  // «Configurar vista»: que columnas se ven. Es preferencia de quien mira, no dato.
+  const [viewMenu, setViewMenu] = useState(false)
+  const [view, setView] = useState({ weights: true, percent: true, compact: false })
+  // Filtros del LISTADO de evaluaciones (profesional, mes y area). Van aqui y no en el detalle
+  // porque dentro de UNA evaluacion el servicio, el auditor y el periodo son datos fijos de esa
+  // evaluacion: no hay nada que filtrar con ellos.
+  const [filterProfessionalId, setFilterProfessionalId] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3500) }
   const fail = (caught: unknown, fallback: string) => setError(caught instanceof Error ? caught.message : fallback)
@@ -114,8 +127,12 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       .slice(0, 5)
   }, [detail, live])
 
-  const loadEvaluations = () => adherenceService.evaluations(filterAreaId ? { areaId: filterAreaId } : {}).then(setEvaluations).catch(caught => fail(caught, 'No fue posible cargar las evaluaciones'))
-  useEffect(() => { void loadEvaluations() }, [filterAreaId])
+  const loadEvaluations = () => adherenceService.evaluations({
+    ...(filterAreaId ? { areaId: filterAreaId } : {}),
+    ...(filterProfessionalId ? { professionalId: filterProfessionalId } : {}),
+    ...(filterMonth ? { monthReported: filterMonth } : {}),
+  }).then(setEvaluations).catch(caught => fail(caught, 'No fue posible cargar las evaluaciones'))
+  useEffect(() => { void loadEvaluations() }, [filterAreaId, filterProfessionalId, filterMonth])
 
   const openEvaluation = async (id: string) => {
     setError('')
@@ -132,6 +149,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       setEvaluatorSignedNameInput(result.evaluation.evaluator_signed_name || '')
       setProfessionalSignedNameInput(result.evaluation.professional_signed_name || '')
       setReopenJustification('')
+      setDirty(false); setSaveState('idle')
       setSelectedId(id)
       const plan = await adherenceService.evaluationPlan(id)
       setImprovementPlan(plan)
@@ -193,16 +211,24 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
 
   const setScore = (recordId: string, criterionId: string, value: Score) => {
     setScores(current => ({ ...current, [recordId]: { ...current[recordId], [criterionId]: value } }))
+    setDirty(true)
+    setSaveState('idle')
   }
 
-  const saveScores = async () => {
+  const saveScores = async (silent = false) => {
     if (!selectedId) return
-    setBusy(true); setError('')
+    if (!silent) setBusy(true)
+    setError(''); setSaveState('saving')
     try {
       const result = await adherenceService.saveScores(selectedId, scoresToPayload(scores))
       setConcept(result.concept)
-      notify('Calificaciones guardadas')
-    } catch (caught) { fail(caught, 'No fue posible guardar las calificaciones') } finally { setBusy(false) }
+      setDirty(false)
+      setSaveState('saved')
+      if (!silent) notify('Calificaciones guardadas')
+    } catch (caught) {
+      setSaveState('error')
+      fail(caught, 'No fue posible guardar las calificaciones')
+    } finally { if (!silent) setBusy(false) }
   }
 
 
@@ -287,6 +313,35 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     } catch (caught) { fail(caught, 'No fue posible guardar antes de abrir la ventana') }
     finally { setBusy(false) }
   }
+
+  /**
+   * Autoguardado. Espera 2,5 s desde la ultima marca: en una matriz de 25 columnas se califica a
+   * rafagas, y guardar en cada toque serian decenas de peticiones por minuto.
+   *
+   * NO corre con la matriz en la otra ventana (el buffer de aqui esta viejo y pisaria lo de alla)
+   * ni con la evaluacion cerrada, que no acepta escrituras.
+   */
+  useEffect(() => {
+    if (!dirty || !selectedId || poppedOut) return
+    if (detail?.evaluation.status === 'CLOSED') return
+    const timer = window.setTimeout(() => { void saveScores(true) }, 2500)
+    return () => window.clearTimeout(timer)
+  }, [dirty, scores, selectedId, poppedOut, detail?.evaluation.status])
+
+  // El indicador de "Guardado" no se queda fijo: a los pocos segundos vuelve a idle.
+  useEffect(() => {
+    if (saveState !== 'saved') return
+    const timer = window.setTimeout(() => setSaveState('idle'), 2500)
+    return () => window.clearTimeout(timer)
+  }, [saveState])
+
+  // Aviso al salir con cambios sin guardar (por si el autoguardado no llego a correr).
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
 
   /** Devuelve la matriz a esta pantalla: cierra la ventana y recarga lo que se guardo alli. */
   const bringMatrixBack = async () => {
@@ -427,6 +482,26 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                 {/* B1: la misma matriz con más espacio. No duplica estado, así que al volver
                     no se pierde ninguna calificación. */}
                 {!poppedOut && (
+                  <div className="hcop-viewcfg">
+                    <Button variant="secondary" onClick={() => setViewMenu(!viewMenu)}>
+                      <Settings2 size={15} /> Configurar vista
+                    </Button>
+                    {viewMenu && (
+                      <>
+                        {/* Capa para cerrar tocando fuera: un menu que solo se cierra con su
+                            propio boton se queda abierto tapando la matriz. */}
+                        <button className="hcop-viewcfg-veil" aria-label="Cerrar" onClick={() => setViewMenu(false)} />
+                        <div className="hcop-viewcfg-menu">
+                          <p>Columnas y densidad</p>
+                          <label><input type="checkbox" checked={view.weights} onChange={e => setView({ ...view, weights: e.target.checked })} /> Mostrar peso</label>
+                          <label><input type="checkbox" checked={view.percent} onChange={e => setView({ ...view, percent: e.target.checked })} /> Mostrar % de cumplimiento</label>
+                          <label><input type="checkbox" checked={view.compact} onChange={e => setView({ ...view, compact: e.target.checked })} /> Filas compactas</label>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+                {!poppedOut && (
                   <Button identity={identity} onClick={() => setFullscreen(true)} disabled={!detail.records.length}>
                     <Maximize2 size={15} /> Pantalla completa
                   </Button>
@@ -453,6 +528,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                 <div className="hcop-tablewrap">
                   <HcMatrix
                     variant="embedded"
+                    showWeights={view.weights}
+                    showPercent={view.percent}
+                    compact={view.compact}
                     scopes={visibleScopes}
                     criteria={visibleCriteria}
                     records={visibleRecords}
@@ -651,6 +729,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           {/* Con la matriz en otra ventana, guardar desde aqui escribiria el buffer VIEJO de esta
               pantalla encima de lo que se esta calificando alla. Se bloquea el pie entero:
               cerrar una evaluacion sin ver la matriz tampoco tiene sentido. */}
+          <SaveStatusIndicator state={saveState} />
           {poppedOut ? (
             <p className="hcop-foot-locked">
               <ExternalLink size={14} /> Guardar y finalizar están en la otra ventana mientras la matriz esté allí.
@@ -719,12 +798,32 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             <div><span className="num">{closedCount}</span><span className="lbl">Cerradas</span></div>
             <div><span className="num" style={{ color: colorForPercent(avgCompliance) }}>{avgCompliance === null ? '—' : `${avgCompliance.toFixed(0)}%`}</span><span className="lbl">Cumpl. promedio</span></div>
           </div>
-          <div className="w-[220px]">
+          <div className="hcop-listfilters">
             <Select
               value={filterAreaId || 'ALL'}
               onChange={value => setFilterAreaId(value === 'ALL' ? '' : value)}
               options={[{ value: 'ALL', label: 'Todas las áreas' }, ...areas.map(area => ({ value: area.id, label: area.name }))]}
             />
+            <Select
+              value={filterProfessionalId || 'ALL'}
+              onChange={value => setFilterProfessionalId(value === 'ALL' ? '' : value)}
+              options={[{ value: 'ALL', label: 'Todos los profesionales' },
+                ...professionals.map(item => ({ value: item.id, label: item.full_name }))]}
+            />
+            {/* Mes reportado: es texto libre en el modelo («Julio 2026»), asi que el desplegable
+                se arma con los meses que de verdad existen en las evaluaciones. */}
+            <Select
+              value={filterMonth || 'ALL'}
+              onChange={value => setFilterMonth(value === 'ALL' ? '' : value)}
+              options={[{ value: 'ALL', label: 'Todos los períodos' },
+                ...[...new Set(evaluations.map(item => item.month_reported).filter(Boolean))]
+                  .map(month => ({ value: month, label: month }))]}
+            />
+            {(filterAreaId || filterProfessionalId || filterMonth) && (
+              <button className="row-action" onClick={() => { setFilterAreaId(''); setFilterProfessionalId(''); setFilterMonth('') }}>
+                <X size={13} /> Limpiar
+              </button>
+            )}
           </div>
         </div>
         <div className="evaluations-table">
