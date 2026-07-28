@@ -510,3 +510,16 @@ export interface ChecklistEvidence {
   uploaded_by_name: string | null
   created_at: string
 }
+
+/** Dashboard (§15.2-15.4): el MISMO `DataCenter` mas lo que solo el dashboard mira. */
+export interface ChecklistDashboard extends DataCenter {
+  byProgram: (DataCenterRow & { series: { period: string; percent: number | null }[] })[]
+  systemInfo: {
+    openAudits: { id: string; audit_date: string; template_name: string; auditor_name: string; days_open: number }[]
+    unusedTemplates: { id: string; code: string; name: string }[]
+    idleAuditors: { name: string; assigned: number }[]
+    /** NC de rondas cerradas que no tienen plan de mejora. El indicador que de verdad mueve. */
+    findingsWithoutPlan: number
+  }
+  activity: AuditLogEntry[]
+}

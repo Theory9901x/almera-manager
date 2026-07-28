@@ -2068,6 +2068,111 @@ async function dataCenterData(request) {
   }
 }
 
+/**
+ * DASHBOARD (§15.2-15.4). NO recalcula nada: parte de `dataCenterData()` con los mismos filtros
+ * y le suma lo que solo el dashboard mira — el resumen por programa y el panel «Informacion del
+ * sistema», que en vez de adornos (version, respaldo) responde preguntas que mueven trabajo.
+ */
+checklistsRouter.get('/analytics/dashboard', checklistsModule, view, async (request, response, next) => {
+  try {
+    const data = await dataCenterData(request)
+    const { params, where } = dataCenterFilters(request)
+    const canManage = request.auth.permissions.includes('checklists.manage')
+
+    const [byProgram, programSeries, openAudits, unusedTemplates, idleAuditors, orphanFindings, activity] =
+      await Promise.all([
+        // Resumen por PROGRAMA: es el «tipo de lista» del molde.
+        query(`SELECT COALESCE(pr.name, 'Sin programa') AS name, COUNT(DISTINCT a.id)::int AS audits, ${DC_TALLY}
+               ${DC_FROM}
+               JOIN checklist_templates t ON t.id = a.template_id
+               LEFT JOIN checklist_programs pr ON pr.id = t.program_id
+               WHERE ${where} GROUP BY pr.name ORDER BY pr.name NULLS LAST`, params),
+
+        // Serie mensual por programa, para el sparkline de cada fila.
+        query(`SELECT COALESCE(pr.name, 'Sin programa') AS name,
+                      to_char(date_trunc('month', a.audit_date), 'YYYY-MM') AS period, ${DC_TALLY}
+               ${DC_FROM}
+               JOIN checklist_templates t ON t.id = a.template_id
+               LEFT JOIN checklist_programs pr ON pr.id = t.program_id
+               WHERE ${where} GROUP BY pr.name, period ORDER BY period`, params),
+
+        // Rondas abiertas hace mas de 7 dias: trabajo a medias que nadie ve. No se filtra por
+        // los filtros del tablero a proposito — es una alerta de la entidad, no del recorte.
+        query(`SELECT a.id, a.audit_date, t.name AS template_name, u.full_name AS auditor_name,
+                      (CURRENT_DATE - a.audit_date)::int AS days_open
+                 FROM checklist_audits a
+                 JOIN checklist_templates t ON t.id = a.template_id
+                 JOIN users u ON u.id = a.auditor_id
+                WHERE a.organization_id = $1 AND a.status = 'BORRADOR'
+                  AND (CURRENT_DATE - a.audit_date) > 7
+                  ${canManage ? '' : 'AND a.auditor_id = ' + Number(uid(request))}
+                ORDER BY a.audit_date LIMIT 10`, [oid(request)]),
+
+        // Listas publicadas que nadie ha usado: formatos cargados que no circulan.
+        query(`SELECT t.id, t.code, t.name FROM checklist_templates t
+                WHERE t.organization_id = $1 AND t.status = 'PUBLICADA'
+                  AND NOT EXISTS (SELECT 1 FROM checklist_audits a WHERE a.template_id = t.id)
+                ORDER BY t.code, t.name LIMIT 10`, [oid(request)]),
+
+        // Auditores con listas asignadas y ninguna ronda: la asignacion no basta.
+        query(`SELECT u.full_name AS name, COUNT(DISTINCT asg.template_id)::int AS assigned
+                 FROM checklist_assignments asg
+                 JOIN memberships m ON m.id = asg.membership_id
+                 JOIN users u ON u.id = m.user_id
+                WHERE m.organization_id = $1 AND m.active
+                  AND NOT EXISTS (SELECT 1 FROM checklist_audits a WHERE a.auditor_id = m.user_id)
+                GROUP BY u.full_name ORDER BY u.full_name LIMIT 10`, [oid(request)]),
+
+        // EL indicador que de verdad mueve: NC sin plan de mejora. Un hallazgo sin responsable
+        // es un hallazgo perdido.
+        query(`SELECT COUNT(*)::int AS n
+                 FROM checklist_answers ans
+                 JOIN checklist_audits a ON a.id = ans.audit_id
+                WHERE a.organization_id = $1 AND a.status = 'CERRADA' AND ans.value = 'NC'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM checklist_action_plans p
+                     WHERE p.audit_id = ans.audit_id
+                       AND p.criterion_id = ans.criterion_id
+                       AND p.audit_subject_id = ans.audit_subject_id)`, [oid(request)]),
+
+        // Actividad reciente. Solo para quien administra: la bitacora nombra rondas ajenas.
+        canManage
+          ? query(`SELECT id, audit_id, audit_label, action, detail, actor_name, created_at
+                     FROM checklist_audit_log WHERE organization_id = $1
+                    ORDER BY created_at DESC, id DESC LIMIT 12`, [oid(request)])
+          : Promise.resolve({ rows: [] }),
+      ])
+
+    const shapeTally = row => {
+      const applicable = Number(row.c) + Number(row.nc)
+      return {
+        name: row.name, audits: row.audits,
+        c: Number(row.c), nc: Number(row.nc), na: Number(row.na), applicable,
+        percent: applicable > 0 ? (Number(row.c) / applicable) * 100 : null,
+      }
+    }
+    const seriesByProgram = new Map()
+    for (const row of programSeries.rows) {
+      const applicable = Number(row.c) + Number(row.nc)
+      const list = seriesByProgram.get(row.name) || []
+      list.push({ period: row.period, percent: applicable > 0 ? (Number(row.c) / applicable) * 100 : null })
+      seriesByProgram.set(row.name, list)
+    }
+
+    response.json({
+      ...data,
+      byProgram: byProgram.rows.map(row => ({ ...shapeTally(row), series: seriesByProgram.get(row.name) || [] })),
+      systemInfo: {
+        openAudits: openAudits.rows.map(row => ({ ...row, id: String(row.id) })),
+        unusedTemplates: unusedTemplates.rows.map(row => ({ ...row, id: String(row.id) })),
+        idleAuditors: idleAuditors.rows,
+        findingsWithoutPlan: orphanFindings.rows[0].n,
+      },
+      activity: activity.rows.map(row => ({ ...row, id: String(row.id), audit_id: row.audit_id ? String(row.audit_id) : null })),
+    })
+  } catch (error) { next(error) }
+})
+
 checklistsRouter.get('/analytics/datacenter', checklistsModule, view, async (request, response, next) => {
   try {
     response.json(await dataCenterData(request))

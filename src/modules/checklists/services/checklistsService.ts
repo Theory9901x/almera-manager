@@ -1,5 +1,5 @@
 import type {
-  ActionPlan, ActionPlanDetail, AdherenceResult, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
+  ActionPlan, ActionPlanDetail, AdherenceResult, ChecklistDashboard, AnalyticsFilters, AnalyticsSummary, AssignedTemplate, AuditDetail, AuditLogEntry, AuditSummary,
   DataCenter, DataCenterFilters, DataCenterOptions, PlanAssignee, PlanNotification, RepositoryFilters, RepositoryPage,
   ChecklistArea, ChecklistMembership, ChecklistProgram, ChecklistSignature, ChecklistTemplate, ChecklistTemplateDetail,
   ChecklistValue, DirectorySubject, SeedTemplate, SignerSuggestion,
@@ -169,6 +169,8 @@ export const checklistsService = {
   dataCenterOptions: () => call<DataCenterOptions>('/analytics/options'),
   dataCenter: (filters: DataCenterFilters) =>
     call<DataCenter>(`/analytics/datacenter${toQueryString(filters as Record<string, string | undefined>)}`),
+  dashboard: (filters: DataCenterFilters) =>
+    call<ChecklistDashboard>(`/analytics/dashboard${toQueryString(filters as Record<string, string | undefined>)}`),
   dataCenterCsv: (filters: DataCenterFilters) => {
     // Navegacion directa en vez de fetch+blob: el navegador guarda el archivo con su nombre y no
     // hay que cargar en memoria un CSV que puede ser de miles de filas.

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Archive, BarChart3, ClipboardCheck, ClipboardList, Download, Eye, FileText, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { Archive, BarChart3, ClipboardCheck, ClipboardList, Download, Eye, FileText, LayoutDashboard, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, Select, Table, ToastProvider,
   moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
+import { DashboardPanel } from '../components/DashboardPanel'
 import { DataCenterPanel } from '../components/DataCenterPanel'
 import { RepositoryPanel } from '../components/RepositoryPanel'
 import { StartAuditDialog, type StartContext } from '../components/StartAuditDialog'
@@ -35,7 +36,7 @@ function ChecklistsListContent() {
   const canManage = Boolean(session?.permissions.includes('checklists.manage'))
   const canFill = Boolean(session?.permissions.includes('checklists.fill'))
 
-  const [section, setSection] = useState<'auditorias' | 'repositorio' | 'analitica' | 'listas'>('auditorias')
+  const [section, setSection] = useState<'auditorias' | 'dashboard' | 'repositorio' | 'analitica' | 'listas'>('auditorias')
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([])
   const [areas, setAreas] = useState<ChecklistArea[]>([])
   const [audits, setAudits] = useState<AuditSummary[]>([])
@@ -223,6 +224,11 @@ function ChecklistsListContent() {
             onClick={() => setSection('auditorias')}
           >Auditorías</button>
           <button
+            className={`ds-tabs-item ${section === 'dashboard' ? 'is-active' : ''}`}
+            style={section === 'dashboard' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            onClick={() => setSection('dashboard')}
+          ><LayoutDashboard size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Dashboard</button>
+          <button
             className={`ds-tabs-item ${section === 'repositorio' ? 'is-active' : ''}`}
             style={section === 'repositorio' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
             onClick={() => setSection('repositorio')}
@@ -386,6 +392,8 @@ function ChecklistsListContent() {
               </Card>
             </>
           )}
+
+          {section === 'dashboard' && <DashboardPanel />}
 
           {section === 'repositorio' && <RepositoryPanel canManage={canManage} />}
 
