@@ -111,6 +111,9 @@ async function assertAreaAccess(request, areaId) {
 }
 
 async function assertEvaluationAccess(request) {
+  // Un id no numerico nunca casa con la clave bigint: 404 aqui, en vez de dejar que Postgres
+  // falle con 22P02 y el error suba como 500.
+  if (!/^\d+$/.test(String(request.params.id ?? ''))) fail(404, 'Evaluación no encontrada')
   const result = await query(
     `SELECT p.area_id FROM adherence_evaluations e JOIN adherence_professionals p ON p.id = e.professional_id
      WHERE e.id = $1 AND e.organization_id = $2`,
@@ -542,21 +545,53 @@ adherenceRouter.post('/evaluations/:id/close', close, async (request, response, 
     const evaluatorSignedName = String(request.body?.evaluatorSignedName || request.auth.user.fullName).trim()
     const signature = readSignature(request.body?.evaluatorSignature)
     if (!signature.ok) return response.status(400).json({ error: signature.error })
-    const result = await query(
-      `UPDATE adherence_evaluations
-       SET status = 'CLOSED', evaluator_signed_name = $1, evaluator_signed_at = NOW(),
-           evaluator_document = $4, evaluator_position = $5, evaluator_signature = $6,
-           updated_at = NOW()
-       WHERE id = $2 AND organization_id = $3 AND status = 'DRAFT' AND total_records > 0 RETURNING *`,
-      [evaluatorSignedName, request.params.id, oid(request),
-        String(request.body?.evaluatorDocument || '').trim(),
-        String(request.body?.evaluatorPosition || '').trim(),
-        signature.image],
-    )
-    if (!result.rows[0]) return response.status(409).json({ error: 'La evaluación no puede cerrarse: verifica que tenga historias clínicas y no esté ya cerrada' })
-    response.json(result.rows[0])
+    // El cumplimiento se RECALCULA aqui dentro, en la misma transaccion del cierre. Solo se
+    // persistia al guardar calificaciones, asi que cerrar sin guardar dejaba firmado el valor
+    // viejo (o un 0 % si nunca se guardo) mientras el informe mostraba el real: el numero que
+    // se firma tiene que ser el que sale de las calificaciones que hay en ese instante.
+    const closed = await (async () => {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const value = await closeWithinTransaction(client, request, evaluatorSignedName, signature.image)
+        await client.query('COMMIT')
+        return value
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally { client.release() }
+    })()
+    if (!closed) return response.status(409).json({ error: 'La evaluación no puede cerrarse: verifica que tenga historias clínicas y no esté ya cerrada' })
+    response.json(closed)
   } catch (error) { next(error) }
 })
+
+/** Cuerpo del cierre. Vive aparte solo para que el handler no se vuelva ilegible. */
+async function closeWithinTransaction(client, request, evaluatorSignedName, signatureImage) {
+  const result = await client.query(
+    `UPDATE adherence_evaluations
+     SET status = 'CLOSED', evaluator_signed_name = $1, evaluator_signed_at = NOW(),
+         evaluator_document = $4, evaluator_position = $5, evaluator_signature = $6,
+         updated_at = NOW()
+     WHERE id = $2 AND organization_id = $3 AND status = 'DRAFT' AND total_records > 0 RETURNING *`,
+    [evaluatorSignedName, request.params.id, oid(request),
+      String(request.body?.evaluatorDocument || '').trim(),
+      String(request.body?.evaluatorPosition || '').trim(),
+      signatureImage],
+  )
+  if (!result.rows[0]) return null
+  const [criteria, scores] = await Promise.all([
+    client.query('SELECT * FROM adherence_criteria WHERE matrix_version_id = $1', [result.rows[0].matrix_version_id]),
+    client.query('SELECT evaluation_record_id, criterion_id, score FROM adherence_evaluation_scores WHERE evaluation_id = $1', [request.params.id]),
+  ])
+  const { overallCompliance } = computeCompliance(criteria.rows, scores.rows)
+  const concept = await resolveConcept(oid(request), overallCompliance)
+  const updated = await client.query(
+    'UPDATE adherence_evaluations SET overall_compliance = $1, concept = $2 WHERE id = $3 RETURNING *',
+    [overallCompliance, concept, request.params.id],
+  )
+  return updated.rows[0]
+}
 
 adherenceRouter.post('/evaluations/:id/reopen', close, async (request, response, next) => {
   try {

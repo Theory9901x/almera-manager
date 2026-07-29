@@ -78,9 +78,25 @@ function gaugeSvg(percent) {
   </svg>`
 }
 
-/** Barras horizontales con etiqueta y valor. `rows` = [{ label, percent }]. */
-function barsSvg(rows, { labelWidth = 240, width = 1000, barHeight = 18, gap = 9 } = {}) {
+/**
+ * Barras horizontales con etiqueta y valor. `rows` = [{ label, percent }].
+ *
+ * Con muchas filas se parte en DOS COLUMNAS. Un SVG es un bloque indivisible para la impresion:
+ * las 25 barras por HC median mas que el hueco que quedaba en la hoja, asi que saltaban enteras
+ * a la siguiente y dejaban media pagina en blanco. En dos columnas cabe donde este.
+ */
+function barsSvg(rows, options = {}) {
   if (!rows.length) return '<p class="muted">Sin datos.</p>'
+  const { columns = rows.length > 12 ? 2 : 1, width = 1000 } = options
+  if (columns > 1) {
+    const half = Math.ceil(rows.length / columns)
+    const chunks = Array.from({ length: columns }, (_, i) => rows.slice(i * half, (i + 1) * half))
+    const columnWidth = Math.floor((width - 24 * (columns - 1)) / columns)
+    return `<div class="bars-cols">${chunks
+      .map(chunk => barsSvg(chunk, { ...options, columns: 1, width: columnWidth }))
+      .join('')}</div>`
+  }
+  const { labelWidth = 240, barHeight = 18, gap = 9 } = options
   const trackWidth = width - labelWidth - 52
   const height = rows.length * (barHeight + gap) + 6
   const bars = rows.map((row, index) => {
@@ -277,6 +293,7 @@ export function renderAdherenceReportHtml({
   .criterion-text { padding-left: 18px; }
   .scope-row td { background: #fdf1f2; font-weight: 700; }
   .muted { color: #667085; }
+  .bars-cols { display: flex; gap: 24px; align-items: flex-start; }
 
   /* Resumen: gauge + cifras */
   .summary { display: flex; gap: 14px; align-items: stretch; margin: 10px 0 4px; }
@@ -300,7 +317,8 @@ export function renderAdherenceReportHtml({
   .matrix { font-size: 9px; table-layout: fixed; }
   .matrix th, .matrix td { padding: 3px 4px; overflow-wrap: anywhere; }
   .matrix .criterion-text { padding-left: 8px; }
-  .matrix th.hc { text-align: center; padding: 3px 1px; }
+  /* El numero de HC NO se parte: cortado en dos lineas se lee como dos numeros distintos. */
+  .matrix th.hc { text-align: center; padding: 3px 1px; font-size: 6.2px; letter-spacing: -.1px; white-space: nowrap; }
   .matrix col.c-crit { width: 210px; }
   .matrix col.c-pct { width: 46px; }
   .matrix th.hc span { display: block; font-size: 6.5px; color: #98a2b3; }
@@ -329,8 +347,11 @@ export function renderAdherenceReportHtml({
   /* La matriz ocupa mas de una hoja: sin esto, la pagina siguiente llega sin cabecera y las
      columnas de HC quedan sin identificar. */
   thead { display: table-header-group; }
-  h2, .summary, .signatures { break-inside: avoid; }
-  tr, .signature-box { break-inside: avoid; }
+  /* Un titulo nunca cierra una hoja: la grafica que lo sigue es un bloque indivisible y saltaba
+     de pagina dejando el encabezado solo al pie. */
+  h2 { break-after: avoid; }
+  h2, .summary, .signatures, .donut-wrap, .bars-cols { break-inside: avoid; }
+  tr, .signature-box, .obs-block, .scale-table { break-inside: avoid; }
   .page-break { break-before: page; }
 </style>
 </head>

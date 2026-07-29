@@ -118,9 +118,22 @@ if (isDev) {
   app.use((_request, response) => response.sendFile(resolve(dist, 'index.html')))
 }
 
-app.use((error, _request, response, _next) => {
-  console.error(error)
+app.use((error, request, response, _next) => {
+  // 22P02 (sintaxis invalida para el tipo) y 22003 (fuera de rango) solo pueden venir de un
+  // identificador que no es un numero: un id asi jamas casa con una clave bigint. Se responde
+  // 400 y NO se registra traza — antes cada peticion a una ruta inexistente dejaba un stack
+  // completo en el log de PM2 y parecia un fallo del servidor.
+  if (error?.code === '22P02' || error?.code === '22003') {
+    return response.status(400).json({ error: 'Identificador inválido' })
+  }
   const status = Number(error.status || 500)
+  // Solo se registra traza de lo que es un fallo del servidor. Un 404 o un 409 son respuestas
+  // previstas: volcaban un stack completo cada vez y ahogaban en ruido los errores de verdad.
+  if (status >= 500) console.error(error)
+  // El 404 se calla del todo: hay pantallas que lo usan como respuesta normal («tu cuenta no esta
+  // vinculada a ningun profesional») y lo registrarian en cada carga. Los demas 4xx dejan UNA
+  // linea, que basta para diagnosticar un permiso o un conflicto.
+  else if (status !== 404) console.warn(`${status} ${request.method} ${request.originalUrl} — ${error.message}`)
   response.status(status).json({ error: status === 500 ? 'Error interno del servidor' : error.message })
 })
 

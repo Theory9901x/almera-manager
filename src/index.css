@@ -5671,6 +5671,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px;
   align-items: start;
 }
+/* Tarjeta que ocupa la fila entera, para que la ultima no se quede sola con medio hueco al lado. */
+.hcop-rpanel > .hcop-rspan { grid-column: 1 / -1; }
 
 /* Alto util: lo que queda de pantalla descontando la barra, los KPIs y el pie. Con un minimo
    para que en pantallas cortas siga habiendo matriz que calificar. */

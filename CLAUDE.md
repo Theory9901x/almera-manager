@@ -204,7 +204,33 @@ obtiene pintando el color en un `<canvas>` y leyendo `getImageData` (no uses
 
 ## 6. Verificación visual obligatoria (Puppeteer)
 
-No hay credenciales para navegar la app autenticada en local. El método probado es
+### 6.0 SÍ se puede correr el sistema entero en local
+
+Esto estuvo mal documentado mucho tiempo y costó verificaciones a medias: **hay un
+PostgreSQL 17 instalado como servicio de Windows y una base `sgimr` real**, con las
+credenciales en `.env` (`PGPASSWORD=sgimr_dev`, usuario y base `sgimr`). Nada de Docker,
+no hace falta.
+
+```bash
+npm run build && node server/index.mjs   # queda en http://localhost:3100
+```
+
+Se entra con `admin@sgimr.cloud` / `Admin1234!` (el bootstrap de `.env`). Con eso se puede
+sembrar datos, navegar la app **autenticada** con Puppeteer y probar los endpoints reales,
+que es lo único que descubre fallos de servidor. Así aparecieron el cierre que guardaba 0 %,
+los 500 de las rutas inexistentes y el ruido de trazas en el log.
+
+Dos advertencias:
+- El rol `sgimr` **no puede crear bases**. Para probar el `schema.sql` desde cero se usa un
+  esquema aparte: `CREATE SCHEMA migtest; SET search_path TO migtest, public;` y se aplica ahí.
+- Al terminar, **borra los datos sembrados**; la base de dev se comparte entre sesiones.
+
+Para probar la migración tal y como la vivirá producción, se simula el estado viejo
+(`ALTER TABLE ... DROP COLUMN`, `DROP TABLE` de lo nuevo) y se vuelve a llamar a `migrate()`.
+
+### 6.1 Componentes sueltos con datos falsos
+
+Cuando basta con ver un componente aislado (o no hay datos que sembrar), el método es
 montar los componentes **reales** con datos falsos y fotografiarlos en Chrome:
 
 1. `_test_harness.tsx` — monta el componente real + `./src/index.css` con datos mock.
@@ -343,6 +369,24 @@ página y visor propio de PDF.
 - Fuera del tema oscuro quedan a proposito la **encuesta publica** (`/e/:slug`), el **login** y
   los **visores de documento** (PDF, lienzo de firma): ahi el blanco es el papel, o el publico
   es externo y no tiene la preferencia.
+- **Un valor derivado que solo se persiste en UN endpoint acaba desfasado en otro.** El
+  cumplimiento de una evaluación solo se guardaba al guardar calificaciones; cerrar no lo
+  recalculaba, así que quien calificaba y pulsaba «Finalizar» sin guardar **firmaba el valor
+  viejo, o un 0 %**, mientras el informe PDF (que sí recalcula) mostraba el real. Se arregló por
+  los dos lados: el cierre recalcula dentro de su transacción y el cliente vuelca el buffer
+  antes de cerrar. Regla: si un número se firma, recalcúlalo en el momento de firmarlo.
+- **`/:id` al final de un router se traga TODAS las rutas que no casaron antes.** Pedir
+  `/api/checklists/loquesea` mandaba `NaN` a una clave `bigint`, Postgres devolvía 22P02 y salía
+  un **500 con traza** donde tocaba un 404. Pasaba en `checklists`, `surveys`, `audits`, planes y
+  evaluaciones. Los `assert*` filtran ahora el id con `/^\d+$/`, y el manejador de errores global
+  traduce 22P02/22003 a un 400 sin traza.
+- **El log solo debe llevar lo que es un fallo.** `console.error(error)` volcaba un stack completo
+  por cada 404 y 409 previsto — incluido el 404 «tu cuenta no está vinculada a ningún profesional»
+  que el panel de inicio provoca en **cada carga**. Ahora solo los 5xx dejan traza, los 404 se
+  callan y el resto de 4xx deja una línea.
+- **Un SVG es indivisible al imprimir.** Una gráfica de 25 barras que no cabe en lo que queda de
+  hoja no se parte: salta entera y deja media página en blanco, con el título huérfano al pie.
+  Se resuelve con `h2 { break-after: avoid }` y partiendo las gráficas largas en dos columnas.
 - **Carpeta nueva que el servidor importe en runtime = hay que sumarla a `PAYLOAD` en
   `scripts/deploy-manual.sh`.** Añadí `shared/adherenceScoring.mjs`, el deploy no lo empaquetó y
   el arranque murió en `ERR_MODULE_NOT_FOUND` con la app en **502**. `npm run check` y

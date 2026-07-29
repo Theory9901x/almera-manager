@@ -273,6 +273,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     if (!selectedId) return
     setBusy(true); setError('')
     try {
+      // Cerrar es firmar: lo que quede sin guardar se pierde y se firmaria el valor anterior.
+      // Se vuelca primero el buffer y solo despues se cierra.
+      if (dirty) await adherenceService.saveScores(selectedId, scoresToPayload(scores))
       const updated = await adherenceService.closeEvaluation(selectedId, {
         evaluatorSignedName: evaluatorSign.name.trim() || undefined,
         evaluatorDocument: evaluatorSign.document.trim(),
@@ -281,6 +284,8 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       })
       setDetail(current => current ? { ...current, evaluation: updated } : current)
       setEvaluatorSign(current => ({ ...current, name: updated.evaluator_signed_name || '' }))
+      setDirty(false); setSaveState('saved')
+      setConcept(updated.concept)
       notify('Evaluación cerrada')
     } catch (caught) { fail(caught, 'No fue posible cerrar la evaluación') } finally { setBusy(false) }
   }
@@ -437,7 +442,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         <div className="hcop-kpis">
           <div className="hcop-kpi">
             <span className="ic"><ClipboardCheck size={17} /></span>
-            <div><div className="l">HC evaluadas</div><div className="v">{live.completedRecordIds.size}</div><div className="d">de {detail.records.length}</div></div>
+            {/* Son las HC con TODOS sus criterios respondidos, no las que estan en la evaluacion:
+                llamarlas «evaluadas» hacia leer 15 donde hay 25 historias. */}
+            <div><div className="l">HC completas</div><div className="v">{live.completedRecordIds.size}</div><div className="d">de {detail.records.length}</div></div>
           </div>
           <div className="hcop-kpi">
             <span className="ic"><Sparkles size={17} /></span>
@@ -656,7 +663,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
               )) : <p className="hcop-muted">Ninguna celda calificada en 0 (no cumple).</p>}
             </Card>
 
-            <Card accent={identity.color} className="p-4">
+            {/* Ocupa la fila entera: con cinco tarjetas en rejilla automatica esta quedaba sola
+                al final dejando un hueco, y su lista de barras se lee mejor ancha que en 230 px. */}
+            <Card accent={identity.color} className="p-4 hcop-rspan">
               <div className="hcop-rh"><b>Criterios con menor cumplimiento</b></div>
               {worstCriteria.length ? worstCriteria.map(row => (
                 <div className="hcop-secbar" key={row.criterion.id}>
@@ -775,11 +784,11 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             </p>
           ) : (
             <div className="hcop-fbtns">
+              {/* Un solo boton: «Guardar borrador» y «Guardar calificaciones» llamaban a la misma
+                  funcion con etiquetas distintas, lo que hacia pensar que guardaban cosas
+                  distintas. Guardar es guardar; lo que cierra es «Finalizar». */}
               <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
-                <Save size={15} /> Guardar borrador
-              </Button>
-              <Button variant="secondary" onClick={() => void saveScores()} disabled={busy || isClosed}>
-                <ClipboardCheck size={15} /> Guardar calificaciones
+                <Save size={15} /> Guardar calificaciones
               </Button>
               {!isClosed
                 ? <GradientButton onClick={() => void closeEvaluationAction()} disabled={busy}><Lock size={15} />Finalizar evaluación</GradientButton>

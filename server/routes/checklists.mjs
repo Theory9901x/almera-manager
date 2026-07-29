@@ -38,6 +38,10 @@ function existingId(value) {
 }
 
 async function assertTemplate(request) {
+  // `/:id` esta al final del router y recoge cualquier ruta que no case antes. Sin este filtro,
+  // pedir /api/checklists/loquesea manda «NaN» a un bigint: Postgres revienta con 22P02 y sale
+  // un 500 con traza en el log, cuando lo correcto es un 404 silencioso.
+  if (!existingId(request.params.id)) fail(404, 'Lista no encontrada')
   const result = await query(
     'SELECT * FROM checklist_templates WHERE id = $1 AND organization_id = $2',
     [Number(request.params.id), oid(request)],
@@ -283,6 +287,7 @@ checklistsRouter.get('/subjects/directory', checklistsModule, view, async (reque
 // ---- Auditorias ----
 
 async function assertAudit(request, { requireOpen = false } = {}) {
+  if (!existingId(request.params.auditId)) fail(404, 'Auditoría no encontrada')
   const result = await query(
     `SELECT a.*, t.name AS template_name, t.code, t.version, t.subject_label, t.numbered_items,
             ar.name AS area_name, u.full_name AS auditor_name
@@ -975,6 +980,7 @@ async function notifyUser(request, { userId, planId, message }, client = null) {
  * assertAudit: esconderlo en la interfaz no protege nada.
  */
 async function assertPlan(request) {
+  if (!existingId(request.params.planId)) fail(404, 'Plan de mejora no encontrado')
   const result = await query(
     `SELECT p.*, a.auditor_id, a.audit_date, a.template_id, a.area_id,
             t.name AS template_name, a.template_code, ar.name AS area_name, ar.center AS area_center,

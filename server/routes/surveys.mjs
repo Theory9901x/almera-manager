@@ -324,6 +324,9 @@ async function loadStructure(surveyId) {
 }
 
 async function assertSurvey(request) {
+  // `/:id` recoge cualquier ruta que no case antes. Sin este filtro, un id no numerico manda
+  // «NaN» a un bigint y Postgres devuelve 22P02: un 500 con traza en el log donde tocaba un 404.
+  if (!/^\d+$/.test(String(request.params.id ?? ''))) fail(404, 'Encuesta no encontrada')
   const survey = await loadSurveyMeta(Number(request.params.id), oid(request))
   if (!survey) fail(404, 'Encuesta no encontrada')
   return survey
