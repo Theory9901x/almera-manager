@@ -6,12 +6,14 @@ import {
 } from 'lucide-react'
 import { Badge, Button, Card, DatePicker, Field, Select, SignaturePad, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
-import type { Area, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score } from '../types'
+import type { Area, Commitment, CommitmentStatus, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score } from '../types'
 import { ConceptBadge } from '../design/ConceptBadge'
 import { ComplianceRing } from '../design/ComplianceRing'
 import { GradientButton } from '../design/GradientButton'
 import { HcMatrix } from '../design/HcMatrix'
 import { HcMatrixFullscreen } from '../design/HcMatrixFullscreen'
+import { CommitmentsEditor } from '../design/CommitmentsEditor'
+import { COMMITMENT_STATUS_LABELS } from '../design/commitmentStatus'
 import { ToastStack } from '../design/Toast'
 import { SaveStatusIndicator, type SaveState } from '@/design-system'
 import { buildScoreMap, scoresToPayload } from '../design/scoreMap'
@@ -31,7 +33,7 @@ function newEvaluationForm() {
 }
 
 function newClosureForm() {
-  return { generalObservations: '', commitments: '', improvementPlanPercent: '' }
+  return { generalObservations: '', improvementPlanPercent: '' }
 }
 
 export default function EvaluationsPanel({ areas, professionals }: { areas: Area[]; professionals: Professional[] }) {
@@ -145,7 +147,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
       setConcept(result.evaluation.concept)
       setClosureForm({
         generalObservations: result.evaluation.general_observations || '',
-        commitments: result.evaluation.commitments || '',
         improvementPlanPercent: result.evaluation.improvement_plan_percent === null || result.evaluation.improvement_plan_percent === undefined ? '' : String(result.evaluation.improvement_plan_percent),
       })
       setEvaluatorSign({
@@ -261,12 +262,56 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     try {
       const updated = await adherenceService.updateEvaluation(selectedId, {
         generalObservations: closureForm.generalObservations,
-        commitments: closureForm.commitments,
         improvementPlanPercent: closureForm.improvementPlanPercent === '' ? null : Number(closureForm.improvementPlanPercent),
       })
       setDetail(current => current ? { ...current, evaluation: updated } : current)
       notify('Cierre guardado')
     } catch (caught) { fail(caught, 'No fue posible guardar el cierre') } finally { setBusy(false) }
+  }
+
+  /* --- Compromisos: cada actividad se guarda al momento, no con un boton global. Un
+     "Guardar" que abarcara toda la lista haria que anadir la cuarta actividad pudiera
+     deshacer un cambio de estado que el profesional hizo entre medias. --- */
+  const withCommitments = (commitments: Commitment[]) =>
+    setDetail(current => current ? { ...current, commitments } : current)
+
+  const addCommitment = async (description: string, dueDate: string) => {
+    if (!selectedId) return
+    setBusy(true); setError('')
+    try {
+      const created = await adherenceService.addCommitment(selectedId, { description, dueDate: dueDate || null })
+      withCommitments([...(detail?.commitments || []), created])
+      notify(`Compromiso ${created.code} agregado`)
+    } catch (caught) { fail(caught, 'No fue posible agregar el compromiso') } finally { setBusy(false) }
+  }
+
+  const editCommitment = async (commitmentId: string, data: { description?: string; dueDate?: string | null }) => {
+    if (!selectedId) return
+    try {
+      const updated = await adherenceService.updateCommitment(selectedId, commitmentId, data)
+      withCommitments((detail?.commitments || []).map(item => item.id === commitmentId ? updated : item))
+    } catch (caught) { fail(caught, 'No fue posible guardar el compromiso') }
+  }
+
+  const removeCommitment = async (commitmentId: string) => {
+    if (!selectedId) return
+    setBusy(true); setError('')
+    try {
+      // El servidor devuelve la lista ya renumerada: renumerar aqui tambien seria una segunda
+      // definicion del orden, y las dos podrian discrepar.
+      const result = await adherenceService.removeCommitment(selectedId, commitmentId)
+      withCommitments(result.commitments)
+      notify('Compromiso eliminado')
+    } catch (caught) { fail(caught, 'No fue posible eliminar el compromiso') } finally { setBusy(false) }
+  }
+
+  const setCommitmentStatus = async (commitmentId: string, status: CommitmentStatus) => {
+    if (!selectedId) return
+    try {
+      const updated = await adherenceService.setCommitmentStatus(selectedId, commitmentId, status)
+      withCommitments((detail?.commitments || []).map(item => item.id === commitmentId ? updated : item))
+      notify(`${updated.code}: ${COMMITMENT_STATUS_LABELS[status]}`)
+    } catch (caught) { fail(caught, 'No fue posible actualizar el estado') }
   }
 
   const closeEvaluationAction = async () => {
@@ -718,10 +763,22 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           <h2 className="mt-1 text-xl font-black">Observaciones, compromisos y firmas</h2>
           <div className="dialog-form mt-4">
             <div className="full"><Field label="Observaciones generales"><textarea className="ds-input ds-textarea" rows={3} disabled={isClosed} value={closureForm.generalObservations} onChange={event => setClosureForm({ ...closureForm, generalObservations: event.target.value })} /></Field></div>
-            <div className="full"><Field label="Compromisos del profesional"><textarea className="ds-input ds-textarea" rows={3} disabled={isClosed} value={closureForm.commitments} onChange={event => setClosureForm({ ...closureForm, commitments: event.target.value })} /></Field></div>
             <Field label="Mejoramiento esperado (%)"><input className="ds-input" type="number" min="0" max="100" disabled={isClosed} value={closureForm.improvementPlanPercent} onChange={event => setClosureForm({ ...closureForm, improvementPlanPercent: event.target.value })} /></Field>
             {!isClosed && <div className="full"><Button variant="secondary" onClick={() => void saveClosureFields()} disabled={busy}><Save size={16} />Guardar cierre</Button></div>}
           </div>
+
+          {/* Los compromisos NO son un campo de texto: cada actividad se agrega, se numera y se
+              sigue por separado. Se pueden seguir agregando con la evaluacion cerrada, porque el
+              acuerdo nace en la retroalimentacion, que ocurre despues de cerrar la calificacion. */}
+          <CommitmentsEditor
+            commitments={detail.commitments}
+            professionalName={detail.evaluation.professional_name}
+            busy={busy}
+            onAdd={addCommitment}
+            onEdit={editCommitment}
+            onRemove={removeCommitment}
+            onStatus={setCommitmentStatus}
+          />
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <SignatureBlock

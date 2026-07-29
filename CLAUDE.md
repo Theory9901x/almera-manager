@@ -478,6 +478,17 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   `position: sticky` y con 25 columnas el sticky es justo lo que hace usable la matriz.
 - Sticky en los dos ejes con `left` fijos en px (260 / 312): si se cambia el ancho de la columna
   de criterio hay que ajustar los tres, o las columnas fijas se solapan.
+- **Los compromisos son FILAS, no un campo de texto** (`adherence_commitments`). Un párrafo libre
+  no se puede seguir: no se sabe cuál de los tres compromisos se cumplió, ni citarlo en la
+  siguiente visita, ni quitarlo sin reescribirlo entero. Cada actividad tiene su número (lo que se
+  lee e imprime) y su **`code` `CMP-000123`**, que es una **columna generada** a partir del id —
+  así no puede repetirse ni desincronizarse, y no hace falta una segunda sentencia para asignarlo.
+  Al borrar una actividad se **renumera** para que no queden huecos, pero **el `code` no cambia
+  jamás**: es la referencia que quedó escrita en un informe. El TEXT `commitments` sigue ahí con lo
+  que hubiera antes del cambio (el `schema.sql` lo convirtió en filas, línea a línea) y ya nadie lo
+  escribe; el informe solo cae a él si no hay ninguna fila.
+  Quien **ejecuta** mueve el estado y quien **audita** redacta: el profesional (`own_plan`) solo
+  puede cambiar el estado de los suyos —403 en los ajenos— y no puede crear, reescribir ni borrar.
 - **Ventana aparte para dos monitores**: ruta `/app/adherencia/matriz/:evaluationId`
   (`HcMatrixWindowPage`). Es solo para CALIFICAR — sin cierre, firmas ni plan de mejora, que
   siguen en operacion donde tienen contexto. Carga su propia copia del servidor porque una

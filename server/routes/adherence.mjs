@@ -483,18 +483,159 @@ async function loadEvaluationDetail(organizationId, evaluationId) {
   )
   if (!evaluation.rows[0]) return null
   const matrixVersionId = evaluation.rows[0].matrix_version_id
-  const [scopes, criteria, records, scores] = await Promise.all([
+  const [scopes, criteria, records, scores, commitments] = await Promise.all([
     query('SELECT * FROM adherence_scopes WHERE matrix_version_id = $1 ORDER BY order_index, id', [matrixVersionId]),
     query('SELECT * FROM adherence_criteria WHERE matrix_version_id = $1 ORDER BY scope_id, order_index, id', [matrixVersionId]),
     query('SELECT * FROM adherence_evaluation_records WHERE evaluation_id = $1 ORDER BY created_at, id', [evaluationId]),
     query('SELECT evaluation_record_id, criterion_id, score FROM adherence_evaluation_scores WHERE evaluation_id = $1', [evaluationId]),
+    loadCommitments(evaluationId),
   ])
   const { criterionResults, scopeResults, overallCompliance } = computeCompliance(criteria.rows, scores.rows)
   return {
     evaluation: evaluation.rows[0], scopes: scopes.rows, criteria: criteria.rows, records: records.rows, scores: scores.rows,
-    criterionResults, scopeResults, overallCompliance,
+    commitments, criterionResults, scopeResults, overallCompliance,
   }
 }
+
+/* ============================================================================
+   Compromisos del profesional: una fila por actividad.
+   ============================================================================ */
+
+/** Estados por los que pasa una actividad. El auditor la crea; el profesional la mueve. */
+const COMMITMENT_STATUSES = ['PENDIENTE', 'EN_PROCESO', 'CUMPLIDO', 'INCUMPLIDO']
+
+async function loadCommitments(evaluationId) {
+  const result = await query(
+    `SELECT c.*, u.full_name AS status_changed_by_name
+     FROM adherence_commitments c
+     LEFT JOIN users u ON u.id = c.status_changed_by_id
+     WHERE c.evaluation_id = $1 ORDER BY c.order_index, c.id`,
+    [evaluationId],
+  )
+  return result.rows
+}
+
+/** Comprueba que el compromiso pertenece a la evaluacion de la ruta y a la entidad activa. */
+async function assertCommitment(request) {
+  if (!/^\d+$/.test(String(request.params.commitmentId ?? ''))) fail(404, 'Compromiso no encontrado')
+  const result = await query(
+    'SELECT * FROM adherence_commitments WHERE id = $1 AND evaluation_id = $2 AND organization_id = $3',
+    [request.params.commitmentId, request.params.id, oid(request)],
+  )
+  if (!result.rows[0]) fail(404, 'Compromiso no encontrado')
+  return result.rows[0]
+}
+
+adherenceRouter.get('/evaluations/:id/commitments', view, async (request, response, next) => {
+  try {
+    await assertEvaluationAccess(request)
+    response.json(await loadCommitments(request.params.id))
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.post('/evaluations/:id/commitments', evaluate, async (request, response, next) => {
+  try {
+    await assertEvaluationAccess(request)
+    const description = String(request.body?.description || '').trim()
+    if (!description) return response.status(400).json({ error: 'La descripción de la actividad es obligatoria' })
+    const evaluation = await query(
+      'SELECT professional_id, status FROM adherence_evaluations WHERE id = $1 AND organization_id = $2',
+      [request.params.id, oid(request)],
+    )
+    if (!evaluation.rows[0]) return response.status(404).json({ error: 'Evaluación no encontrada' })
+    // Se pueden agregar compromisos a una evaluacion cerrada: el acuerdo puede surgir en la
+    // retroalimentacion, que ocurre DESPUES de cerrar la calificacion.
+    const next_ = await query(
+      'SELECT COALESCE(MAX(order_index), 0) + 1 AS n FROM adherence_commitments WHERE evaluation_id = $1',
+      [request.params.id],
+    )
+    const created = await query(
+      `INSERT INTO adherence_commitments
+         (organization_id, evaluation_id, professional_id, order_index, description, due_date, created_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [oid(request), request.params.id, evaluation.rows[0].professional_id, next_.rows[0].n,
+        description, request.body?.dueDate || null, uid(request)],
+    )
+    response.status(201).json(created.rows[0])
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.patch('/evaluations/:id/commitments/:commitmentId', evaluate, async (request, response, next) => {
+  try {
+    await assertEvaluationAccess(request)
+    await assertCommitment(request)
+    const body = request.body || {}
+    const sets = []
+    const values = []
+    if (Object.hasOwn(body, 'description')) {
+      const description = String(body.description || '').trim()
+      if (!description) return response.status(400).json({ error: 'La descripción de la actividad es obligatoria' })
+      values.push(description); sets.push(`description = $${values.length}`)
+    }
+    // SET dinamico y no COALESCE: la fecha limite debe poder BORRARSE, y con COALESCE un null
+    // significa «no cambies» en vez de «quitala».
+    if (Object.hasOwn(body, 'dueDate')) { values.push(body.dueDate || null); sets.push(`due_date = $${values.length}`) }
+    if (Object.hasOwn(body, 'orderIndex')) { values.push(Number(body.orderIndex)); sets.push(`order_index = $${values.length}`) }
+    if (!sets.length) return response.status(400).json({ error: 'No hay cambios válidos' })
+    values.push(request.params.commitmentId)
+    const updated = await query(
+      `UPDATE adherence_commitments SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${values.length} RETURNING *`,
+      values,
+    )
+    response.json(updated.rows[0])
+  } catch (error) { next(error) }
+})
+
+adherenceRouter.delete('/evaluations/:id/commitments/:commitmentId', evaluate, async (request, response, next) => {
+  try {
+    await assertEvaluationAccess(request)
+    await assertCommitment(request)
+    await query('DELETE FROM adherence_commitments WHERE id = $1', [request.params.commitmentId])
+    // Se renumera para que la lista impresa no salte de 1 a 3: el numero que se ve es la
+    // posicion, y un hueco haria pensar que falta una actividad. El `code` NO cambia nunca.
+    await query(
+      `UPDATE adherence_commitments c SET order_index = orden.n
+       FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY order_index, id) AS n
+             FROM adherence_commitments WHERE evaluation_id = $1) orden
+       WHERE c.id = orden.id`,
+      [request.params.id],
+    )
+    response.json({ ok: true, commitments: await loadCommitments(request.params.id) })
+  } catch (error) { next(error) }
+})
+
+/**
+ * Cambio de estado de una actividad. Lo puede hacer el auditor (que la cierra en la visita) y
+ * TAMBIEN el profesional sobre las suyas: es quien la ejecuta y quien sabe como va. Por eso el
+ * permiso admite `own_plan`, con la comprobacion de que el compromiso sea realmente suyo.
+ */
+const commitmentStatusPermission = requireAnyPermission([
+  'adherence_matrix.evaluate', 'adherence_matrix.manage', 'adherence_matrix.own_plan',
+])
+
+adherenceRouter.patch('/evaluations/:id/commitments/:commitmentId/status', commitmentStatusPermission, async (request, response, next) => {
+  try {
+    const isAuditor = ['adherence_matrix.evaluate', 'adherence_matrix.manage']
+      .some(permission => request.auth.permissions.includes(permission))
+    if (isAuditor) await assertEvaluationAccess(request)
+    const commitment = await assertCommitment(request)
+    if (!isAuditor) {
+      const professionalId = await ownProfessionalId(request)
+      if (!professionalId || String(professionalId) !== String(commitment.professional_id)) {
+        return response.status(403).json({ error: 'Solo puedes actualizar tus propios compromisos' })
+      }
+    }
+    const status = String(request.body?.status || '').trim()
+    if (!COMMITMENT_STATUSES.includes(status)) return response.status(400).json({ error: 'Estado de compromiso inválido' })
+    const updated = await query(
+      `UPDATE adherence_commitments
+       SET status = $1, status_note = $2, status_changed_at = NOW(), status_changed_by_id = $3, updated_at = NOW()
+       WHERE id = $4 RETURNING *`,
+      [status, String(request.body?.note || '').trim(), uid(request), request.params.commitmentId],
+    )
+    response.json(updated.rows[0])
+  } catch (error) { next(error) }
+})
 
 adherenceRouter.get('/evaluations/:id', view, async (request, response, next) => {
   try {
@@ -509,7 +650,9 @@ adherenceRouter.patch('/evaluations/:id', evaluate, async (request, response, ne
   try {
     await assertEvaluationAccess(request)
     const body = request.body || {}
-    const fieldMap = { generalObservations: 'general_observations', commitments: 'commitments', improvementPlanPercent: 'improvement_plan_percent' }
+    // `commitments` (TEXT) ya no se escribe: los compromisos son filas de adherence_commitments.
+    // La columna se conserva con lo que hubiera antes del cambio, pero nadie la actualiza.
+    const fieldMap = { generalObservations: 'general_observations', improvementPlanPercent: 'improvement_plan_percent' }
     const changes = Object.entries(fieldMap).filter(([key]) => Object.hasOwn(body, key))
     if (!changes.length) return response.status(400).json({ error: 'No hay cambios válidos' })
     const values = changes.map(([key]) => body[key])
@@ -806,6 +949,27 @@ adherenceRouter.get('/my-plans', requireAnyPermission(['adherence_matrix.own_pla
       [professionalId, oid(request)],
     )
     response.json(plans.rows)
+  } catch (error) { next(error) }
+})
+
+/** Los compromisos del profesional que ha iniciado sesion, de todas sus evaluaciones. */
+adherenceRouter.get('/my-commitments', requireAnyPermission(['adherence_matrix.own_plan']), async (request, response, next) => {
+  try {
+    const professionalId = await ownProfessionalId(request)
+    if (!professionalId) return response.status(404).json({ error: 'Tu cuenta no está vinculada a ningún profesional auditado todavía' })
+    const commitments = await query(
+      `SELECT c.*, e.month_reported, e.evaluation_date, a.name AS area_name,
+              u.full_name AS status_changed_by_name
+       FROM adherence_commitments c
+       JOIN adherence_evaluations e ON e.id = c.evaluation_id
+       JOIN adherence_professionals p ON p.id = c.professional_id
+       JOIN adherence_areas a ON a.id = p.area_id
+       LEFT JOIN users u ON u.id = c.status_changed_by_id
+       WHERE c.professional_id = $1 AND c.organization_id = $2
+       ORDER BY e.evaluation_date DESC, c.order_index`,
+      [professionalId, oid(request)],
+    )
+    response.json(commitments.rows)
   } catch (error) { next(error) }
 })
 

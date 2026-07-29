@@ -159,8 +159,21 @@ function signatureBox(title, { name, document: documentId, position, image, at }
   </div>`
 }
 
+/** Estados de un compromiso. No es el semaforo: un pendiente no es «malo», esta sin empezar. */
+const COMMITMENT_STATUS = {
+  PENDIENTE: { label: 'Pendiente', color: '#64748B' },
+  EN_PROCESO: { label: 'En proceso', color: '#0284C7' },
+  CUMPLIDO: { label: 'Cumplido', color: '#059669' },
+  INCUMPLIDO: { label: 'Incumplido', color: '#DC2626' },
+}
+
+function formatShortDate(value) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`))
+}
+
 export function renderAdherenceReportHtml({
-  evaluation, scopes, criteria, records, scores = [], scopeResults, criterionResults, overallCompliance, thresholds,
+  evaluation, scopes, criteria, records, scores = [], commitments = [], scopeResults, criterionResults, overallCompliance, thresholds,
 }) {
   const scopeResultById = new Map(scopeResults.map(result => [String(result.scopeId), result]))
   const criterionResultById = new Map(criterionResults.map(result => [String(result.criterionId), result]))
@@ -323,6 +336,12 @@ export function renderAdherenceReportHtml({
   .matrix col.c-pct { width: 46px; }
   .matrix th.hc span { display: block; font-size: 6.5px; color: #98a2b3; }
   .scale-table { max-width: 300px; }
+  /* Compromisos: el numero y el codigo mandan poco ancho, la actividad se lleva el resto. */
+  .cmt-table col.c-n { width: 34px; }
+  .cmt-table col.c-code { width: 92px; }
+  .cmt-table col.c-due { width: 110px; }
+  .cmt-table col.c-st { width: 110px; }
+  .mono { font-variant-numeric: tabular-nums; letter-spacing: .02em; font-weight: 700; }
   .cell { text-align: center; font-weight: 700; }
   .sc-2 { background: #e7f7ee; color: #0f7a46; }
   .sc-1 { background: #fdf3e2; color: #a56200; }
@@ -443,7 +462,23 @@ export function renderAdherenceReportHtml({
   <div class="obs-block">${escapeHtml(evaluation.general_observations) || 'Sin observaciones registradas.'}</div>
 
   <h2>Compromisos del profesional</h2>
-  <div class="obs-block">${escapeHtml(evaluation.commitments) || 'Sin compromisos registrados.'}</div>
+  ${commitments.length ? `
+  <table class="cmt-table">
+    <colgroup><col class="c-n" /><col class="c-code" /><col /><col class="c-due" /><col class="c-st" /></colgroup>
+    <thead><tr><th class="num">N.º</th><th>Identificador</th><th>Actividad</th><th>Fecha límite</th><th>Estado</th></tr></thead>
+    <tbody>${commitments.map(item => {
+      const status = COMMITMENT_STATUS[item.status] || COMMITMENT_STATUS.PENDIENTE
+      return `<tr>
+        <td class="num">${item.order_index}</td>
+        <td class="mono">${escapeHtml(item.code)}</td>
+        <td>${escapeHtml(item.description)}</td>
+        <td>${formatShortDate(item.due_date)}</td>
+        <td><span class="dot" style="background:${status.color}"></span>${status.label}</td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>
+  <p class="muted">Cada actividad tiene identificador propio: cítalo para hacerle seguimiento en la próxima visita.</p>`
+    : `<div class="obs-block">${escapeHtml(evaluation.commitments) || 'Sin compromisos registrados.'}</div>`}
 
   <h2>Plan de mejora</h2>
   <div class="obs-block">${evaluation.improvement_plan_percent !== null && evaluation.improvement_plan_percent !== undefined ? `Mejoramiento esperado: ${Number(evaluation.improvement_plan_percent).toFixed(1)}%` : 'Sin plan de mejora registrado.'}</div>

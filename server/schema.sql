@@ -1309,3 +1309,60 @@ ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS evaluator_signature T
 ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS professional_document TEXT NOT NULL DEFAULT '';
 ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS professional_position TEXT NOT NULL DEFAULT '';
 ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS professional_signature TEXT NOT NULL DEFAULT '';
+
+-- ---------------------------------------------------------------------------
+-- Compromisos del profesional: UNA FILA POR ACTIVIDAD, no un campo de texto.
+--
+-- Antes los compromisos eran un TEXT libre en la evaluacion. Con eso no hay seguimiento
+-- posible: no se puede decir cual de los tres compromisos se cumplio, ni buscarlo, ni
+-- referenciarlo en una visita. Cada actividad es una variable propia, se agrega y se quita
+-- por separado, y responde el profesional auditado.
+--
+-- `code` es columna GENERADA a partir del id: el identificador no puede desincronizarse de la
+-- fila ni repetirse, y no hace falta una segunda sentencia para asignarlo.
+-- `order_index` es la enumeracion que se ve e imprime (1, 2, 3...); el codigo es para buscar.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS adherence_commitments (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  evaluation_id BIGINT NOT NULL REFERENCES adherence_evaluations(id) ON DELETE CASCADE,
+  professional_id BIGINT NOT NULL REFERENCES adherence_professionals(id),
+  code TEXT GENERATED ALWAYS AS ('CMP-' || lpad(id::text, 6, '0')) STORED,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  description TEXT NOT NULL,
+  due_date DATE,
+  status TEXT NOT NULL DEFAULT 'PENDIENTE'
+    CHECK (status IN ('PENDIENTE','EN_PROCESO','CUMPLIDO','INCUMPLIDO')),
+  status_note TEXT NOT NULL DEFAULT '',
+  status_changed_at TIMESTAMPTZ,
+  status_changed_by_id BIGINT REFERENCES users(id),
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS adherence_commitments_eval_idx
+  ON adherence_commitments(evaluation_id, order_index);
+CREATE INDEX IF NOT EXISTS adherence_commitments_professional_idx
+  ON adherence_commitments(professional_id, status);
+
+-- Backfill del texto libre que ya existe: cada linea no vacia pasa a ser una actividad, para
+-- que ninguna evaluacion cerrada pierda lo que su profesional se comprometio a hacer. Corre una
+-- sola vez por evaluacion (la condicion NOT EXISTS lo hace idempotente); el TEXT original se
+-- conserva y deja de escribirse.
+INSERT INTO adherence_commitments (organization_id, evaluation_id, professional_id, order_index, description, created_by_id)
+SELECT e.organization_id, e.id, e.professional_id,
+       linea.order_index,
+       btrim(linea.texto),
+       e.created_by_id
+FROM adherence_evaluations e
+CROSS JOIN LATERAL unnest(string_to_array(e.commitments, E'\n')) WITH ORDINALITY AS linea(texto, order_index)
+WHERE btrim(linea.texto) <> ''
+  AND NOT EXISTS (SELECT 1 FROM adherence_commitments c WHERE c.evaluation_id = e.id);
+
+-- `status_changed_by_id` dice QUIEN movio el estado por ultima vez: es informativo, no
+-- procedencia. Con la referencia por defecto, borrar un usuario fallaba porque una actividad
+-- suya lo referenciaba. Se anula en su lugar: la actividad y su estado siguen siendo validos
+-- aunque quien lo marco ya no exista.
+ALTER TABLE adherence_commitments DROP CONSTRAINT IF EXISTS adherence_commitments_status_changed_by_id_fkey;
+ALTER TABLE adherence_commitments ADD CONSTRAINT adherence_commitments_status_changed_by_id_fkey
+  FOREIGN KEY (status_changed_by_id) REFERENCES users(id) ON DELETE SET NULL;

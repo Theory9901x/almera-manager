@@ -1,4 +1,4 @@
-import type { Area, AreaMatrix, Auditor, Dashboard, Evaluation, EvaluationDetail, EvaluationRecord, EvaluationSummary, ImprovementPlan, PlanFollowup, Position, Professional, ScoreComputation, Threshold } from '../types'
+import type { Area, AreaMatrix, Auditor, Commitment, CommitmentStatus, Dashboard, Evaluation, EvaluationDetail, EvaluationRecord, EvaluationSummary, ImprovementPlan, PlanFollowup, Position, Professional, ScoreComputation, Threshold } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/adherence${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) }, ...init })
@@ -71,6 +71,18 @@ export const adherenceService = {
   },
   linkProfessionalAccount: (id: string, membershipId: string | null) => call<Professional>(`/professionals/${id}`, { method: 'PATCH', body: JSON.stringify({ membershipId }) }),
   myEvaluations: () => call<EvaluationSummary[]>('/my-evaluations'),
+
+  // Compromisos: una actividad por fila, con su propio ID y su propio estado.
+  commitments: (evaluationId: string) => call<Commitment[]>(`/evaluations/${evaluationId}/commitments`),
+  addCommitment: (evaluationId: string, data: { description: string; dueDate?: string | null }) =>
+    call<Commitment>(`/evaluations/${evaluationId}/commitments`, { method: 'POST', body: JSON.stringify(data) }),
+  updateCommitment: (evaluationId: string, commitmentId: string, data: { description?: string; dueDate?: string | null; orderIndex?: number }) =>
+    call<Commitment>(`/evaluations/${evaluationId}/commitments/${commitmentId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  removeCommitment: (evaluationId: string, commitmentId: string) =>
+    call<{ ok: true; commitments: Commitment[] }>(`/evaluations/${evaluationId}/commitments/${commitmentId}`, { method: 'DELETE' }),
+  setCommitmentStatus: (evaluationId: string, commitmentId: string, status: CommitmentStatus, note = '') =>
+    call<Commitment>(`/evaluations/${evaluationId}/commitments/${commitmentId}/status`, { method: 'PATCH', body: JSON.stringify({ status, note }) }),
+  myCommitments: () => call<Commitment[]>('/my-commitments'),
 
   // Plan de mejora (auditor)
   evaluationPlan: (evaluationId: string) => call<ImprovementPlan | null>(`/evaluations/${evaluationId}/plan`),

@@ -5863,3 +5863,68 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* Observaciones generales, junto a la matriz. */
 .hcop-genobs { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: start; }
 @media (max-width: 800px) { .hcop-genobs { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------------------
+   Compromisos del profesional: una fila por actividad.
+   El numero grande de la izquierda es la ENUMERACION (lo que se lee y se imprime);
+   el codigo CMP-xxxxxx va pequeno arriba, porque sirve para buscar, no para leer.
+   --------------------------------------------------------------------------- */
+.cmt-block { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 18px; }
+.cmt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.cmt-title { margin-top: 4px; font-size: 15px; font-weight: 900; }
+.cmt-sub { margin-top: 3px; font-size: 12px; color: var(--muted); max-width: 62ch; }
+.cmt-count { text-align: right; white-space: nowrap; }
+.cmt-count b { display: block; font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.cmt-count span { font-size: 11px; color: var(--muted); }
+.cmt-empty { margin-top: 12px; font-size: 13px; color: var(--muted); }
+
+.cmt-list { margin-top: 14px; display: grid; gap: 10px; list-style: none; padding: 0; }
+.cmt-item {
+  display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start;
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  background: var(--surface);
+}
+.cmt-n {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  font-weight: 900; font-size: 13px; font-variant-numeric: tabular-nums;
+  background: var(--m-matrices-soft); color: var(--m-matrices);
+}
+.cmt-body { min-width: 0; display: grid; gap: 8px; }
+.cmt-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cmt-code {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.cmt-by { font-size: 10.5px; color: var(--muted); }
+.cmt-text { font-size: 13px; line-height: 1.5; }
+.cmt-input { font-size: 13px; }
+.cmt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+/* El desplegable del sistema es `width: 100%`, pensado para un formulario en columna. Aqui va en
+   una fila junto a la fecha y la papelera: sin acotarlo se come el renglon entero y empuja el
+   punto de estado y el boton de quitar a lineas sueltas. */
+.cmt-row .ds-select-trigger { width: auto; min-width: 168px; min-height: 38px; font-size: 13px; }
+.cmt-row .ds-datepicker-trigger { width: auto; min-width: 168px; min-height: 38px; font-size: 13px; }
+.cmt-due { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.cmt-due.is-late { color: #DC2626; }
+.cmt-late { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.cmt-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.cmt-del {
+  margin-left: auto; display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: 9px; border: 1px solid var(--border); color: var(--muted); background: transparent;
+  cursor: pointer; transition: color .15s, border-color .15s;
+}
+.cmt-del:hover:not(:disabled) { color: #DC2626; border-color: #DC2626; }
+.cmt-del:disabled { opacity: .4; cursor: not-allowed; }
+
+.cmt-new {
+  margin-top: 14px; display: grid; gap: 12px; align-items: end;
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+  border: 1px dashed var(--border); border-radius: 12px; padding: 14px;
+}
+@media (max-width: 860px) { .cmt-new { grid-template-columns: 1fr; } }
+
+.cmt-pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800;
+}

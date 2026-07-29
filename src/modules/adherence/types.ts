@@ -140,12 +140,41 @@ export interface ScopeResult {
   compliancePercent: number | null
 }
 
+export type CommitmentStatus = 'PENDIENTE' | 'EN_PROCESO' | 'CUMPLIDO' | 'INCUMPLIDO'
+
+/**
+ * Un compromiso es UNA actividad, no una linea de un texto libre. Tiene su propio `code`
+ * (generado por la base a partir del id, por eso nunca se repite ni se desincroniza) para poder
+ * referenciarla y buscarla, y su propio estado para poder seguirla por separado.
+ */
+export interface Commitment {
+  id: string
+  organization_id: string
+  evaluation_id: string
+  professional_id: string
+  code: string
+  order_index: number
+  description: string
+  due_date: string | null
+  status: CommitmentStatus
+  status_note: string
+  status_changed_at: string | null
+  status_changed_by_name?: string | null
+  created_at: string
+  updated_at: string
+  /** Solo en «Mis compromisos»: de que evaluacion viene. */
+  month_reported?: string
+  evaluation_date?: string
+  area_name?: string
+}
+
 export interface EvaluationDetail {
   evaluation: Evaluation
   scopes: Scope[]
   criteria: Criterion[]
   records: EvaluationRecord[]
   scores: ScoreEntry[]
+  commitments: Commitment[]
   criterionResults: CriterionResult[]
   scopeResults: ScopeResult[]
   overallCompliance: number

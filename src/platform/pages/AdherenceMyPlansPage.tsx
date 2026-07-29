@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeft, CalendarClock, ClipboardList, Download, FileText, Play, Upload, X } from 'lucide-react'
-import { PageHeader, moduleIdentity } from '@/design-system'
+import { PageHeader, Select, moduleIdentity } from '@/design-system'
 import { adherenceService } from '@/modules/adherence/services/adherenceService'
-import type { ImprovementPlan, PlanFollowup } from '@/modules/adherence/types'
+import type { Commitment, CommitmentStatus, ImprovementPlan, PlanFollowup } from '@/modules/adherence/types'
 import { PlanStatusBadge } from '@/modules/adherence/design/PlanStatusBadge'
+import { COMMITMENT_STATUSES, COMMITMENT_STATUS_COLORS, COMMITMENT_STATUS_LABELS, isCommitmentOverdue } from '@/modules/adherence/design/commitmentStatus'
 import { ComplianceRing } from '@/modules/adherence/design/ComplianceRing'
 import { GradientButton } from '@/modules/adherence/design/GradientButton'
 import { ToastStack } from '@/modules/adherence/design/Toast'
@@ -24,6 +25,7 @@ export default function AdherenceMyPlansPage() {
   const [busy, setBusy] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [followups, setFollowups] = useState<PlanFollowup[]>([])
+  const [commitments, setCommitments] = useState<Commitment[]>([])
   const [description, setDescription] = useState('')
   const [progressPercent, setProgressPercent] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -41,7 +43,21 @@ export default function AdherenceMyPlansPage() {
       })
   }
 
-  useEffect(() => { loadPlans() }, [])
+  /** Los compromisos se piden aparte de los planes: son entidades distintas y una puede estar
+   *  vacia sin que la otra lo este. */
+  const loadCommitments = () => {
+    adherenceService.myCommitments().then(setCommitments).catch(() => setCommitments([]))
+  }
+
+  const changeCommitmentStatus = async (item: Commitment, status: CommitmentStatus) => {
+    try {
+      const updated = await adherenceService.setCommitmentStatus(item.evaluation_id, item.id, status)
+      setCommitments(current => current.map(row => row.id === item.id ? { ...row, ...updated } : row))
+      notify('Compromiso actualizado')
+    } catch (caught) { fail(caught, 'No fue posible actualizar el compromiso') }
+  }
+
+  useEffect(() => { loadPlans(); loadCommitments() }, [])
 
   const selected = plans.find(plan => plan.id === selectedId) || null
 
@@ -221,6 +237,59 @@ export default function AdherenceMyPlansPage() {
           <div className="almera-empty"><ClipboardList size={30} /><p>Aún no tienes planes de mejora asignados.</p></div>
         </div>
       )}
+
+      {/* Los compromisos son actividades acordadas en la auditoria, distintas del plan de mejora:
+          el plan es lo que prescribe el auditor, el compromiso es lo que el profesional se
+          compromete a hacer. Aqui las ve y mueve su estado; no puede reescribir el acuerdo. */}
+      <section className="surface-panel" style={{ ['--ds-accent' as string]: identity.color }}>
+        <div className="cmt-head">
+          <div>
+            <p className="ds-eyebrow">Compromisos</p>
+            <h3 className="cmt-title">Mis compromisos de auditoría</h3>
+            <p className="cmt-sub">Marca cómo va cada actividad. Cada una tiene su identificador.</p>
+          </div>
+          {commitments.length > 0 && (
+            <div className="cmt-count">
+              <b>{commitments.filter(item => item.status === 'CUMPLIDO').length}</b>
+              <span>de {commitments.length} cumplidas</span>
+            </div>
+          )}
+        </div>
+        {commitments.length ? (
+          <ol className="cmt-list">
+            {commitments.map(item => {
+              const overdue = isCommitmentOverdue(item.due_date, item.status)
+              return (
+                <li className="cmt-item" key={item.id}>
+                  <span className="cmt-n">{item.order_index}</span>
+                  <div className="cmt-body">
+                    <div className="cmt-meta">
+                      <span className="cmt-code">{item.code}</span>
+                      <span className="cmt-by">{item.area_name} · {item.month_reported}</span>
+                    </div>
+                    <p className="cmt-text">{item.description}</p>
+                    <div className="cmt-row">
+                      <span className={`cmt-due${overdue ? ' is-late' : ''}`}>
+                        <CalendarClock size={13} />
+                        {item.due_date ? formatDate(item.due_date) : 'Sin fecha límite'}
+                        {overdue ? <b className="cmt-late">Vencida</b> : null}
+                      </span>
+                      <Select
+                        value={item.status}
+                        onChange={value => void changeCommitmentStatus(item, value as CommitmentStatus)}
+                        options={COMMITMENT_STATUSES.map(status => ({ value: status, label: COMMITMENT_STATUS_LABELS[status] }))}
+                      />
+                      <span className="cmt-dot" style={{ background: COMMITMENT_STATUS_COLORS[item.status] }} />
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        ) : (
+          <div className="almera-empty"><ClipboardList size={30} /><p>Aún no tienes compromisos registrados.</p></div>
+        )}
+      </section>
     </div>
   )
 }
