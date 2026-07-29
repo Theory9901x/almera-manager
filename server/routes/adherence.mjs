@@ -889,7 +889,9 @@ adherenceRouter.get('/evaluations/:id/report.pdf', exportData, async (request, r
     if (!detail) return response.status(404).json({ error: 'Evaluación no encontrada' })
     const thresholds = await query('SELECT concept, min_percent FROM adherence_thresholds WHERE organization_id = $1 ORDER BY min_percent DESC', [oid(request)])
     const html = renderAdherenceReportHtml({ ...detail, thresholds: thresholds.rows })
-    const pdf = await renderPdf(html)
+    // Apaisado: el informe lleva la matriz completa de criterios x HC. En vertical, con 25
+    // historias, cada columna baja de 20 px y la calificacion deja de leerse.
+    const pdf = await renderPdf(html, { landscape: true })
     response.setHeader('Content-Type', 'application/pdf')
     response.setHeader('Content-Disposition', `attachment; filename="informe-adherencia-${request.params.id}.pdf"`)
     response.send(pdf)
