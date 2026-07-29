@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, ExternalLink, Layers,
-  ListChecks, Lock, Maximize2, Minimize2, Plus, Save, Search, Send, Settings2, Sparkles,
-  Unlock, X,
+  ListChecks, Lock, Maximize2, Minimize2, Paperclip, PenLine, Plus, Save, Search, Send,
+  Settings2, Sparkles, Unlock, X,
 } from 'lucide-react'
-import { Badge, Button, Card, DatePicker, Field, ModuleHero, Select, Table, moduleIdentity } from '@/design-system'
+import { Badge, Button, Card, DatePicker, Field, Select, SignaturePad, Table, moduleIdentity } from '@/design-system'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score } from '../types'
 import { ConceptBadge } from '../design/ConceptBadge'
@@ -48,8 +48,10 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   const [newRecordNumber, setNewRecordNumber] = useState('')
   const [concept, setConcept] = useState<string | null>(null)
   const [closureForm, setClosureForm] = useState(newClosureForm)
-  const [evaluatorSignedNameInput, setEvaluatorSignedNameInput] = useState('')
-  const [professionalSignedNameInput, setProfessionalSignedNameInput] = useState('')
+  // Firmas: nombre, CEDULA, CARGO e imagen. El nombre escrito a maquina no acredita a nadie,
+  // asi que se pide primero quien firma y luego su firma (lienzo tactil o imagen adjunta).
+  const [evaluatorSign, setEvaluatorSign] = useState({ name: '', document: '', position: '', image: '' })
+  const [professionalSign, setProfessionalSign] = useState({ name: '', document: '', position: '', image: '' })
   const [reopenJustification, setReopenJustification] = useState('')
   const [improvementPlan, setImprovementPlan] = useState<ImprovementPlan | null>(null)
   const [planForm, setPlanForm] = useState({ description: '', plannedStartDate: '', plannedEndDate: '' })
@@ -146,8 +148,20 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         commitments: result.evaluation.commitments || '',
         improvementPlanPercent: result.evaluation.improvement_plan_percent === null || result.evaluation.improvement_plan_percent === undefined ? '' : String(result.evaluation.improvement_plan_percent),
       })
-      setEvaluatorSignedNameInput(result.evaluation.evaluator_signed_name || '')
-      setProfessionalSignedNameInput(result.evaluation.professional_signed_name || '')
+      setEvaluatorSign({
+        name: result.evaluation.evaluator_signed_name || '',
+        document: result.evaluation.evaluator_document || '',
+        position: result.evaluation.evaluator_position || '',
+        image: result.evaluation.evaluator_signature || '',
+      })
+      // El profesional auditado ya esta identificado en la evaluacion: se precargan su nombre y
+      // su documento para que solo confirme y firme, no para que los vuelva a teclear.
+      setProfessionalSign({
+        name: result.evaluation.professional_signed_name || result.evaluation.professional_name || '',
+        document: result.evaluation.professional_document || result.evaluation.document_id || '',
+        position: result.evaluation.professional_position || '',
+        image: result.evaluation.professional_signature || '',
+      })
       setReopenJustification('')
       setDirty(false); setSaveState('idle')
       setSelectedId(id)
@@ -259,9 +273,14 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     if (!selectedId) return
     setBusy(true); setError('')
     try {
-      const updated = await adherenceService.closeEvaluation(selectedId, evaluatorSignedNameInput.trim() || undefined)
+      const updated = await adherenceService.closeEvaluation(selectedId, {
+        evaluatorSignedName: evaluatorSign.name.trim() || undefined,
+        evaluatorDocument: evaluatorSign.document.trim(),
+        evaluatorPosition: evaluatorSign.position.trim(),
+        evaluatorSignature: evaluatorSign.image,
+      })
       setDetail(current => current ? { ...current, evaluation: updated } : current)
-      setEvaluatorSignedNameInput(updated.evaluator_signed_name || '')
+      setEvaluatorSign(current => ({ ...current, name: updated.evaluator_signed_name || '' }))
       notify('Evaluación cerrada')
     } catch (caught) { fail(caught, 'No fue posible cerrar la evaluación') } finally { setBusy(false) }
   }
@@ -272,16 +291,24 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     try {
       const updated = await adherenceService.reopenEvaluation(selectedId, reopenJustification.trim())
       setDetail(current => current ? { ...current, evaluation: updated } : current)
-      setEvaluatorSignedNameInput(''); setProfessionalSignedNameInput(''); setReopenJustification('')
+      setEvaluatorSign({ name: '', document: '', position: '', image: '' })
+      setProfessionalSign({ name: '', document: '', position: '', image: '' })
+      setReopenJustification('')
       notify('Evaluación reabierta')
     } catch (caught) { fail(caught, 'No fue posible reabrir la evaluación') } finally { setBusy(false) }
   }
 
   const signAsProfessional = async () => {
-    if (!selectedId || !professionalSignedNameInput.trim()) { setError('Escribe el nombre del profesional para registrar la firma'); return }
+    if (!selectedId || !professionalSign.name.trim()) { setError('Escribe el nombre del profesional para registrar la firma'); return }
+    if (!professionalSign.document.trim()) { setError('La cédula del profesional es obligatoria para registrar la firma'); return }
     setBusy(true); setError('')
     try {
-      const updated = await adherenceService.signEvaluation(selectedId, professionalSignedNameInput.trim())
+      const updated = await adherenceService.signEvaluation(selectedId, {
+        professionalSignedName: professionalSign.name.trim(),
+        professionalDocument: professionalSign.document.trim(),
+        professionalPosition: professionalSign.position.trim(),
+        professionalSignature: professionalSign.image,
+      })
       setDetail(current => current ? { ...current, evaluation: updated } : current)
       notify('Firma del profesional registrada')
     } catch (caught) { fail(caught, 'No fue posible registrar la firma') } finally { setBusy(false) }
@@ -395,6 +422,14 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             {live.overall === null ? '—' : `${Math.round(live.overall)}%`}
           </span>
           <span className="hcop-bar-spacer" />
+          <SaveStatusIndicator state={saveState} />
+          {/* Guardar vive AQUI, junto a «Informe PDF»: es la accion que mas se repite y estaba
+              al fondo de la pagina, donde habia que bajar cada vez. */}
+          {!isClosed && !poppedOut && (
+            <Button identity={identity} onClick={() => void saveScores()} disabled={busy}>
+              <Save size={15} />{dirty ? 'Guardar cambios' : 'Guardar'}
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => void downloadReport()} disabled={busy}><Download size={15} />Informe PDF</Button>
         </div>
 
@@ -548,6 +583,26 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
 
         </div>
 
+        {/* Observaciones GENERALES de la evaluacion, junto a la matriz: son de toda la ronda, no
+            de una HC concreta (esas van en la fila de observaciones de la propia matriz). */}
+        <Card accent={identity.color} className="p-4">
+          <div className="hcop-genobs">
+            <div>
+              <p className="ds-eyebrow">Observaciones</p>
+              <h3 className="mt-1 text-sm font-black">Observaciones generales de la evaluación</h3>
+            </div>
+            <textarea
+              className="ds-input ds-textarea"
+              rows={2}
+              disabled={isClosed}
+              value={closureForm.generalObservations}
+              placeholder="Contexto de la evaluación, hallazgos transversales, acuerdos…"
+              onChange={event => setClosureForm({ ...closureForm, generalObservations: event.target.value })}
+              onBlur={() => { if (!isClosed) void saveClosureFields() }}
+            />
+          </div>
+        </Card>
+
         <aside className="hcop-rpanel">
             <Card accent={identity.color} className="p-4">
               <div className="hcop-rh"><b>Cumplimiento general</b></div>
@@ -660,28 +715,34 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="scope-editor">
-              <strong>Firma del evaluador</strong>
-              {detail.evaluation.evaluator_signed_name ? (
-                <span className="text-xs text-[var(--muted)]">{detail.evaluation.evaluator_signed_name} · firmado</span>
-              ) : (
-                <>
-                  <Field label="Nombre del evaluador"><input className="ds-input" value={evaluatorSignedNameInput} onChange={event => setEvaluatorSignedNameInput(event.target.value)} placeholder="Nombre de quien evalúa" /></Field>
-                  {!isClosed && <Button identity={identity} onClick={() => void closeEvaluationAction()} disabled={busy}><Lock size={16} />Cerrar y firmar evaluación</Button>}
-                </>
-              )}
-            </div>
-            <div className="scope-editor">
-              <strong>Firma del profesional auditado</strong>
-              {detail.evaluation.professional_signed_name ? (
-                <span className="text-xs text-[var(--muted)]">{detail.evaluation.professional_signed_name} · firmado</span>
-              ) : (
-                <>
-                  <Field label="Nombre del profesional"><input className="ds-input" value={professionalSignedNameInput} onChange={event => setProfessionalSignedNameInput(event.target.value)} placeholder="Nombre de quien acepta" /></Field>
-                  <Button variant="secondary" onClick={() => void signAsProfessional()} disabled={busy}><Send size={16} />Registrar firma</Button>
-                </>
-              )}
-            </div>
+            <SignatureBlock
+              title="Firma del evaluador"
+              hint="Quien realiza la auditoría"
+              value={evaluatorSign}
+              onChange={setEvaluatorSign}
+              signedName={detail.evaluation.evaluator_signed_name}
+              signedAt={detail.evaluation.evaluator_signed_at}
+              signedDocument={detail.evaluation.evaluator_document}
+              signedPosition={detail.evaluation.evaluator_position}
+              signedImage={detail.evaluation.evaluator_signature}
+              disabled={busy}
+              action={!isClosed
+                ? <Button identity={identity} onClick={() => void closeEvaluationAction()} disabled={busy}><Lock size={16} />Cerrar y firmar evaluación</Button>
+                : null}
+            />
+            <SignatureBlock
+              title="Firma del profesional auditado"
+              hint="Quien recibe la retroalimentación"
+              value={professionalSign}
+              onChange={setProfessionalSign}
+              signedName={detail.evaluation.professional_signed_name}
+              signedAt={detail.evaluation.professional_signed_at}
+              signedDocument={detail.evaluation.professional_document}
+              signedPosition={detail.evaluation.professional_position}
+              signedImage={detail.evaluation.professional_signature}
+              disabled={busy}
+              action={<Button variant="secondary" onClick={() => void signAsProfessional()} disabled={busy}><Send size={16} />Registrar firma</Button>}
+            />
           </div>
 
           {isClosed && (
@@ -825,6 +886,116 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           </Table>
         </div>
       </Card>
+    </div>
+  )
+}
+
+
+/** Datos de quien firma: nombre, cedula y cargo. */
+interface SignData { name: string; document: string; position: string; image: string }
+
+/**
+ * Bloque de firma de una evaluacion.
+ *
+ * Primero IDENTIFICA a quien firma (nombre, cedula y cargo) y despues recoge la firma: en
+ * lienzo tactil para tablet, o adjuntando una imagen para quien firma en papel y la escanea.
+ * Un nombre escrito a maquina no acredita nada, y ese era todo el respaldo que habia antes.
+ *
+ * Una vez firmado no se edita: la firma avala unos datos concretos, y cambiarlos despues la
+ * dejaria avalando algo que ya no es lo que se firmo.
+ */
+function SignatureBlock({
+  title, hint, value, onChange, signedName, signedAt, signedDocument, signedPosition, signedImage,
+  action, disabled,
+}: {
+  title: string
+  hint: string
+  value: SignData
+  onChange(next: SignData): void
+  signedName: string | null
+  signedAt: string | null
+  signedDocument?: string
+  signedPosition?: string
+  signedImage?: string
+  action: React.ReactNode
+  disabled?: boolean
+}) {
+  const [mode, setMode] = useState<'pad' | 'file'>('pad')
+  const [fileError, setFileError] = useState('')
+
+  if (signedName) {
+    return (
+      <div className="sign-block is-signed">
+        <strong>{title}</strong>
+        {signedImage
+          ? <img className="sign-preview" src={signedImage} alt={`Firma de ${signedName}`} />
+          : <p className="sign-nofirma">Firmado sin imagen de firma.</p>}
+        <div className="sign-who">
+          <b>{signedName}</b>
+          {signedDocument ? <span>C.C. {signedDocument}</span> : null}
+          {signedPosition ? <span>{signedPosition}</span> : null}
+          {signedAt ? <time>{new Date(signedAt).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time> : null}
+        </div>
+      </div>
+    )
+  }
+
+  /** Imagen adjunta: se convierte a data URL para guardarse igual que la del lienzo. */
+  const readFile = (file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setFileError('Adjunta una imagen de la firma (JPG o PNG)'); return }
+    // 400 KB es el tope que valida el servidor; se avisa aqui para no subir en balde.
+    if (file.size > 380 * 1024) { setFileError('La imagen pesa demasiado: máximo 380 KB'); return }
+    setFileError('')
+    const reader = new FileReader()
+    reader.onload = () => onChange({ ...value, image: String(reader.result || '') })
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="sign-block">
+      <div>
+        <strong>{title}</strong>
+        <small>{hint}</small>
+      </div>
+
+      {/* Primero quien firma; la firma va despues. */}
+      <div className="sign-fields">
+        <Field label="Nombre completo *">
+          <input className="ds-input" value={value.name} disabled={disabled}
+            onChange={event => onChange({ ...value, name: event.target.value })} placeholder="Nombre de quien firma" />
+        </Field>
+        <Field label="Cédula *">
+          <input className="ds-input" value={value.document} disabled={disabled} inputMode="numeric"
+            onChange={event => onChange({ ...value, document: event.target.value })} placeholder="N.º de documento" />
+        </Field>
+        <Field label="Cargo">
+          <input className="ds-input" value={value.position} disabled={disabled}
+            onChange={event => onChange({ ...value, position: event.target.value })} placeholder="Ej. Odontóloga" />
+        </Field>
+      </div>
+
+      <div className="sign-modes">
+        <button className={mode === 'pad' ? 'is-on' : ''} onClick={() => setMode('pad')}>
+          <PenLine size={13} /> Firmar en pantalla
+        </button>
+        <button className={mode === 'file' ? 'is-on' : ''} onClick={() => setMode('file')}>
+          <Paperclip size={13} /> Adjuntar imagen
+        </button>
+      </div>
+
+      {mode === 'pad' ? (
+        <SignaturePad onChange={image => onChange({ ...value, image: image || '' })} />
+      ) : (
+        <div className="sign-file">
+          <input type="file" accept="image/png,image/jpeg" disabled={disabled}
+            onChange={event => { readFile(event.target.files?.[0]); event.target.value = '' }} />
+          {value.image ? <img className="sign-preview" src={value.image} alt="Firma adjunta" /> : null}
+          {fileError ? <p className="sign-error">{fileError}</p> : null}
+        </div>
+      )}
+
+      {action}
     </div>
   )
 }

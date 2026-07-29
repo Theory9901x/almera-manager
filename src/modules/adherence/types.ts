@@ -102,8 +102,15 @@ export interface Evaluation {
   improvement_plan_percent: number | null
   evaluator_signed_name: string | null
   evaluator_signed_at: string | null
+  /** Cedula, cargo e imagen de la firma. El nombre escrito a maquina no acredita nada. */
+  evaluator_document?: string
+  evaluator_position?: string
+  evaluator_signature?: string
   professional_signed_name: string | null
   professional_signed_at: string | null
+  professional_document?: string
+  professional_position?: string
+  professional_signature?: string
   status: EvaluationStatus
 }
 

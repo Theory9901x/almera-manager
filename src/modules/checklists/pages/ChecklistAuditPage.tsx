@@ -8,10 +8,10 @@ import {
 } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, ProgressRing, SaveStatusIndicator,
-  Select, ToastProvider, moduleIdentity, semaphoreColor, useToast,
+  Select, SignaturePad, ToastProvider, moduleIdentity, semaphoreColor, useToast,
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
-import { SignaturePad } from '../components/SignaturePad'
+
 import { EvidencesCard } from '../components/EvidencesCard'
 import { PlanCreateDialog, type PlanDraft } from '../components/PlanCreateDialog'
 import {

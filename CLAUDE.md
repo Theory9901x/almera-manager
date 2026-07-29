@@ -414,6 +414,11 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   `width: max-content; min-width: 100%`, asi que con pocas HC la columna de criterio absorbia
   todo el sobrante (llego a ~1100 px) y las celdas quedaban aplastadas. Lleva tope fijo
   (300 px ampliada / 260 px embebida) y el resto se lo reparten las columnas de HC.
+- **Las firmas se capturan de verdad**: nombre, CEDULA, CARGO e imagen (lienzo tactil o imagen
+  adjunta), en `adherence_evaluations.*_document / *_position / *_signature`. Antes solo se
+  guardaba el nombre escrito a maquina, que no acredita a nadie. `SignaturePad` vive ahora en el
+  design system porque lo usan Listas de Chequeo y Matrices. Una firma ya registrada NO se edita:
+  avala unos datos concretos.
 - **Las observaciones por HC van DENTRO de la matriz**, en su ultima fila, en las dos vistas: en
   el modo ampliado no habia otra tarjeta donde escribirlas, y anotar el porque de un 0 en el
   momento es justo lo que se pierde si hay que salir de la matriz. Se guardan al salir del campo,

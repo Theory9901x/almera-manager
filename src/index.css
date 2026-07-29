@@ -5826,3 +5826,38 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   background: var(--hcfs-cell); border-color: var(--hcfs-cell-brd); color: var(--hcfs-ink);
 }
 .hc-matrix.is-full .hcm-obs-row td.hcm-criterion { color: var(--hcfs-soft); }
+
+/* --- Firmas de la evaluacion de adherencia: identificacion + firma --- */
+.sign-block {
+  display: grid; gap: 12px; align-content: start; padding: 15px 16px;
+  border: 1px solid var(--border-hairline); border-radius: 15px;
+  background: var(--color-surface-soft);
+}
+.sign-block > div > strong { display: block; font-size: 13.5px; font-weight: 800; }
+.sign-block > div > small { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.sign-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sign-fields .ds-field:first-child { grid-column: 1 / -1; }
+.sign-modes { display: inline-flex; gap: 6px; }
+.sign-modes button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px;
+  border: 1px solid var(--border-hairline); background: var(--color-surface-card);
+  color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.sign-modes button.is-on { border-color: var(--m-matrices); color: var(--m-matrices); }
+.sign-file { display: grid; gap: 9px; font-size: 12px; }
+.sign-error { font-size: 11.5px; color: var(--danger); }
+/* La firma se muestra sobre papel blanco tambien en oscuro: es tinta sobre papel, y el trazo
+   negro sobre superficie oscura no se veria. */
+.sign-preview {
+  width: 100%; max-width: 320px; border-radius: 10px; background: #fff;
+  border: 1px solid var(--border-hairline); padding: 6px;
+}
+.sign-nofirma { font-size: 11.5px; color: var(--muted); }
+.sign-who { display: grid; gap: 2px; font-size: 12px; }
+.sign-who b { font-weight: 800; }
+.sign-who span, .sign-who time { color: var(--muted); font-size: 11px; }
+.sign-block.is-signed { background: color-mix(in srgb, #059669 8%, var(--color-surface-soft)); }
+
+/* Observaciones generales, junto a la matriz. */
+.hcop-genobs { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: start; }
+@media (max-width: 800px) { .hcop-genobs { grid-template-columns: 1fr; } }

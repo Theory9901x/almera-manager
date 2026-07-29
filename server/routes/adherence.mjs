@@ -522,15 +522,36 @@ adherenceRouter.patch('/evaluations/:id', evaluate, async (request, response, ne
   } catch (error) { next(error) }
 })
 
+
+/**
+ * Valida la imagen de una firma. Se admite vacia (se puede cerrar sin firma grafica y firmar
+ * despues), pero si viene tiene que ser un PNG en data URL y no pasar de 400 KB.
+ */
+const MAX_SIGNATURE_BYTES = 400 * 1024
+function readSignature(raw) {
+  const image = String(raw || '')
+  if (!image) return { ok: true, image: '' }
+  if (!image.startsWith('data:image/')) return { ok: false, error: 'La firma no es una imagen válida' }
+  if (image.length > MAX_SIGNATURE_BYTES) return { ok: false, error: 'La firma es demasiado pesada (máximo 400 KB)' }
+  return { ok: true, image }
+}
+
 adherenceRouter.post('/evaluations/:id/close', close, async (request, response, next) => {
   try {
     await assertEvaluationAccess(request)
     const evaluatorSignedName = String(request.body?.evaluatorSignedName || request.auth.user.fullName).trim()
+    const signature = readSignature(request.body?.evaluatorSignature)
+    if (!signature.ok) return response.status(400).json({ error: signature.error })
     const result = await query(
       `UPDATE adherence_evaluations
-       SET status = 'CLOSED', evaluator_signed_name = $1, evaluator_signed_at = NOW(), updated_at = NOW()
+       SET status = 'CLOSED', evaluator_signed_name = $1, evaluator_signed_at = NOW(),
+           evaluator_document = $4, evaluator_position = $5, evaluator_signature = $6,
+           updated_at = NOW()
        WHERE id = $2 AND organization_id = $3 AND status = 'DRAFT' AND total_records > 0 RETURNING *`,
-      [evaluatorSignedName, request.params.id, oid(request)],
+      [evaluatorSignedName, request.params.id, oid(request),
+        String(request.body?.evaluatorDocument || '').trim(),
+        String(request.body?.evaluatorPosition || '').trim(),
+        signature.image],
     )
     if (!result.rows[0]) return response.status(409).json({ error: 'La evaluación no puede cerrarse: verifica que tenga historias clínicas y no esté ya cerrada' })
     response.json(result.rows[0])
@@ -577,10 +598,17 @@ adherenceRouter.post('/evaluations/:id/sign', signPermission, async (request, re
       }
       professionalSignedName = request.auth.user.fullName
     }
+    const signature = readSignature(request.body?.professionalSignature)
+    if (!signature.ok) return response.status(400).json({ error: signature.error })
     const result = await query(
-      `UPDATE adherence_evaluations SET professional_signed_name = $1, professional_signed_at = NOW(), updated_at = NOW()
+      `UPDATE adherence_evaluations SET professional_signed_name = $1, professional_signed_at = NOW(),
+              professional_document = $4, professional_position = $5, professional_signature = $6,
+              updated_at = NOW()
        WHERE id = $2 AND organization_id = $3 RETURNING *`,
-      [professionalSignedName, request.params.id, oid(request)],
+      [professionalSignedName, request.params.id, oid(request),
+        String(request.body?.professionalDocument || '').trim(),
+        String(request.body?.professionalPosition || '').trim(),
+        signature.image],
     )
     if (!result.rows[0]) return response.status(404).json({ error: 'Evaluación no encontrada' })
     response.json(result.rows[0])

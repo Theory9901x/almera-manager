@@ -37,9 +37,11 @@ export const adherenceService = {
   saveScores: (evaluationId: string, scores: { recordId: string; criterionId: string; score: 0 | 1 | 2 | null }[]) =>
     call<ScoreComputation>(`/evaluations/${evaluationId}/scores`, { method: 'PUT', body: JSON.stringify({ scores }) }),
   updateEvaluation: (id: string, data: Record<string, unknown>) => call<Evaluation>(`/evaluations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  closeEvaluation: (id: string, evaluatorSignedName?: string) => call<Evaluation>(`/evaluations/${id}/close`, { method: 'POST', body: JSON.stringify({ evaluatorSignedName }) }),
+  closeEvaluation: (id: string, data?: { evaluatorSignedName?: string; evaluatorDocument?: string; evaluatorPosition?: string; evaluatorSignature?: string }) =>
+    call<Evaluation>(`/evaluations/${id}/close`, { method: 'POST', body: JSON.stringify(data || {}) }),
   reopenEvaluation: (id: string, justification: string) => call<Evaluation>(`/evaluations/${id}/reopen`, { method: 'POST', body: JSON.stringify({ justification }) }),
-  signEvaluation: (id: string, professionalSignedName: string) => call<Evaluation>(`/evaluations/${id}/sign`, { method: 'POST', body: JSON.stringify({ professionalSignedName }) }),
+  signEvaluation: (id: string, data: { professionalSignedName: string; professionalDocument?: string; professionalPosition?: string; professionalSignature?: string }) =>
+    call<Evaluation>(`/evaluations/${id}/sign`, { method: 'POST', body: JSON.stringify(data) }),
   downloadReport: async (id: string) => {
     const response = await fetch(`/api/adherence/evaluations/${id}/report.pdf`, { credentials: 'same-origin' })
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible generar el informe') }

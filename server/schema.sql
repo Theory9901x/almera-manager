@@ -1291,3 +1291,21 @@ CREATE TABLE IF NOT EXISTS checklist_notifications (
 );
 CREATE INDEX IF NOT EXISTS checklist_notifications_idx
   ON checklist_notifications(user_id, read, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Firmas de la evaluacion de adherencia: nombre, CEDULA, CARGO e IMAGEN.
+--
+-- Antes solo se guardaba el nombre escrito a maquina, que no acredita nada. La firma se captura
+-- en lienzo tactil (tablet) o se adjunta como imagen, y va acompanada de los datos con los que
+-- se identifica a quien firma — que es lo que pide el formato institucional.
+--
+-- La imagen se guarda como data URL en la fila, igual que en Listas de Chequeo: pesa ~8 KB y
+-- viaja con la evaluacion a su informe PDF sin depender de un archivo suelto en disco que el
+-- proximo despliegue podria dejar atras.
+-- ---------------------------------------------------------------------------
+ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS evaluator_document TEXT NOT NULL DEFAULT '';
+ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS evaluator_position TEXT NOT NULL DEFAULT '';
+ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS evaluator_signature TEXT NOT NULL DEFAULT '';
+ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS professional_document TEXT NOT NULL DEFAULT '';
+ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS professional_position TEXT NOT NULL DEFAULT '';
+ALTER TABLE adherence_evaluations ADD COLUMN IF NOT EXISTS professional_signature TEXT NOT NULL DEFAULT '';
