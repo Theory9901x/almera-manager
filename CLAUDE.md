@@ -306,6 +306,7 @@ guardar algo sensible.
 | Módulo | Key | Ruta | Estado |
 |---|---|---|---|
 | Inicio | `dashboard` | `/app` | Rediseñado (bento, hero) |
+| Planes de mejora | — (transversal) | `/app/planes-mejora` | Directorio de solo lectura (§14) |
 | Gestión ALMERA | `almera` | `/app/modulos/almera` | Operativo |
 | Asistencias Técnicas | `technical-assistances` | `/app/modulos/technical-assistances` | Operativo, rediseñado |
 | Auditorías Internas | `internal-audits` | — | **Inactivo** (`active = FALSE`) |
@@ -387,6 +388,17 @@ página y visor propio de PDF.
 - **Un SVG es indivisible al imprimir.** Una gráfica de 25 barras que no cabe en lo que queda de
   hoja no se parte: salta entera y deja media página en blanco, con el título huérfano al pie.
   Se resuelve con `h2 { break-after: avoid }` y partiendo las gráficas largas en dos columnas.
+- **`var(--border)` y `var(--surface-*)` no son lo mismo, y uno de ellos NO EXISTE.** El token de
+  borde es `--border-hairline`; `--border` no está definido, así que `border: 1px solid var(--border)`
+  cae a `currentColor` — un borde del color del texto, que en claro pasa por bueno y en oscuro
+  aparece como una línea clara. Y `--surface` es la superficie BASE: usarlo en una tarjeta anidada
+  dentro de una `Card` da exactamente el mismo color que su contenedor (contraste 1.00) en los dos
+  temas. Para lo anidado, `--surface-soft`.
+- **Un color en línea no se puede tematizar.** `style={{ color: STATUS[x].color }}` gana siempre al
+  CSS, así que el gris de «pendiente» se hundía en el fondo oscuro sin forma de aclararlo. Los
+  estados van con `data-status` y el color en CSS, con su override en oscuro.
+- **Un tinte al 15 % del propio color no basta para leer 11 px en negrita**: los tonos medios se
+  quedaban en 2.3 de contraste. El tinte da el color; el texto va un paso más profundo.
 - **Carpeta nueva que el servidor importe en runtime = hay que sumarla a `PAYLOAD` en
   `scripts/deploy-manual.sh`.** Añadí `shared/adherenceScoring.mjs`, el deploy no lo empaquetó y
   el arranque murió en `ERR_MODULE_NOT_FOUND` con la app en **502**. `npm run check` y
@@ -489,6 +501,27 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   escribe; el informe solo cae a él si no hay ninguna fila.
   Quien **ejecuta** mueve el estado y quien **audita** redacta: el profesional (`own_plan`) solo
   puede cambiar el estado de los suyos —403 en los ajenos— y no puede crear, reescribir ni borrar.
+- **El SCROLL VERTICAL es de la PAGINA, no de la tabla** — en las tres superficies. La tabla tenía
+  su propio alto y su propio scroll dentro de una página que además scrolleaba: una ventanita de
+  una docena de filas. Se evalúa como un formulario, de arriba abajo y de un tirón. La tabla se
+  queda solo con el **horizontal**, que sí necesita para sus 25 columnas. Tres cosas que hay que
+  respetar si se toca: `overflow-x: auto` convierte el contenedor en contenedor de scroll en **los
+  dos ejes**, así que no puede llevar alto máximo; el overlay ampliado pasó a `display: block`
+  porque en una columna flex de alto fijo los hijos **se encogen** para caber y la tabla recuperaba
+  su scroll interno; y el colchón del pie pegajoso vive ahora en la **página** (`.hcop-page-pad`).
+  Coste asumido: la cabecera de HC ya no queda fija, así que cada celda lleva `title` con su HC.
+- **Todo lo que se PORTALEA al `<body>` va en `--z-portal` (400), por encima de `--z-overlay`
+  (200).** El desplegable de calificación tenía `z-index: 80` y los del sistema (`ds-select-content`,
+  `ds-datepicker-content`) **ninguno**: dentro del overlay de la matriz se dibujaban **detrás**, así
+  que en pantalla completa y en la ventana aparte era **imposible elegir una calificación** — la
+  función principal del módulo. No se nota en la vista embebida porque ahí no hay overlay.
+- **Calificar tiene que verse.** Dos columnas de HC contiguas eran idénticas (con 25 es fácil
+  calificar la de al lado): ahora alternan un tinte del 4 % vía `columnClass(index)` — con índice
+  explícito y **no** `:nth-child`, porque las columnas de peso y % son opcionales y la paridad
+  cambiaría al ocultarlas. Y la casilla sin calificar era una caja del color de la fila con borde
+  casi invisible: ahora lleva borde **discontinuo** y marcado, y en la ampliada mide 40×30.
+- **Una evaluación cerrada bloquea las casillas, y hay que DECIRLO.** Sin el aviso de solo lectura,
+  quien abre la ventana pulsa una celda, no pasa nada y concluye que la ventana está rota.
 - **Ventana aparte para dos monitores**: ruta `/app/adherencia/matriz/:evaluationId`
   (`HcMatrixWindowPage`). Es solo para CALIFICAR — sin cierre, firmas ni plan de mejora, que
   siguen en operacion donde tienen contexto. Carga su propia copia del servidor porque una
@@ -523,3 +556,33 @@ para overlays). Cuatro cosas que costó descubrir y conviene no deshacer:
 Al verificar con Puppeteer: **Chrome headless reporta `prefers-reduced-motion: reduce`**,
 así que apaga las animaciones del propio módulo. Hay que forzar `no-preference` con
 `page.emulateMediaFeatures` o se fotografía algo que ningún usuario ve.
+
+---
+
+## 14. Planes de mejora: un directorio, no un cuarto circuito
+
+`/app/planes-mejora` (`server/routes/plans.mjs` + `ImprovementPlansPage.tsx`) es **solo lectura**.
+Cada módulo conserva su propio circuito y su propio modelo; esto los LEE y los presenta juntos
+pero **separados**, que es justo lo que pidió el usuario: un plan de una matriz de adherencia y una
+no conformidad de una lista de chequeo se atienden distinto, y revueltos en una lista plana se
+pierde quién responde por cada cosa.
+
+- **De Listas de Chequeo solo se lee.** Su flujo (NC → plan → evidencia → cierre) no se toca desde
+  aquí, por decisión expresa. Leer `checklist_action_plans` no es tocarlo.
+- **La evidencia NO vive aquí.** Se sube donde siempre: en la auditoría, por el profesional. Este
+  apartado sirve para encontrar y hacer seguimiento, no para cargar archivos.
+- Dos categorías por fila: el **módulo** (color de identidad + etiqueta, agrupado en su propia
+  tabla) y el **origen** (`Matriz de adherencia` / `Lista de chequeo`).
+- El `code` (`ADH-000012`, `LCH-000045`) se **deriva en la consulta** con `lpad(id)`: hay un
+  identificador citable sin añadir una columna a las tablas de cada módulo.
+- Los estados de los dos módulos se **normalizan** a cuatro (`PENDIENTE`, `EN_PROCESO`,
+  `POR_VERIFICAR`, `CERRADO`) para poder filtrarlos con un mismo control, pero **cada fila muestra
+  la etiqueta de su módulo** («No iniciado», «Subsanado»…), que es la que su gente reconoce. Ese
+  color es de **flujo, no del semáforo** (§5.1): un plan pendiente no es «malo», está sin empezar.
+- Un profesional (`own_plan`) o un colaborador de Listas ven **solo lo suyo**: el filtro va en la
+  consulta, no en el cliente.
+- **`Fecha` no es «Fecha límite»**: solo los planes de matrices tienen plazo. En Listas se muestra
+  la fecha de la auditoría y se dice que lo es, con una etiqueta debajo.
+- La flecha de cada fila lleva **a su módulo**. Para adherencia usa
+  `/app/adherencia/operacion?evaluacion=<id>`, que `EvaluationsPanel` lee al montar y **limpia
+  después** (si no, recargar reabriría siempre lo mismo y pelearía con «volver al listado»).

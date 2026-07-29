@@ -57,6 +57,10 @@ export default function AppLayout() {
     : null
   )
 
+  // Los modulos que generan planes de mejora. El directorio transversal solo tiene sentido si
+  // esta persona tiene al menos uno; si no, seria una pagina vacia en el menu.
+  const hasPlanModules = session.modules.some(module => module.key === 'adherence-matrix' || module.key === 'checklists')
+
   const adherenceLinks = adherenceModule ? [
     session.permissions.includes('adherence_matrix.manage') && { to: '/app/adherencia/configuracion', label: 'Configuración' },
     (session.permissions.includes('adherence_matrix.evaluate') || session.permissions.includes('adherence_matrix.manage')) && { to: '/app/adherencia/operacion', label: 'Operación' },
@@ -97,6 +101,14 @@ export default function AppLayout() {
               <LayoutDashboard className="item-icon" size={20} />
               <span className="min-w-0 flex-1 truncate">Inicio</span>
             </NavLink>
+            {/* Va en PRINCIPAL, no dentro de un modulo: es transversal a todos. Solo aparece si
+                la persona tiene alguno de los modulos que generan planes. */}
+            {hasPlanModules && (
+              <NavLink to="/app/planes-mejora" onClick={() => setOpen(false)} className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}>
+                <ClipboardList className="item-icon" size={20} />
+                <span className="min-w-0 flex-1 truncate">Planes de mejora</span>
+              </NavLink>
+            )}
           </div>
 
           <div className="sidebar-section">

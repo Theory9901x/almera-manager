@@ -64,6 +64,12 @@
   --shadow-brand: 0 12px 26px rgba(199,25,45,.24);
   /* Elevacion de superficies neutras (tarjetas SGIMR) */
   --border-hairline: rgba(16,24,40,.14);
+  /* Todo lo que se PORTALEA al <body> (desplegables, calendarios) tiene que quedar por encima de
+     los overlays a pantalla completa, que van en z-index 200. Con z-index 80 —o sin ninguno— el
+     desplegable de calificacion se dibujaba DETRAS del overlay de la matriz: en la ventana nueva
+     y en pantalla completa era imposible elegir un valor, que es la funcion principal. */
+  --z-overlay: 200;
+  --z-portal: 400;
   --radius-card: 16px;
   --radius-card-sm: 10px;
   --shadow-card-sm: 0 1px 3px rgba(16,24,40,.08), 0 6px 16px rgba(16,24,40,.08);
@@ -632,7 +638,7 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .score-selector-trigger:hover{transform:translateY(-1px)}
 .score-selector-trigger:focus-visible{outline:2px solid var(--m-matrices, #8156c0);outline-offset:2px}
 .score-selector-trigger[data-disabled]{cursor:not-allowed;opacity:.6;transform:none}
-.score-selector-content{z-index:80;overflow:hidden;border:1px solid var(--border-hairline);border-radius:10px;background:#fff;box-shadow:var(--shadow-card-lg);padding:4px;min-width:88px}
+.score-selector-content{z-index:var(--z-portal);overflow:hidden;border:1px solid var(--border-hairline);border-radius:10px;background:#fff;box-shadow:var(--shadow-card-lg);padding:4px;min-width:88px}
 .score-selector-item{display:flex;align-items:center;gap:8px;border-radius:7px;padding:7px 9px;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer;outline:none}
 .score-selector-item[data-highlighted]{background:var(--color-surface-soft)}
 .score-selector-check{margin-left:auto;display:inline-flex}
@@ -1898,6 +1904,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-select-trigger svg { transition: transform 150ms ease; color: var(--muted); }
 .ds-select-trigger[data-state="open"] svg { transform: rotate(180deg); color: var(--ds-accent, #4F46E5); }
 .ds-select-content {
+  z-index: var(--z-portal);
   z-index: 90; overflow: hidden; border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
   box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.12); padding: 5px; min-width: var(--radix-select-trigger-width);
   animation: ds-popover-in 160ms ease;
@@ -1926,6 +1933,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-datepicker-trigger:disabled { opacity: .6; cursor: not-allowed; }
 .ds-datepicker-placeholder { color: #9aa5b8; font-weight: 400; }
 .ds-datepicker-content {
+  z-index: var(--z-portal);
   z-index: 90; width: 272px; border: 1px solid var(--border-hairline); border-radius: 14px; background: #fff;
   box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.14); padding: 12px; animation: ds-popover-in 160ms ease;
 }
@@ -4901,6 +4909,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Desplegables de Radix en oscuro: el contenido tenia blanco fijo. */
 :root[data-theme="dark"] .ds-select-content {
+  z-index: var(--z-portal);
   background: #131c2e;
   border-color: var(--neo-line, #24314b);
   box-shadow: 0 10px 34px rgba(2, 6, 18, .6), inset 0 1px 0 rgba(148, 163, 255, .08);
@@ -4995,7 +5004,9 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hcop-macts { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .hcop-addhc { display: flex; align-items: center; gap: 8px; }
 .hcop-addhc .ds-input { width: 150px; height: 38px; }
-.hcop-tablewrap { overflow: auto; max-height: 62vh; }
+/* Declaracion base; el bloque de mas abajo le quita el alto y el scroll vertical (el vertical es
+   de la pagina). Se deja aqui solo el horizontal para que el orden en la hoja no importe. */
+.hcop-tablewrap { overflow-x: auto; }
 .hcop-hint {
   padding: 11px; font-size: 11px; color: var(--muted); text-align: center;
   border-top: 1px solid var(--border-hairline);
@@ -5160,17 +5171,27 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    Overlay de pantalla completa
    ============================================================================ */
 .hcfs {
-  position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column;
+  /* El overlay SCROLLEA COMO UNA PAGINA. Antes era una columna flex con la tabla en `flex: 1` y
+     su propio scroll: la evaluacion quedaba encerrada en una franja de pantalla mientras la
+     leyenda, los filtros y el pie no se movian. Se recorre como un formulario, de arriba abajo. */
+  /* `display: block`, NO columna flex: en una columna flex de alto fijo los hijos se ENCOGEN para
+     caber (flex-shrink por defecto), asi que la tabla se comprimia y recuperaba su scroll interno
+     en vez de desbordar y dejar scrollear el overlay. */
+  position: fixed; inset: 0; z-index: 200; overflow-y: auto; overscroll-behavior: contain;
+  display: block;
   font-size: 12px; color: #E6EAF5;
   background:
     radial-gradient(900px 500px at 15% -8%, rgba(124, 58, 237, .25), transparent 55%),
     radial-gradient(800px 400px at 100% 0%, rgba(59, 130, 246, .15), transparent 50%),
     #0A0E22;
 }
+/* Pegajosos arriba y abajo: ahora que la pagina scrollea, sin esto «Guardar» y «Salir» se van
+   con el scroll y hay que volver al principio para llegar a ellos. */
 .hcfs-top {
+  position: sticky; top: 0; z-index: 4;
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   padding: 12px 20px; border-bottom: 1px solid #1E2A52;
-  background: rgba(14, 19, 48, .6); backdrop-filter: blur(12px);
+  background: rgba(14, 19, 48, .82); backdrop-filter: blur(12px);
 }
 .hcfs-top-l { display: flex; align-items: center; gap: 13px; min-width: 0; }
 .hcfs-logo {
@@ -5244,8 +5265,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .hcfs-pin.is-on { border-style: solid; border-color: #A855F7; background: rgba(124, 58, 237, .18); color: #E9D5FF; }
 
+/* Solo scroll HORIZONTAL: el vertical lo lleva el overlay. Sin `flex: 1` ni `min-height: 0`,
+   porque ya no tiene que caber en la pantalla — crece con sus filas y la pagina la recorre. */
 .hcfs-tablewrap {
-  flex: 1; min-height: 0; margin: 0 20px; overflow: auto;
+  margin: 0 20px; overflow-x: auto; overflow-y: visible;
   border: 1px solid #1E2A52; border-radius: 14px; background: rgba(18, 26, 58, .4);
 }
 /* El zoom escala el contenido sin romper el sticky: se aplica al tamano de fuente base de la
@@ -5267,8 +5290,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hcfs-empty { padding: 40px; text-align: center; color: #94A0C8; font-size: 12px; }
 
 .hcfs-foot {
+  position: sticky; bottom: 0; z-index: 4; margin-top: 14px;
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  padding: 13px 20px;
+  padding: 13px 20px; border-top: 1px solid #1E2A52;
+  background: rgba(14, 19, 48, .82); backdrop-filter: blur(12px);
 }
 .hcfs-showing { font-size: 11.5px; color: #94A0C8; }
 .hcfs-progress { display: flex; align-items: center; gap: 9px; flex: 1; max-width: 300px; }
@@ -5674,18 +5699,22 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* Tarjeta que ocupa la fila entera, para que la ultima no se quede sola con medio hueco al lado. */
 .hcop-rpanel > .hcop-rspan { grid-column: 1 / -1; }
 
-/* Alto util: lo que queda de pantalla descontando la barra, los KPIs y el pie. Con un minimo
-   para que en pantallas cortas siga habiendo matriz que calificar. */
+/* El scroll VERTICAL es de la pagina, no de la tabla.
+   La tabla tenia su propio alto (`max-height: 100vh - 430px`) y su propio scroll vertical: una
+   ventanita de una docena de filas dentro de una pagina que ademas scrolleaba por su cuenta. Se
+   evalua como un formulario —de arriba abajo, de un tiron— y para eso el scroll tiene que ser
+   uno y de la pagina entera. Aqui solo queda el HORIZONTAL, que la tabla si necesita para sus
+   25 columnas de HC.
+   Ojo: `overflow-x: auto` convierte el contenedor en contenedor de scroll en los DOS ejes, asi
+   que no puede llevar alto maximo — si lo lleva, vuelve a aparecer el scroll interno. */
 .hcop-tablewrap {
-  overflow: auto;
-  /* 400px = barra + KPIs + filtros + cabecera de la tarjeta + EL PIE PEGAJOSO. Sin descontar
-     el pie, sus botones se quedaban encima de las ultimas filas y no se podian calificar. */
-  max-height: max(300px, calc(100vh - 430px));
-  /* Colchon del alto del pie pegajoso: asi, al llegar al final del scroll, la ultima fila queda
-     POR ENCIMA del pie y se puede calificar. Sin esto, las ultimas celdas eran inalcanzables. */
-  padding-bottom: 72px;
-  overscroll-behavior: contain;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
 }
+/* Colchon al final de la pagina: el pie es pegajoso y sin esto tapa las ultimas filas, que
+   quedaban inalcanzables. Antes vivia en la tabla; ahora que scrollea la pagina, va en ella. */
+.hcop-page-pad { padding-bottom: 88px; }
 
 /* En la embebida la columna de criterio no necesita 260 px: con eso y el peso y el %, en un
    portatil quedaban 8 columnas de HC. A 200 px entran tres mas sin que el texto sufra. */
@@ -5744,7 +5773,9 @@ h1, h2, h3, strong, th { text-wrap: balance; }
     linear-gradient(160deg, var(--hcfs-bg1), var(--hcfs-bg2));
   color: var(--hcfs-ink);
 }
-.hcfs-top { border-bottom-color: var(--hcfs-line); background: color-mix(in srgb, var(--hcfs-panel) 72%, transparent); }
+/* Al ser pegajosos, cabecera y pie tapan filas al pasar por debajo: el fondo tiene que ser
+   OPACO en tema claro, no un 72 % que deja ver el texto de la tabla atravesado. */
+.hcfs-top, .hcfs-foot { border-color: var(--hcfs-line); background: var(--hcfs-panel); }
 .hcfs-crumbs { color: var(--hcfs-faint); }
 .hcfs-crumbs b, .hcfs-top-l p { color: var(--hcfs-soft); }
 .hcfs-btn { border-color: var(--hcfs-line); background: var(--hcfs-panel); color: var(--hcfs-ink); }
@@ -5869,7 +5900,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    El numero grande de la izquierda es la ENUMERACION (lo que se lee y se imprime);
    el codigo CMP-xxxxxx va pequeno arriba, porque sirve para buscar, no para leer.
    --------------------------------------------------------------------------- */
-.cmt-block { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 18px; }
+.cmt-block { margin-top: 22px; border-top: 1px solid var(--border-hairline); padding-top: 18px; }
 .cmt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .cmt-title { margin-top: 4px; font-size: 15px; font-weight: 900; }
 .cmt-sub { margin-top: 3px; font-size: 12px; color: var(--muted); max-width: 62ch; }
@@ -5879,10 +5910,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .cmt-empty { margin-top: 12px; font-size: 13px; color: var(--muted); }
 
 .cmt-list { margin-top: 14px; display: grid; gap: 10px; list-style: none; padding: 0; }
+/* La tarjeta de la actividad va sobre la Card del cierre, asi que necesita una superficie
+   DISTINTA: con `--surface` era exactamente el mismo color que su contenedor en los dos temas
+   (blanco sobre blanco en claro, #131c2e sobre #131c2e en oscuro) y solo la separaba el borde. */
 .cmt-item {
   display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start;
-  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
-  background: var(--surface);
+  border: 1px solid var(--border-hairline); border-radius: 12px; padding: 12px 14px;
+  background: var(--surface-soft);
 }
 .cmt-n {
   width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
@@ -5911,7 +5945,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .cmt-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .cmt-del {
   margin-left: auto; display: grid; place-items: center; width: 30px; height: 30px;
-  border-radius: 9px; border: 1px solid var(--border); color: var(--muted); background: transparent;
+  border-radius: 9px; border: 1px solid var(--border-hairline); color: var(--muted); background: transparent;
   cursor: pointer; transition: color .15s, border-color .15s;
 }
 .cmt-del:hover:not(:disabled) { color: #DC2626; border-color: #DC2626; }
@@ -5920,7 +5954,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .cmt-new {
   margin-top: 14px; display: grid; gap: 12px; align-items: end;
   grid-template-columns: minmax(0, 1fr) 200px auto;
-  border: 1px dashed var(--border); border-radius: 12px; padding: 14px;
+  border: 1px dashed var(--border-hairline); border-radius: 12px; padding: 14px;
 }
 @media (max-width: 860px) { .cmt-new { grid-template-columns: 1fr; } }
 
@@ -5928,3 +5962,172 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px;
   font-size: 11px; font-weight: 800;
 }
+
+/* Compromisos en tema oscuro.
+   Medir el contraste del contenedor no basta (§10): hay que mirar los HIJOS. Aqui el numero de la
+   actividad usaba el tono de identidad al 0.55 de luminosidad sobre su propio -soft al 0.28: dos
+   valores demasiado cercanos para leerse. Y el campo de texto necesita separarse de la tarjeta,
+   que ya no es la superficie base. */
+:root[data-theme="dark"] .cmt-n { color: var(--ink); }
+:root[data-theme="dark"] .cmt-input,
+:root[data-theme="dark"] .cmt-new .ds-input { background: var(--canvas-soft); }
+:root[data-theme="dark"] .cmt-new { border-color: var(--line); background: color-mix(in srgb, var(--surface-soft) 45%, transparent); }
+:root[data-theme="dark"] .cmt-del { border-color: var(--line); }
+/* La fecha vencida en rojo puro sobre oscuro vibra; se aclara al tono del semaforo en oscuro. */
+:root[data-theme="dark"] .cmt-due.is-late { color: #FCA5A5; }
+
+/* ---------------------------------------------------------------------------
+   Planes de mejora (directorio transversal).
+   El color y la etiqueta del modulo son la CATEGORIZACION, no un adorno: es lo que
+   evita leer un plan de una matriz como si fuera una NC de una lista de chequeo.
+   Cada grupo fija su propio --pmx-accent con la identidad de su modulo.
+   --------------------------------------------------------------------------- */
+.pmx-cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.pmx-card {
+  position: relative; overflow: hidden; text-align: left; cursor: pointer;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
+  background: var(--color-surface-card); box-shadow: var(--shadow-card-sm);
+  padding: 16px 18px 14px; transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+}
+/* Franja de identidad arriba, como en las Card del sistema. */
+.pmx-card::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 3px;
+  background: var(--pmx-accent, var(--muted));
+}
+.pmx-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-card-md, 0 10px 24px rgba(30,37,64,.10)); }
+.pmx-card.is-on { border-color: var(--pmx-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pmx-accent) 16%, transparent); }
+.pmx-card > strong { display: block; margin-top: 8px; font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.pmx-tag {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--pmx-accent); background: color-mix(in srgb, var(--pmx-accent) 14%, transparent);
+}
+.pmx-mini { margin-top: 10px; display: grid; gap: 4px; font-size: 11.5px; color: var(--muted); }
+.pmx-mini span { display: flex; align-items: center; gap: 7px; }
+.pmx-mini i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+.pmx-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
+.pmx-search { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; color: var(--muted); }
+.pmx-search .ds-input { flex: 1; }
+.pmx-filters .ds-select-trigger { width: auto; min-width: 190px; }
+
+.pmx-groups { margin-top: 18px; display: grid; gap: 22px; }
+.pmx-group-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.pmx-group-count { font-size: 11.5px; color: var(--muted); }
+/* Solo scroll horizontal: la pagina lleva el vertical (misma regla que la matriz). */
+.pmx-tablewrap {
+  overflow-x: auto; border: 1px solid var(--border-hairline); border-radius: 14px;
+  border-top: 3px solid var(--pmx-accent);
+}
+.pmx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pmx-table th {
+  text-align: left; padding: 9px 12px; font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+  background: var(--surface-soft); white-space: nowrap;
+}
+/* En tablas densas las divisorias SI van: son funcionales (§5.4). */
+.pmx-table td { padding: 10px 12px; border-top: 1px solid var(--border-hairline); vertical-align: top; }
+.pmx-table tbody tr:hover td { background: color-mix(in srgb, var(--pmx-accent) 5%, transparent); }
+.pmx-code { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pmx-src { font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.pmx-instr small { display: block; font-size: 10.5px; color: var(--muted); }
+.pmx-desc {
+  max-width: 340px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; line-height: 1.45;
+}
+.pmx-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pmx-date small { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+/* Color de FLUJO, no del semaforo (§5.1): un plan pendiente no es «malo», esta sin empezar.
+   Va en CSS por atributo para poder aclararlo en oscuro — en linea no se podria. */
+.pmx-status {
+  display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px;
+  font-weight: 800; white-space: nowrap;
+  color: var(--pmx-st, var(--muted)); background: color-mix(in srgb, var(--pmx-st, var(--muted)) 15%, transparent);
+}
+/* Un paso mas profundos que el color de referencia del estado: a 11 px en negrita, sobre su
+   propio tinte al 15 %, los tonos medios se quedaban en 2.3 de contraste. El tinte es el que
+   da el color; el texto tiene que poder leerse. */
+.pmx-status[data-status="PENDIENTE"] { --pmx-st: #475569; }
+.pmx-status[data-status="EN_PROCESO"] { --pmx-st: #0369A1; }
+.pmx-status[data-status="POR_VERIFICAR"] { --pmx-st: #A85A08; }
+.pmx-status[data-status="CERRADO"] { --pmx-st: #047056; }
+.pmx-pct { display: block; margin-top: 3px; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pmx-go {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+  border: 1px solid var(--border-hairline); color: var(--muted); transition: color .15s, border-color .15s;
+}
+.pmx-go:hover { color: var(--pmx-accent); border-color: var(--pmx-accent); }
+.pmx-empty { padding: 26px 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+/* Planes de mejora en tema oscuro. La cabecera de la tabla usa --surface-soft, que en oscuro es
+   mas CLARA que la superficie base: sin esto la fila de titulos queda mas luminosa que el cuerpo
+   y tira del ojo hacia donde no hay dato. */
+:root[data-theme="dark"] .pmx-table th { background: var(--canvas-soft); }
+:root[data-theme="dark"] .pmx-tablewrap { background: var(--color-surface-card); }
+
+/* En oscuro los estados pensados sobre papel pierden fuerza: el gris del pendiente se hunde en el
+   fondo y el verde del cerrado deja de leerse. Se suben una parada, sin cambiar el significado. */
+:root[data-theme="dark"] .pmx-status[data-status="PENDIENTE"] { --pmx-st: #A3B0C4; }
+:root[data-theme="dark"] .pmx-status[data-status="EN_PROCESO"] { --pmx-st: #38BDF8; }
+:root[data-theme="dark"] .pmx-status[data-status="POR_VERIFICAR"] { --pmx-st: #FBBF24; }
+:root[data-theme="dark"] .pmx-status[data-status="CERRADO"] { --pmx-st: #34D399; }
+
+/* ---------------------------------------------------------------------------
+   Calificar: que se vea DONDE se pulsa y de QUE historia es cada celda.
+   Dos fallos que hacian la matriz inservible en la ventana aparte:
+   1) dos columnas de HC contiguas eran identicas — con 25 columnas es facil
+      calificar la de al lado sin notarlo;
+   2) la casilla sin calificar era una caja del mismo color que la fila con un
+      borde casi invisible, asi que no parecia pulsable.
+   --------------------------------------------------------------------------- */
+
+/* Tinte alterno de columna. Muy leve a proposito: separa sin competir con el color
+   de la calificacion, que es lo que de verdad hay que leer. */
+.hc-matrix td.is-alt,
+.hc-matrix th.hcm-hc.is-alt { background: color-mix(in srgb, var(--m-matrices) 4%, transparent); }
+.hc-matrix .hcm-scope-row td.is-alt { background: color-mix(in srgb, var(--m-matrices) 7%, transparent); }
+/* La columna activa manda sobre el tinte alterno: es el foco, no una franja mas. */
+.hc-matrix td.is-active, .hc-matrix th.hcm-hc.is-active { background: color-mix(in srgb, var(--m-matrices) 11%, transparent); }
+
+/* Casilla SIN CALIFICAR: borde discontinuo y marcado. El trazo discontinuo dice
+   «aqui falta algo» sin necesidad de leer nada. */
+.score-selector-trigger.is-compact {
+  border-style: dashed; border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--m-matrices) 42%, transparent);
+  font-size: 12px;
+}
+/* Ya calificada: solida y con su color. El `sc-*` de mas arriba pone el fondo. */
+.score-selector-trigger.is-compact.sc-2,
+.score-selector-trigger.is-compact.sc-1,
+.score-selector-trigger.is-compact.sc-0,
+.score-selector-trigger.is-compact.sc-na { border-style: solid; border-width: 1.5px; }
+.score-selector-trigger.is-compact:hover {
+  border-style: solid; border-color: var(--m-matrices);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-matrices) 18%, transparent);
+}
+.score-selector-trigger.is-compact:focus-visible {
+  outline: 2px solid var(--m-matrices); outline-offset: 2px;
+}
+
+/* En la vista ampliada y en la ventana aparte la casilla se agranda: es el control que se
+   pulsa cientos de veces y a 32x26 con el digito a 11 px costaba acertar. */
+.hcfs-tablewrap .score-selector-trigger.is-compact {
+  width: calc(40px * var(--hcfs-zoom, 1)); height: calc(30px * var(--hcfs-zoom, 1));
+  font-size: calc(13px * var(--hcfs-zoom, 1));
+}
+/* Divisorias verticales entre columnas de HC: en una tabla densa son funcionales (§5.4). */
+.hcfs-tablewrap .hc-matrix.is-full td, .hcfs-tablewrap .hc-matrix.is-full th.hcm-hc {
+  border-left: 1px solid var(--hcfs-line, #1E2A52);
+}
+
+/* Aviso de solo lectura en la matriz ampliada / ventana aparte. */
+.hcfs-readonly {
+  display: flex; align-items: center; gap: 9px; margin: 12px 20px 0;
+  padding: 9px 13px; border-radius: 11px; font-size: 11.5px;
+  border: 1px solid color-mix(in srgb, #D97706 45%, transparent);
+  background: color-mix(in srgb, #D97706 12%, transparent); color: #92400E;
+}
+.hcfs-readonly b { font-weight: 800; }
+/* El overlay tiene el CLARO como base y el oscuro como override (bloque de mas arriba); el aviso
+   sigue la misma regla, o el ambar claro quedaria ilegible sobre papel. */
+:root[data-theme="dark"] .hcfs-readonly { color: #FBBF24; }

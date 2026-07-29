@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, ExternalLink, Layers,
   ListChecks, Lock, Maximize2, Minimize2, Paperclip, PenLine, Plus, Save, Search, Send,
@@ -137,6 +138,19 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     ...(filterMonth ? { monthReported: filterMonth } : {}),
   }).then(setEvaluations).catch(caught => fail(caught, 'No fue posible cargar las evaluaciones'))
   useEffect(() => { void loadEvaluations() }, [filterAreaId, filterProfessionalId, filterMonth])
+
+  // Enlace directo desde el directorio de Planes de mejora: /app/adherencia/operacion?evaluacion=12
+  // abre esa evaluacion. El parametro se limpia despues, para que recargar no reabra siempre lo
+  // mismo ni el boton «volver al listado» quede peleando con la URL.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const requested = searchParams.get('evaluacion')
+    if (!requested) return
+    void openEvaluation(requested)
+    const next = new URLSearchParams(searchParams)
+    next.delete('evaluacion')
+    setSearchParams(next, { replace: true })
+  }, [])
 
   const openEvaluation = async (id: string) => {
     setError('')
@@ -452,7 +466,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   if (selectedId && detail) {
     const isClosed = detail.evaluation.status === 'CLOSED'
     return (
-      <div className="hcop-detail">
+      // El colchon del pie pegajoso vive en la PAGINA: la tabla ya no tiene scroll vertical
+      // propio, asi que sin el, el pie tapa las ultimas filas y quedan inalcanzables.
+      <div className="hcop-detail hcop-page-pad">
         <ToastStack notice={notice} error={error} onDismissError={() => setError('')} />
 
         {/* Barra compacta en vez del hero grande: en un portatil de 768 px de alto, el hero y

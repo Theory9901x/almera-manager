@@ -12,6 +12,7 @@ import { surveysRouter } from './routes/surveys.mjs'
 import { surveysPublicRouter } from './routes/surveysPublic.mjs'
 import { carbonRouter } from './routes/carbon.mjs'
 import { checklistsRouter } from './routes/checklists.mjs'
+import { plansRouter } from './routes/plans.mjs'
 
 const isDev = process.argv.includes('--dev')
 if (isDev) process.env.NODE_ENV = 'development'
@@ -55,6 +56,8 @@ app.use('/api/adherence', requireAuth, adherenceRouter)
 app.use('/api/surveys', requireAuth, surveysRouter)
 app.use('/api/carbon', requireAuth, carbonRouter)
 app.use('/api/checklists', requireAuth, checklistsRouter)
+// Directorio transversal de planes de mejora: LEE de cada modulo, no sustituye su circuito.
+app.use('/api/plans', requireAuth, plansRouter)
 // Sin requireAuth: es la unica superficie publica del sistema, para que cualquiera con el
 // enlace pueda responder una encuesta externa sin iniciar sesion.
 app.use('/api/public/surveys', surveysPublicRouter)

@@ -9,6 +9,7 @@ import ModulePage from '@/platform/pages/ModulePage'
 import AdherenceConfigPage from '@/platform/pages/AdherenceConfigPage'
 import AdherenceOperationPage from '@/platform/pages/AdherenceOperationPage'
 import AdherenceMyPlansPage from '@/platform/pages/AdherenceMyPlansPage'
+import ImprovementPlansPage from '@/platform/pages/ImprovementPlansPage'
 import HcMatrixWindowPage from '@/modules/adherence/pages/HcMatrixWindowPage'
 import MyAccountPage from '@/platform/pages/MyAccountPage'
 import DesignSystemGalleryPage from '@/platform/pages/DesignSystemGalleryPage'
@@ -156,6 +157,9 @@ function AppRoutes() {
         <Route path="administracion" element={<AdminPage />} />
         <Route path="administracion/:section" element={<AdminPage />} />
         <Route path="mi-cuenta" element={<MyAccountPage />} />
+        {/* Directorio transversal: no lleva guarda de permiso propia porque el servidor
+            ya devuelve solo los modulos que esta persona tiene. */}
+        <Route path="planes-mejora" element={<ImprovementPlansPage />} />
         <Route path="design-system" element={<DesignSystemGalleryPage />} />
         <Route path="adherencia/configuracion" element={<AdherenceConfigRoute />} />
         <Route path="adherencia/operacion" element={<AdherenceOperationRoute />} />

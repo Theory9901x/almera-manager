@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  ChevronsLeft, ChevronsRight, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Minimize2,
-  Pin, RefreshCw, Save, Search, Table2,
+  ChevronsLeft, ChevronsRight, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Lock,
+  Minimize2, Pin, RefreshCw, Save, Search, Table2,
 } from 'lucide-react'
 import { ConfirmDialog } from '@/design-system'
 import type { Criterion, EvaluationRecord, Score, Scope } from '../types'
@@ -234,6 +234,15 @@ export function HcMatrixFullscreen({
           </button>
         </div>
       </header>
+
+      {/* Si esta cerrada, las casillas no dejan calificar. Sin decirlo, quien abre la ventana
+          pulsa una celda, no pasa nada y parece que la ventana esta rota. */}
+      {disabled && (
+        <div className="hcfs-readonly">
+          <Lock size={14} />
+          <span><b>Evaluación cerrada.</b> Se muestra en solo lectura: para volver a calificar hay que reabrirla desde Operación.</span>
+        </div>
+      )}
 
       <div className="hcfs-legend">
         <span className="hcfs-lg"><i className="sc-2">2</i> Cumple</span>

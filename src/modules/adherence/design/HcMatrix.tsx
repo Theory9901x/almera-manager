@@ -15,6 +15,20 @@ import type { LiveCompliance, ScoreMap } from './useLiveCompliance'
  * Sticky en los dos ejes: la columna de criterio se queda al desplazar en horizontal y el
  * encabezado de HC al desplazar en vertical. Sin eso, con 25 columnas se califica a ciegas.
  */
+/**
+ * Clase de una celda de columna de HC. `is-alt` alterna un tinte muy leve columna a columna:
+ * con 25 historias, dos columnas contiguas se veian identicas y era facil calificar la de al lado.
+ * El indice se pasa explicito y no se usa :nth-child porque las columnas que van ANTES (criterio,
+ * peso, %) son opcionales: con nth-child la paridad cambia al ocultar el peso.
+ */
+function columnClass(index: number, isActive: boolean, isPinned?: boolean) {
+  return [
+    index % 2 === 1 ? 'is-alt' : '',
+    isActive ? 'is-active' : '',
+    isPinned ? 'is-pinned' : '',
+  ].filter(Boolean).join(' ')
+}
+
 export function HcMatrix({
   variant, scopes, criteria, records, scores, live, disabled,
   activeRecordId, onFocusRecord, onScore, onRemoveRecord, pinnedRecordIds,
@@ -52,10 +66,10 @@ export function HcMatrix({
           <th className="hcm-criterion">{full ? 'Dimensión / Criterio' : 'Criterio'}</th>
           {showWeights && <th className="hcm-weight">Peso</th>}
           {showPercent && <th className="hcm-pct">% Cumpl.</th>}
-          {records.map(record => (
+          {records.map((record, index) => (
             <th
               key={record.id}
-              className={`hcm-hc${activeRecordId === record.id ? ' is-active' : ''}${pinnedRecordIds?.has(record.id) ? ' is-pinned' : ''}`}
+              className={`hcm-hc ${columnClass(index, activeRecordId === record.id, pinnedRecordIds?.has(record.id))}`}
               id={`hc-col-${record.id}`}
               onPointerEnter={() => onFocusRecord?.(record.id)}
             >
@@ -93,8 +107,8 @@ export function HcMatrix({
                       : <ComplianceRing percent={scopePercent} size={30} strokeWidth={3.5} />}
                   </td>
                 )}
-                {records.map(record => (
-                  <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''} />
+                {records.map((record, index) => (
+                  <td key={record.id} className={columnClass(index, activeRecordId === record.id)} />
                 ))}
               </tr>
               {scopeCriteria.map(criterion => {
@@ -110,8 +124,14 @@ export function HcMatrix({
                           : <ComplianceRing percent={percent} size={28} strokeWidth={3.5} />}
                       </td>
                     )}
-                    {records.map(record => (
-                      <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''}>
+                    {records.map((record, index) => (
+                      // Ahora que el scroll es de la pagina, la cabecera de HC no queda fija: al
+                      // bajar hay que poder saber de que historia es la celda sin volver arriba.
+                      <td
+                        key={record.id}
+                        className={columnClass(index, activeRecordId === record.id)}
+                        title={`HC ${record.record_number} · ${criterion.text}`}
+                      >
                         <ScoreSelector
                           compact={full}
                           value={scores[record.id]?.[criterion.id]}
@@ -133,8 +153,8 @@ export function HcMatrix({
             <td className="hcm-criterion">Observaciones</td>
             {showWeights && <td className="hcm-weight" />}
             {showPercent && <td className="hcm-pct" />}
-            {records.map(record => (
-              <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''}>
+            {records.map((record, index) => (
+              <td key={record.id} className={columnClass(index, activeRecordId === record.id)}>
                 <input
                   className="hcm-obs"
                   defaultValue={record.observations}
@@ -165,10 +185,10 @@ export function HcMatrix({
               </b>
             </td>
           )}
-          {records.map(record => {
+          {records.map((record, index) => {
             const percent = live.byRecord.get(record.id) ?? null
             return (
-              <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''}>
+              <td key={record.id} className={columnClass(index, activeRecordId === record.id)}>
                 <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(1)}%`}</b>
               </td>
             )
