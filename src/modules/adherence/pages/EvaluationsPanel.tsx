@@ -535,6 +535,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                     activeRecordId={activeRecordId}
                     onFocusRecord={setActiveRecordId}
                     onScore={setScore}
+                    onRecordObservation={(recordId, value) => void updateRecordObservations(recordId, value)}
                     onRemoveRecord={!isClosed ? recordId => void removeRecord(recordId) : undefined}
                   />
                 </div>
@@ -612,26 +613,6 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             </Card>
         </aside>
 
-        {detail.records.length > 0 && (
-          <Card accent={identity.color} className="p-5">
-            <p className="ds-eyebrow">Notas</p>
-            <h2 className="mt-1 text-xl font-black">Observaciones por historia clínica</h2>
-            <div className="mt-3 divide-y divide-[var(--border-hairline)]">
-              {detail.records.map(record => (
-                <div key={record.id} className="hc-observations-row">
-                  <strong>HC {record.record_number}</strong>
-                  <input
-                    disabled={isClosed}
-                    defaultValue={record.observations}
-                    onBlur={event => void updateRecordObservations(record.id, event.target.value)}
-                    placeholder="Observación del evaluador para esta HC (opcional)"
-                  />
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
         {/* --- B1..B4: modo ampliado. Recibe el MISMO buffer de calificaciones. --- */}
         <HcMatrixFullscreen
           open={fullscreen}
@@ -650,6 +631,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
           onExportPdf={() => void downloadReport()}
           exporting={busy}
           onOpenWindow={() => void openInWindow()}
+          onRecordObservation={(recordId, value) => void updateRecordObservations(recordId, value)}
         />
 
         <Card accent={identity.color} className="p-5">

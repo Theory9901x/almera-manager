@@ -410,6 +410,14 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   El modo ampliado no es otra tabla, es esta con mas espacio. **Las dos siguen el tema**: la
   paleta del overlay son variables `--hcfs-*` y solo cambian sus valores; estaba clavado en
   oscuro y quien trabaja en claro cambiaba de mundo al expandir.
+- **El ancho manda para la EVALUACION, no para el texto del criterio.** La tabla es
+  `width: max-content; min-width: 100%`, asi que con pocas HC la columna de criterio absorbia
+  todo el sobrante (llego a ~1100 px) y las celdas quedaban aplastadas. Lleva tope fijo
+  (300 px ampliada / 260 px embebida) y el resto se lo reparten las columnas de HC.
+- **Las observaciones por HC van DENTRO de la matriz**, en su ultima fila, en las dos vistas: en
+  el modo ampliado no habia otra tarjeta donde escribirlas, y anotar el porque de un 0 en el
+  momento es justo lo que se pierde si hay que salir de la matriz. Se guardan al salir del campo,
+  no en cada tecla (son hasta 25 columnas).
 - **La vista embebida tiene que servir SOLA**, sin pasar por el modo ampliado. Tres cosas que la
   hacian inutilizable en un portatil de 768 px: el hero grande y los KPIs dejaban la matriz fuera
   de pantalla (ahora hay una barra compacta), el panel de analisis le robaba 300 px de ancho

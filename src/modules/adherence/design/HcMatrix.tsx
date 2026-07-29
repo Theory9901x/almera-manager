@@ -18,7 +18,7 @@ import type { LiveCompliance, ScoreMap } from './useLiveCompliance'
 export function HcMatrix({
   variant, scopes, criteria, records, scores, live, disabled,
   activeRecordId, onFocusRecord, onScore, onRemoveRecord, pinnedRecordIds,
-  showWeights = true, showPercent = true, compact = false,
+  showWeights = true, showPercent = true, compact = false, onRecordObservation,
 }: {
   variant: 'embedded' | 'fullscreen'
   /** «Configurar vista»: en una matriz densa, poder quitar columnas accesorias da aire. */
@@ -38,6 +38,10 @@ export function HcMatrix({
   onRemoveRecord?(recordId: string): void
   /** HC fijadas como referencia: se pintan con un borde propio. */
   pinnedRecordIds?: Set<string>
+  /** Observacion por HC. Si se pasa, la matriz cierra con una fila de observaciones: en el modo
+   *  ampliado no hay otra tarjeta donde escribirlas, y anotar el porque de un 0 en el momento
+   *  es justo lo que se pierde si hay que salir de la matriz para hacerlo. */
+  onRecordObservation?(recordId: string, value: string): void
 }) {
   const full = variant === 'fullscreen'
 
@@ -123,6 +127,32 @@ export function HcMatrix({
             </Fragment>
           )
         })}
+        {/* Observaciones por HC, dentro de la propia matriz. */}
+        {onRecordObservation && (
+          <tr className="hcm-obs-row">
+            <td className="hcm-criterion">Observaciones</td>
+            {showWeights && <td className="hcm-weight" />}
+            {showPercent && <td className="hcm-pct" />}
+            {records.map(record => (
+              <td key={record.id} className={activeRecordId === record.id ? 'is-active' : ''}>
+                <input
+                  className="hcm-obs"
+                  defaultValue={record.observations}
+                  disabled={disabled}
+                  placeholder="Observación…"
+                  title={record.observations || `Observación de la HC ${record.record_number}`}
+                  onFocus={() => onFocusRecord?.(record.id)}
+                  // Al salir del campo, no en cada tecla: son 25 columnas y cada guardado es una
+                  // peticion al servidor.
+                  onBlur={event => {
+                    if (event.target.value !== record.observations) onRecordObservation(record.id, event.target.value)
+                  }}
+                />
+              </td>
+            ))}
+          </tr>
+        )}
+
         {/* Fila de cierre: el % ponderado de cada historia. En la vista embebida tambien sirve,
             pero es en el modo ampliado donde responde la pregunta de las 25 columnas. */}
         <tr className="hcm-total-row">

@@ -57,6 +57,18 @@ export default function HcMatrixWindowPage() {
     setDirty(true)
   }
 
+  /** Observacion de una HC. Se guarda sola (no espera al boton) porque es texto suelto, no
+   *  parte del buffer de calificaciones. */
+  const saveObservation = async (recordId: string, observations: string) => {
+    if (!evaluationId) return
+    try {
+      const record = await adherenceService.updateRecord(evaluationId, recordId, { observations })
+      setDetail(current => current
+        ? { ...current, records: current.records.map(item => item.id === recordId ? record : item) }
+        : current)
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'No fue posible guardar la observación') }
+  }
+
   const save = async () => {
     if (!evaluationId) return
     setSaving(true); setError('')
@@ -91,6 +103,7 @@ export default function HcMatrixWindowPage() {
       live={live}
       disabled={detail.evaluation.status === 'CLOSED'}
       onScore={setScore}
+      onRecordObservation={(recordId, value) => void saveObservation(recordId, value)}
       onSave={() => void save()}
       saving={saving}
       dirty={dirty}

@@ -4,6 +4,7 @@ import {
   ChevronsLeft, ChevronsRight, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Minimize2,
   Pin, RefreshCw, Save, Search, Table2,
 } from 'lucide-react'
+import { ConfirmDialog } from '@/design-system'
 import type { Criterion, EvaluationRecord, Score, Scope } from '../types'
 import { HcMatrix } from './HcMatrix'
 import { colorForPercent } from './scopeColors'
@@ -35,7 +36,7 @@ const csvCell = (value: string | number | null) => {
 export function HcMatrixFullscreen({
   open, onClose, closeLabel, evaluationTitle, evaluationSubtitle, scopes, criteria, records,
   scores, live, disabled, onScore, onSave, saving, onExportPdf, exporting, onOpenWindow, dirty,
-  onReload,
+  onReload, onRecordObservation,
 }: {
   open: boolean
   onClose(): void
@@ -60,6 +61,8 @@ export function HcMatrixFullscreen({
   dirty?: boolean
   /** Solo en la ventana dedicada: recarga desde el servidor para traer lo que se guardó en la otra. */
   onReload?(): void
+  /** Observación por HC: la matriz ampliada también las recoge, sin salir de ella. */
+  onRecordObservation?(recordId: string, value: string): void
 }) {
   const [zoom, setZoom] = useState(100)
   const [stickyColumns, setStickyColumns] = useState(true)
@@ -67,6 +70,9 @@ export function HcMatrixFullscreen({
   const [search, setSearch] = useState('')
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null)
   const [pinned, setPinned] = useState<Set<string>>(new Set())
+  // Confirmacion antes de guardar: desde la matriz ampliada se escribe sobre la evaluacion que
+  // la pantalla principal tiene abierta, y conviene decirlo antes de hacerlo.
+  const [confirmSave, setConfirmSave] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -173,6 +179,23 @@ export function HcMatrixFullscreen({
 
   return createPortal(
     <div className="hcfs" role="dialog" aria-modal="true" aria-label="Matriz de adherencia en pantalla completa">
+      <ConfirmDialog
+        open={confirmSave}
+        title="¿Guardar las calificaciones?"
+        confirmLabel={saving ? 'Guardando…' : 'Sí, guardar'}
+        cancelLabel="Seguir calificando"
+        busy={saving}
+        onCancel={() => setConfirmSave(false)}
+        onConfirm={() => { setConfirmSave(false); onSave() }}
+        description={
+          <p>
+            Se guardan <strong>{live.graded} de {live.totalCells}</strong> celdas calificadas
+            {live.overall !== null ? <> y la adherencia queda en <strong>{live.overall.toFixed(1)} %</strong></> : null}.
+            {' '}El resultado pasa a la pantalla principal de la evaluación.
+          </p>
+        }
+      />
+
       <header className="hcfs-top">
         <div className="hcfs-top-l">
           <span className="hcfs-logo"><Table2 size={17} /></span>
@@ -202,7 +225,7 @@ export function HcMatrixFullscreen({
             </button>
           )}
           {!disabled && (
-            <button className={`hcfs-btn is-pri${dirty ? ' is-dirty' : ''}`} onClick={onSave} disabled={saving}>
+            <button className={`hcfs-btn is-pri${dirty ? ' is-dirty' : ''}`} onClick={() => setConfirmSave(true)} disabled={saving}>
               <Save size={14} /> {saving ? 'Guardando…' : dirty ? 'Guardar cambios' : 'Guardar calificaciones'}
             </button>
           )}
@@ -295,6 +318,7 @@ export function HcMatrixFullscreen({
             activeRecordId={activeRecordId}
             onFocusRecord={setActiveRecordId}
             onScore={onScore}
+            onRecordObservation={onRecordObservation}
             pinnedRecordIds={pinned}
           />
         ) : (

@@ -5789,3 +5789,40 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 :root[data-theme="dark"] .hc-matrix.is-full .hcm-wchip { background: rgba(124, 58, 237, .3); color: #C4B5FD; }
 .hc-matrix.is-full .hcm-w { color: var(--hcfs-soft); }
+
+/* ============================================================================
+   Ancho de la matriz: manda la EVALUACION, no el texto del criterio.
+   La tabla es `width: max-content; min-width: 100%`, asi que con pocas HC la
+   columna de criterio absorbia TODO el sobrante (llegaba a ~1100 px) y las
+   celdas de calificacion quedaban aplastadas a la derecha. Se le pone tope y
+   el sobrante se lo reparten las columnas de HC, que es donde se trabaja.
+   ============================================================================ */
+.hc-matrix th.hcm-criterion,
+.hc-matrix td.hcm-criterion {
+  width: 300px; max-width: 300px;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.hc-matrix.is-embedded th.hcm-criterion,
+.hc-matrix.is-embedded td.hcm-criterion { width: 260px; max-width: 260px; min-width: 200px; }
+/* Las columnas de HC se llevan el resto: mas anchas, mas comodas de calificar. */
+.hcm-hc { min-width: 92px; }
+.hc-matrix.is-full .hcm-hc { min-width: 84px; }
+
+/* Fila de observaciones dentro de la matriz. */
+.hcm-obs-row td { padding: 6px 8px; }
+.hcm-obs-row td.hcm-criterion {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--muted);
+}
+.hcm-obs {
+  width: 100%; min-width: 0; height: 32px; padding: 0 9px;
+  border: 1px solid var(--border-hairline); border-radius: 8px;
+  background: var(--color-surface-soft); color: var(--ink);
+  font-family: inherit; font-size: 11.5px;
+}
+.hcm-obs:focus { outline: none; border-color: var(--m-matrices); background: var(--color-surface-card); }
+.hcm-obs::placeholder { color: var(--muted-light); }
+.hc-matrix.is-full .hcm-obs {
+  background: var(--hcfs-cell); border-color: var(--hcfs-cell-brd); color: var(--hcfs-ink);
+}
+.hc-matrix.is-full .hcm-obs-row td.hcm-criterion { color: var(--hcfs-soft); }
