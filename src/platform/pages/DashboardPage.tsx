@@ -200,7 +200,7 @@ function AuditorHome({ membershipId }: { membershipId: string }) {
             <p className="ds-module-badge" style={{ ['--ds-eyebrow-color' as string]: identity.color }}>Matrices de adherencia</p>
             <h2 className="mt-1 text-lg font-black">Mis evaluaciones en borrador</h2>
           </div>
-          <Link to="/app/adherencia/operacion" className="text-xs font-bold" style={{ color: identity.color }}>Ir a Operación →</Link>
+          <Link to="/app/adherencia/operacion" className="text-xs font-bold ds-accent-link" style={{ ['--row-accent' as string]: identity.color }}>Ir a Operación →</Link>
         </div>
         {drafts.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

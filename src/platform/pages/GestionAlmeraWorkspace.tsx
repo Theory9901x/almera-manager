@@ -39,7 +39,7 @@ export default function GestionAlmeraWorkspace() {
               <button
                 key={key}
                 className={`ds-tabs-item inline-flex items-center gap-2 ${activeTab === key ? 'is-active' : ''}`}
-                style={activeTab === key ? { color: tabIdentity.color, borderBottomColor: tabIdentity.color } : undefined}
+                style={activeTab === key ? ({ ['--tab-accent' as string]: tabIdentity.color }) : undefined}
                 onClick={() => setTab(key)}
               >
                 <Icon size={16} /><span>{label}</span>

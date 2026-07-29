@@ -434,7 +434,7 @@ function PlanDetail({ planId, canManage, myMembershipId, myUserId, onBack }: {
                 <button className="survey-config-add" onClick={() => setReassigning(false)}>Cancelar</button>
               </div>
             ) : (
-              <button className="row-action" style={{ color: identity.color }} onClick={() => setReassigning(true)}>
+              <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => setReassigning(true)}>
                 <UserCheck size={13} /> Reasignar responsable
               </button>
             )}

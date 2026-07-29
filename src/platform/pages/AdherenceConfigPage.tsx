@@ -193,7 +193,7 @@ export default function AdherenceConfigPage() {
             <button
               key={key}
               className={`ds-tabs-item ${section === key ? 'is-active' : ''}`}
-              style={section === key ? { color: identity.color } : undefined}
+              style={section === key ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
               onClick={() => { setSection(key); setSelectedAreaId(null) }}
             >
               {label}
@@ -241,14 +241,16 @@ export default function AdherenceConfigPage() {
 
                       <div className="weight-bar-label">
                         <span>Peso total</span>
-                        <span style={{ color: validWeight ? '#059669' : '#B45309' }}>{Number(area.weight_total).toFixed(0)} / 100</span>
+                        {/* Por clase y no en linea: en oscuro estos cortes se quedan en 3.4 de contraste y hay
+                            que poder aclararlos sin cambiar lo que significan. */}
+                        <span className={validWeight ? 'weight-ok' : 'weight-off'}>{Number(area.weight_total).toFixed(0)} / 100</span>
                       </div>
                       <div className="weight-bar"><div className={`weight-bar-fill ${validWeight ? 'weight-bar-fill--complete' : 'weight-bar-fill--incomplete'}`} style={{ width: `${weightPercent}%` }} /></div>
 
                       <div className="matrix-card-footer">
                         <Badge tone={area.active ? 'info' : 'neutral'}>{area.active ? 'Activa' : 'Inactiva'}</Badge>
                         <div className="flex gap-3">
-                          <button className="row-action" style={{ color: identity.color }} onClick={() => void openArea(area.id)}><Pencil size={14} />Editar matriz</button>
+                          <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => void openArea(area.id)}><Pencil size={14} />Editar matriz</button>
                           <button className="row-action" style={{ color: 'var(--muted)' }} onClick={() => void toggleAreaActive(area)}>{area.active ? 'Desactivar' : 'Activar'}</button>
                         </div>
                       </div>
@@ -265,7 +267,7 @@ export default function AdherenceConfigPage() {
         {section === 'areas' && selectedAreaId && (
           <Card accent={identity.color} className="mt-5 p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <button className="row-action" style={{ color: identity.color }} onClick={() => setSelectedAreaId(null)}><ArrowLeft size={15} />Volver a áreas</button>
+              <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => setSelectedAreaId(null)}><ArrowLeft size={15} />Volver a áreas</button>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[var(--muted)]">Versión vigente: v{versionNumber}</span>
                 {Math.abs(weightTotal - 100) < 0.01
@@ -280,7 +282,7 @@ export default function AdherenceConfigPage() {
                 <div key={scope._key} className="scope-editor">
                   <div className="flex items-center gap-2">
                     <input className="ds-input flex-1 font-bold" value={scope.name} onChange={event => renameScope(scope._key, event.target.value)} placeholder="Nombre del ámbito" />
-                    <button className="row-action" style={{ color: identity.color }} onClick={() => removeScope(scope._key)}><Trash2 size={14} />Quitar ámbito</button>
+                    <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => removeScope(scope._key)}><Trash2 size={14} />Quitar ámbito</button>
                   </div>
                   <div className="grid gap-2">
                     {scope.criteria.length > 0 && (
@@ -297,11 +299,11 @@ export default function AdherenceConfigPage() {
                           <input className="ds-input" type="number" step="0.01" min="0" value={criterion.weight} onChange={event => updateCriterion(scope._key, criterion._key, { weight: event.target.value })} placeholder="Peso" />
                           <span>%</span>
                         </div>
-                        <button className="row-action" style={{ color: identity.color }} onClick={() => removeCriterion(scope._key, criterion._key)}><Trash2 size={14} /></button>
+                        <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => removeCriterion(scope._key, criterion._key)}><Trash2 size={14} /></button>
                       </div>
                     ))}
                   </div>
-                  <button className="row-action" style={{ color: identity.color }} onClick={() => addCriterion(scope._key)}><Plus size={14} />Agregar criterio</button>
+                  <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => addCriterion(scope._key)}><Plus size={14} />Agregar criterio</button>
                 </div>
               ))}
             </div>
@@ -368,7 +370,7 @@ export default function AdherenceConfigPage() {
                       <td>{professional.position_name}</td>
                       <td><Badge tone={professional.active ? 'info' : 'neutral'}>{statusLabels[professional.status]}</Badge></td>
                       <td>{accountLabel(professional.membership_id) ? <span className="inline-flex items-center gap-1 text-xs text-[var(--muted)]"><Link2 size={12} />{accountLabel(professional.membership_id)}</span> : <span className="text-xs text-[var(--muted)]">Sin vincular</span>}</td>
-                      <td><button className="row-action" style={{ color: identity.color }} onClick={() => startEditProfessional(professional)}><Pencil size={14} />Editar</button></td>
+                      <td><button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => startEditProfessional(professional)}><Pencil size={14} />Editar</button></td>
                     </tr>
                   ))}
                   {!professionals.length && <tr><td colSpan={6}><div className="almera-empty"><Users size={30} /><p>No hay profesionales registrados.</p></div></td></tr>}
@@ -400,7 +402,7 @@ export default function AdherenceConfigPage() {
                     <tr key={position.id}>
                       <td><strong>{position.name}</strong></td>
                       <td><Badge tone={position.active ? 'info' : 'neutral'}>{position.active ? 'Activo' : 'Inactivo'}</Badge></td>
-                      <td><button className="row-action" style={{ color: identity.color }} onClick={() => void togglePositionActive(position)}>{position.active ? 'Desactivar' : 'Activar'}</button></td>
+                      <td><button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => void togglePositionActive(position)}>{position.active ? 'Desactivar' : 'Activar'}</button></td>
                     </tr>
                   ))}
                   {!positions.length && <tr><td colSpan={3}><div className="almera-empty"><Briefcase size={30} /><p>No hay cargos registrados.</p></div></td></tr>}

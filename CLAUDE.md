@@ -399,6 +399,28 @@ página y visor propio de PDF.
   estados van con `data-status` y el color en CSS, con su override en oscuro.
 - **Un tinte al 15 % del propio color no basta para leer 11 px en negrita**: los tonos medios se
   quedaban en 2.3 de contraste. El tinte da el color; el texto va un paso más profundo.
+- **El tema oscuro se audita MIDIENDO CADA TEXTO contra su fondo efectivo, no el contenedor.** El
+  método que funcionó: recorrer los elementos con texto propio, componer los alfas subiendo por los
+  ancestros hasta un fondo opaco, y comparar. Dos trampas del propio medidor: un ancestro con
+  **gradiente** tapa lo de detrás pero su `backgroundColor` es transparente, así que sin cortar ahí
+  un hero oscuro sale como «blanco sobre blanco» (falso positivo); y Chrome devuelve
+  `oklch()`/`color-mix()` **sin convertir** en `getComputedStyle` (§5.2), así que leer sus tres
+  números como r,g,b da contrastes inventados — hay que resolverlos pintando en un `<canvas>`.
+  Así bajó de 87 hallazgos a 0 en las 14 rutas.
+- **Un módulo que define sus PROPIAS superficies necesita su propio override oscuro.** Huella de
+  Carbono declaraba `--surface-0/1/2` y `--border-subtle` con valores de papel: en oscuro sus
+  paneles seguían blancos con el texto ya claro encima (contraste 1.04) y el módulo entero era
+  ilegible. Se remapean sus tokens en un bloque; no hay que tocar ninguna de sus 55 reglas.
+- **`style={{ color: identity.color }}` es un anti-patrón**: un color en línea gana al CSS y el
+  tema oscuro no puede aclararlo, y la identidad está calculada a luminosidad 0.55 **para papel**
+  (sobre fondo oscuro cae a 3.0-3.6). El acento va como **variable** — `--row-accent` para
+  `.row-action` y `.ds-accent-link`, `--tab-accent` para las pestañas — y el CSS decide por tema.
+  Ojo al refactorizar en lote: en los **iconos** del sidebar el color en línea sí es lo correcto.
+- **Lo que NO se toca por contraste**: los cuatro colores del semáforo (§5.1) y el gris `--muted`.
+  El semáforo está fijado por decisión del usuario y compartido con el PDF; cambiarlo rompería la
+  paridad pantalla↔informe. Quedan un puñado de hallazgos en tema CLARO por eso, a propósito.
+- **El sidebar es oscuro en LOS DOS temas.** Sus correcciones de contraste no van dentro de
+  `[data-theme="dark"]`, o solo arreglan la mitad de los casos.
 - **Carpeta nueva que el servidor importe en runtime = hay que sumarla a `PAYLOAD` en
   `scripts/deploy-manual.sh`.** Añadí `shared/adherenceScoring.mjs`, el deploy no lo empaquetó y
   el arranque murió en `ERR_MODULE_NOT_FOUND` con la app en **502**. `npm run check` y
@@ -583,6 +605,15 @@ pierde quién responde por cada cosa.
   consulta, no en el cliente.
 - **`Fecha` no es «Fecha límite»**: solo los planes de matrices tienen plazo. En Listas se muestra
   la fecha de la auditoría y se dice que lo es, con una etiqueta debajo.
+- **Filtros y paginación EN SQL.** Las dos fuentes tienen columnas distintas, así que la tentación
+  es traerlo todo y filtrar en Node; con eso, una entidad con miles de planes se trae miles de filas
+  en cada carga. Cada fuente filtra y cuenta en su propia consulta y el handler solo mezcla **la
+  ventana** de la página. El `WHERE` se construye una vez y lo comparten la consulta de filas y la
+  de conteo: si divergen, el contador dice 40 y la tabla muestra 12. Un estado que no existe en un
+  módulo (`POR_VERIFICAR` en Matrices) mete un `FALSE`, no se omite el filtro.
+- **El resumen por módulo cuenta SIN los filtros de la vista**: son las tarjetas con las que se
+  navega, y si cambiaran al filtrar dejarían de ser referencia. El export recorre **todas** las
+  páginas: exportar lo que hay en memoria daría 25 filas y parecería que eso es todo.
 - La flecha de cada fila lleva **a su módulo**. Para adherencia usa
   `/app/adherencia/operacion?evaluacion=<id>`, que `EvaluationsPanel` lee al montar y **limpia
   después** (si no, recargar reabriría siempre lo mismo y pelearía con «volver al listado»).

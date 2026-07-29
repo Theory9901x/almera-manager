@@ -147,7 +147,7 @@ function ChecklistBuilderContent() {
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 checklists-page-bg">
-      <button className="row-action" style={{ color: identity.color }} onClick={() => navigate('/app/listas-chequeo')}>
+      <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => navigate('/app/listas-chequeo')}>
         <ArrowLeft size={15} /> Volver a listas
       </button>
 
@@ -186,7 +186,7 @@ function ChecklistBuilderContent() {
             <button
               key={key}
               className={`ds-tabs-item ${section === key ? 'is-active' : ''}`}
-              style={section === key ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+              style={section === key ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
               onClick={() => setSection(key)}
             >
               {label}

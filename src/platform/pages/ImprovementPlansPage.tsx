@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowUpRight, ClipboardList, Download, Search, X } from 'lucide-react'
+import {
+  AlertTriangle, ArrowUpRight, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  ClipboardList, Download, Search, X,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Input, PageHeader, Select, moduleIdentity } from '@/design-system'
 
@@ -58,6 +61,8 @@ function formatDate(value: string | null) {
   return new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const PAGE_SIZES = [25, 50, 100]
+
 export default function ImprovementPlansPage() {
   const [rows, setRows] = useState<PlanRow[]>([])
   const [summary, setSummary] = useState<ModuleSummary[]>([])
@@ -67,35 +72,54 @@ export default function ImprovementPlansPage() {
   const [moduleFilter, setModuleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
+  // Paginacion EN EL SERVIDOR: con miles de planes, traerlos todos para filtrar en el navegador
+  // es lo que hace que la pagina tarde en abrir aunque solo se miren 25.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [total, setTotal] = useState(0)
+  const [pages, setPages] = useState(1)
+
+  // La busqueda va con retardo: una peticion por pulsacion es un ataque a la propia base.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  // Cualquier cambio de filtro vuelve a la primera pagina: quedarse en la 7 de un resultado de 2
+  // muestra una lista vacia que parece «no hay nada».
+  useEffect(() => { setPage(1) }, [moduleFilter, statusFilter, debouncedSearch, pageSize])
 
   useEffect(() => {
-    fetch('/api/plans', { credentials: 'same-origin' })
+    setLoading(true)
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (moduleFilter) params.set('module', moduleFilter)
+    if (statusFilter) params.set('status', statusFilter)
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    let cancelled = false
+    fetch(`/api/plans?${params}`, { credentials: 'same-origin' })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'No fue posible cargar los planes de mejora')
         return data
       })
-      .then(data => { setRows(data.rows); setSummary(data.summary) })
-      .catch(caught => setError(caught instanceof Error ? caught.message : 'No fue posible cargar los planes'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase()
-    return rows.filter(row => {
-      if (moduleFilter && row.moduleKey !== moduleFilter) return false
-      if (statusFilter && row.normalizedStatus !== statusFilter) return false
-      if (!needle) return true
-      // Se busca por lo que la gente tiene a mano: el ID, la persona, el instrumento o el texto.
-      return [row.code, row.subjectName, row.responsibleName, row.instrumentName, row.description, row.center, row.service]
-        .some(field => String(field || '').toLowerCase().includes(needle))
-    })
-  }, [rows, moduleFilter, statusFilter, search])
+      .then(data => {
+        if (cancelled) return
+        setRows(data.rows); setSummary(data.summary)
+        setTotal(data.total); setPages(data.pages)
+        // El servidor acota la pagina al rango real; se acepta lo que devuelve.
+        if (data.page !== page) setPage(data.page)
+        setError('')
+      })
+      .catch(caught => { if (!cancelled) setError(caught instanceof Error ? caught.message : 'No fue posible cargar los planes') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [page, pageSize, moduleFilter, statusFilter, debouncedSearch])
 
   /** Agrupado por modulo: cada grupo es su propia tabla, con su color y su etiqueta. */
   const groups = useMemo(() => {
     const byModule = new Map<string, PlanRow[]>()
-    for (const row of filtered) {
+    for (const row of rows) {
       const bucket = byModule.get(row.moduleKey) || []
       bucket.push(row)
       byModule.set(row.moduleKey, bucket)
@@ -106,26 +130,55 @@ export default function ImprovementPlansPage() {
       identity: moduleIdentity(moduleKey),
       rows: moduleRows,
     }))
-  }, [filtered])
+  }, [rows])
 
-  const exportCsv = () => {
-    const header = ['ID', 'Modulo', 'Origen', 'Instrumento', 'Sujeto', 'Responsable', 'Descripcion', 'Estado', 'Avance', 'Fecha limite', 'Centro', 'Servicio', 'Creado']
-    const lines = filtered.map(row => [
-      row.code, row.moduleLabel, row.sourceLabel, row.instrumentName, row.subjectName, row.responsibleName,
-      row.description, row.statusLabel, row.progressPercent === null ? '' : `${row.progressPercent}%`,
-      row.plannedEndDate ? String(row.plannedEndDate).slice(0, 10) : '',
-      row.center, row.service, String(row.createdAt).slice(0, 10),
-    ])
-    // El punto y coma es el separador que Excel en español espera; con coma parte mal las celdas.
-    const csv = [header, ...lines]
-      .map(cells => cells.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(';'))
-      .join('\n')
-    const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'planes-de-mejora.csv'
-    anchor.click()
-    URL.revokeObjectURL(url)
+  // Rango que se esta viendo, para que «1–25 de 340» diga la verdad tambien en la ultima pagina.
+  const desde = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const hasta = Math.min(page * pageSize, total)
+
+  const [exporting, setExporting] = useState(false)
+
+  /**
+   * Exporta el conjunto FILTRADO COMPLETO, no la pagina que se ve. Con paginacion en el servidor,
+   * exportar lo que hay en memoria daria 25 filas y el usuario creeria que eso es todo.
+   */
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const all: PlanRow[] = []
+      for (let current = 1; ; current += 1) {
+        const params = new URLSearchParams({ page: String(current), pageSize: '100' })
+        if (moduleFilter) params.set('module', moduleFilter)
+        if (statusFilter) params.set('status', statusFilter)
+        if (debouncedSearch) params.set('search', debouncedSearch)
+        const response = await fetch(`/api/plans?${params}`, { credentials: 'same-origin' })
+        if (!response.ok) throw new Error('No fue posible exportar')
+        const data = await response.json()
+        all.push(...data.rows)
+        if (current >= data.pages || !data.rows.length) break
+      }
+      const header = ['ID', 'Modulo', 'Origen', 'Instrumento', 'Sujeto', 'Responsable', 'Descripcion', 'Estado', 'Avance', 'Fecha limite', 'Centro', 'Servicio', 'Creado']
+      const lines = all.map(row => [
+        row.code, row.moduleLabel, row.sourceLabel, row.instrumentName, row.subjectName, row.responsibleName,
+        row.description, row.statusLabel, row.progressPercent === null ? '' : `${row.progressPercent}%`,
+        row.plannedEndDate ? String(row.plannedEndDate).slice(0, 10) : '',
+        row.center, row.service, String(row.createdAt).slice(0, 10),
+      ])
+      // El punto y coma es el separador que Excel en español espera; con coma parte mal las celdas.
+      const csv = [header, ...lines]
+        .map(cells => cells.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(';'))
+        .join('\r\n')
+      // BOM: sin el, Excel en Windows abre el archivo en la codificacion del sistema y los
+      // acentos llegan hechos un jeroglifico.
+      const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'planes-de-mejora.csv'
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No fue posible exportar')
+    } finally { setExporting(false) }
   }
 
   return (
@@ -187,8 +240,8 @@ export default function ImprovementPlansPage() {
               ...(Object.keys(STATUS) as NormalizedStatus[]).map(key => ({ value: key, label: STATUS[key].label })),
             ]}
           />
-          <button className="row-action" onClick={exportCsv} disabled={!filtered.length}>
-            <Download size={15} />Exportar
+          <button className="row-action" onClick={() => void exportCsv()} disabled={exporting || !total}>
+            <Download size={15} />{exporting ? 'Exportando…' : `Exportar ${total}`}
           </button>
         </div>
 
@@ -268,6 +321,41 @@ export default function ImprovementPlansPage() {
                 </div>
               </section>
             ))}
+          </div>
+        )}
+
+        {/* Paginacion. Se muestra siempre que haya mas de una pagina, y el conteo va aunque no la
+            haya: saber que son 12 de 12 es informacion, no ruido. */}
+        {total > 0 && (
+          <div className="pmx-pager">
+            <span className="pmx-pager-count">
+              {desde}–{hasta} de {total} {total === 1 ? 'plan' : 'planes'}
+            </span>
+            <label className="pmx-pager-size">
+              <span>Por página</span>
+              <Select
+                value={String(pageSize)}
+                onChange={value => setPageSize(Number(value))}
+                options={PAGE_SIZES.map(size => ({ value: String(size), label: String(size) }))}
+              />
+            </label>
+            {pages > 1 && (
+              <div className="pmx-pager-nav">
+                <button onClick={() => setPage(1)} disabled={page === 1} title="Primera página">
+                  <ChevronsLeft size={15} />
+                </button>
+                <button onClick={() => setPage(page - 1)} disabled={page === 1} title="Anterior">
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="pmx-pager-page">Página <b>{page}</b> de {pages}</span>
+                <button onClick={() => setPage(page + 1)} disabled={page >= pages} title="Siguiente">
+                  <ChevronRight size={15} />
+                </button>
+                <button onClick={() => setPage(pages)} disabled={page >= pages} title="Última página">
+                  <ChevronsRight size={15} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

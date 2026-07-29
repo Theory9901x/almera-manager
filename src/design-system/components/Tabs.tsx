@@ -15,7 +15,10 @@ export function Tabs({ items, active, onChange, identity = DEFAULT_MODULE_IDENTI
         <button
           key={item.key}
           className={`ds-tabs-item ${active === item.key ? 'is-active' : ''}`}
-          style={active === item.key ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+          // El acento va como VARIABLE, no como color en linea: un color en linea gana al CSS y
+          // no se puede aclarar en tema oscuro, donde la identidad a luminosidad 0.55 se queda
+          // en 3.2 de contraste sobre el fondo.
+          style={active === item.key ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
           onClick={() => onChange(item.key)}
         >
           {item.label}

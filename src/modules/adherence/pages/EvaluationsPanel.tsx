@@ -960,7 +960,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                   <td className="tabular-col">{evaluation.overall_compliance === null ? '—' : `${Number(evaluation.overall_compliance).toFixed(1)}%`}</td>
                   <td><ConceptBadge concept={evaluation.concept as Concept | null} size="sm" /></td>
                   <td><Badge tone={evaluation.status === 'CLOSED' ? 'info' : 'neutral'}>{evaluation.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}</Badge></td>
-                  <td><button className="row-action" style={{ color: identity.color }} onClick={() => void openEvaluation(evaluation.id)}>Abrir</button></td>
+                  <td><button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => void openEvaluation(evaluation.id)}>Abrir</button></td>
                 </tr>
               ))}
               {!evaluations.length && <tr><td colSpan={8}><div className="almera-empty"><ClipboardList size={30} /><p>Aún no hay evaluaciones registradas.</p></div></td></tr>}

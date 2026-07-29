@@ -59,7 +59,7 @@ export default function AdminPage() {
             key={id}
             onClick={() => navigate(`/app/administracion/${id}`)}
             className={`ds-tabs-item inline-flex items-center gap-2 ${tab === id ? 'is-active' : ''}`}
-            style={tab === id ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            style={tab === id ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
           >
             <Icon size={16} />{label}
           </button>
@@ -129,7 +129,7 @@ function UsersPanel({ data, reload, done }: PanelProps) {
                 <td className="text-sm text-[var(--muted)]">{user.position_name || '—'}</td>
                 <td><Badge tone={user.membership_active ? 'info' : 'neutral'}>{user.membership_active ? 'Activo' : 'Inactivo'}</Badge></td>
                 <td><span className="font-mono text-xs text-[var(--muted)]">{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Sin registro'}</span></td>
-                <td><span className="row-action" style={{ color: identity.color }}>Ver <ChevronRight size={14} /></span></td>
+                <td><span className="row-action" style={{ ['--row-accent' as string]: identity.color }}>Ver <ChevronRight size={14} /></span></td>
               </tr>
             )
           })}</tbody>

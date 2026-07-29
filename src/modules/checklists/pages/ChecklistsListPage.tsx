@@ -220,22 +220,22 @@ function ChecklistsListContent() {
         <nav className="ds-tabs" aria-label="Secciones de listas de chequeo">
           <button
             className={`ds-tabs-item ${section === 'auditorias' ? 'is-active' : ''}`}
-            style={section === 'auditorias' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            style={section === 'auditorias' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
             onClick={() => setSection('auditorias')}
           >Auditorías</button>
           <button
             className={`ds-tabs-item ${section === 'dashboard' ? 'is-active' : ''}`}
-            style={section === 'dashboard' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            style={section === 'dashboard' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
             onClick={() => setSection('dashboard')}
           ><LayoutDashboard size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Dashboard</button>
           <button
             className={`ds-tabs-item ${section === 'repositorio' ? 'is-active' : ''}`}
-            style={section === 'repositorio' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            style={section === 'repositorio' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
             onClick={() => setSection('repositorio')}
           ><Archive size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Repositorio</button>
           <button
             className={`ds-tabs-item ${section === 'analitica' ? 'is-active' : ''}`}
-            style={section === 'analitica' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+            style={section === 'analitica' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
             onClick={() => setSection('analitica')}
           ><BarChart3 size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Centro de datos</button>
           {/* Es una pagina propia, no una pestaña interna: el colaborador entra a ella directo
@@ -247,7 +247,7 @@ function ChecklistsListContent() {
           {canManage && (
             <button
               className={`ds-tabs-item ${section === 'listas' ? 'is-active' : ''}`}
-              style={section === 'listas' ? { color: identity.color, borderBottomColor: identity.color } : undefined}
+              style={section === 'listas' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
               onClick={() => setSection('listas')}
             >Listas institucionales</button>
           )}
@@ -369,7 +369,7 @@ function ChecklistsListContent() {
                             <td><Badge tone={audit.status === 'CERRADA' ? 'info' : 'neutral'}>{audit.status === 'CERRADA' ? 'Cerrada' : 'Borrador'}</Badge></td>
                             <td>
                               <div className="row-action-group">
-                                <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/auditorias/${audit.id}`)}>
+                                <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => navigate(`/app/listas-chequeo/auditorias/${audit.id}`)}>
                                   <Pencil size={13} /> {audit.status === 'CERRADA' ? 'Ver y editar' : 'Continuar'}
                                 </button>
                                 {canManage && (
@@ -528,12 +528,12 @@ function ChecklistsListContent() {
                             <td>
                               <div className="row-action-group">
                                 {canFill && (
-                                  <button className="row-action is-strong" style={{ color: identity.color }}
+                                  <button className="row-action is-strong" style={{ ['--row-accent' as string]: identity.color }}
                                           disabled={busy} onClick={() => setStarting({ id: template.id, name: template.name })}>
                                     <Play size={13} /> Auditar en tablet
                                   </button>
                                 )}
-                                <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/vista-previa`)}>
+                                <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/vista-previa`)}>
                                   <Eye size={13} /> Ver
                                 </button>
                                 {/* El PDF en blanco es respaldo (cotejar contra el formato impreso, o
@@ -543,7 +543,7 @@ function ChecklistsListContent() {
                                    href={checklistsService.formatUrl(template.id)} target="_blank" rel="noreferrer">
                                   <FileText size={13} /> PDF
                                 </a>
-                                <button className="row-action" style={{ color: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
+                                <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => navigate(`/app/listas-chequeo/${template.id}/constructor`)}>
                                   <Pencil size={13} /> Editar
                                 </button>
                               </div>

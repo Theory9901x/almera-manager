@@ -268,17 +268,17 @@ export function RepositoryPanel({ canManage }: { canManage: boolean }) {
                       <td><Badge tone={row.status === 'CERRADA' ? 'info' : 'neutral'}>{row.status === 'CERRADA' ? 'Cerrada' : 'Borrador'}</Badge></td>
                       <td>
                         <div className="row-action-group">
-                          <button className="row-action" style={{ color: identity.color }} title="Ver el detalle completo"
+                          <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} title="Ver el detalle completo"
                                   onClick={() => navigate(`/app/listas-chequeo/auditorias/${row.id}`)}>
                             <Eye size={13} /> Ver
                           </button>
                           {row.status === 'CERRADA' && (
-                            <a className="row-action" style={{ color: identity.color }} title="Descargar su informe PDF"
+                            <a className="row-action" style={{ ['--row-accent' as string]: identity.color }} title="Descargar su informe PDF"
                                href={`/api/checklists/audits/${row.id}/report.pdf`} target="_blank" rel="noreferrer">
                               <Download size={13} />
                             </a>
                           )}
-                          <button className="row-action" style={{ color: identity.color }} title="Abrir para editar"
+                          <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} title="Abrir para editar"
                                   onClick={() => navigate(`/app/listas-chequeo/auditorias/${row.id}`)}>
                             <PenLine size={13} />
                           </button>

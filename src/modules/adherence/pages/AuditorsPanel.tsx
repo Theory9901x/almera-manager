@@ -85,7 +85,7 @@ export default function AuditorsPanel({ areas }: { areas: Area[] }) {
                     {!areas.length && <span className="text-xs text-[var(--muted)]">No hay áreas creadas todavía</span>}
                   </div>
                 </td>
-                <td><button className="row-action" style={{ color: identity.color }} onClick={() => void save(auditor.membership_id)} disabled={busy}><Save size={14} />Guardar</button></td>
+                <td><button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => void save(auditor.membership_id)} disabled={busy}><Save size={14} />Guardar</button></td>
               </tr>
             ))}
             {!auditors.length && <tr><td colSpan={4}><div className="almera-empty"><ShieldCheck size={30} /><p>Ningún usuario tiene el módulo habilitado todavía. Asígnalo desde Administración → Roles y permisos.</p></div></td></tr>}

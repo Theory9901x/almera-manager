@@ -45,7 +45,7 @@ export default function AdherenceOperationPage() {
             <button
               key={key}
               className={`ds-tabs-item ${section === key ? 'is-active' : ''}`}
-              style={section === key ? { color: identity.color } : undefined}
+              style={section === key ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
               onClick={() => { setSection(key); setSearchParams(key === 'dashboard' ? { tab: 'dashboard' } : {}) }}
             >
               {label}

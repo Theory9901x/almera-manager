@@ -513,7 +513,9 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .sidebar-section { margin-bottom: var(--space-5); }
 .sidebar-section-header {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
-  color: rgba(255,255,255,.38); padding: 0 16px; margin: 0 0 var(--space-2);
+  /* El sidebar es oscuro en LOS DOS temas: al 38 % este rotulo se quedaba en 3.56 de
+     contraste tambien en claro. Es la unica etiqueta que ordena el menu. */
+  color: rgba(255,255,255,.58); padding: 0 16px; margin: 0 0 var(--space-2);
 }
 .sidebar-section + .sidebar-section { padding-top: var(--space-4); border-top: 1px solid rgba(255,255,255,.06); }
 .sidebar-item {
@@ -700,7 +702,7 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .filter-primary{display:grid;grid-template-columns:minmax(240px,.75fr) minmax(480px,1.75fr);align-items:end;gap:18px;padding:18px 20px 20px}.filter-field{display:grid;min-width:0;gap:6px}.filter-field>span,.filter-status legend,.filter-date-range>span{color:#344054;font-size:9px;font-weight:790;letter-spacing:.035em;text-transform:uppercase}.filter-field select,.filter-date-range input{width:100%;height:41px;border:1px solid #aeb9c8;border-radius:10px;background:#fff;padding:0 11px;color:#172033;font-size:11px;font-weight:580;outline:0}.filter-field select:focus,.filter-date-range input:focus{border-color:#c7192d;box-shadow:0 0 0 3px rgba(199,25,45,.09)}.filter-status{min-width:0;margin:0;border:0;padding:0}.filter-status legend{margin-bottom:6px}.filter-status>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:3px;border:1px solid #c1cbd7;border-radius:11px;background:#e9eef4;padding:3px}.filter-status button{min-width:0;height:33px;overflow:hidden;border:0;border-radius:8px;background:transparent;padding:0 8px;color:#526074;font-size:10px;font-weight:680;text-overflow:ellipsis;white-space:nowrap}.filter-status button:hover{background:rgba(255,255,255,.72);color:#172033}.filter-status button.active{background:#fff;color:#a81426;font-weight:790;box-shadow:0 1px 4px rgba(20,27,45,.15)}
 .filter-advanced{display:grid;grid-template-columns:minmax(250px,.8fr) minmax(400px,1.2fr);align-items:end;gap:18px;border-top:1px solid var(--border-hairline);background:#f1f4f8;padding:18px 20px 20px}.filter-date-range{display:grid;gap:6px}.filter-date-range>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}.filter-date-range label{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px;color:#667085;font-size:9px;font-weight:700}.filter-date-range input{min-width:0}
 .work-icon.warning{background:#fff7e7;color:#b36d00}.almera-work-list button .ui-badge{margin-left:auto}.almera-empty svg{margin:auto;color:var(--success)}.almera-empty p{margin:8px 0 0}.panel-link{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;border:0;border-top:1px solid var(--line);background:#fff;padding:12px;color:var(--brand);font-size:11px;font-weight:750}
-.table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #e7eaf0}.table-toolbar .almera-panel-title{flex:1;border-bottom:0}.table-toolbar>label{display:flex;width:min(360px,42%);align-items:center;gap:8px;margin-right:18px;border:1px solid #dce1e9;border-radius:99px;padding:0 13px;color:var(--muted)}.table-toolbar input{min-width:0;height:40px;flex:1;border:0;background:transparent;outline:0}.assistance-table tr.is-overdue{background:#fffafb}.assistance-table td{vertical-align:middle}.assistance-table td>strong{display:block}.warning-text{color:#a15f00!important;font-weight:800}.row-action{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:var(--brand);font-size:10px;font-weight:800;white-space:nowrap}
+.table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #e7eaf0}.table-toolbar .almera-panel-title{flex:1;border-bottom:0}.table-toolbar>label{display:flex;width:min(360px,42%);align-items:center;gap:8px;margin-right:18px;border:1px solid #dce1e9;border-radius:99px;padding:0 13px;color:var(--muted)}.table-toolbar input{min-width:0;height:40px;flex:1;border:0;background:transparent;outline:0}.assistance-table tr.is-overdue{background:#fffafb}.assistance-table td{vertical-align:middle}.assistance-table td>strong{display:block}.warning-text{color:#a15f00!important;font-weight:800}.row-action{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:var(--row-accent,var(--brand));font-size:10px;font-weight:800;white-space:nowrap}
 .progress-cell{display:flex;min-width:115px;align-items:center;gap:8px}.progress-cell>span{height:7px;flex:1;overflow:hidden;border-radius:99px;background:#e8ebf0}.progress-cell i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#c7192d,#f05668)}.progress-cell strong{width:32px;font-size:10px;text-align:right}
 .analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.analytics-list{display:grid;gap:12px;padding:18px;max-height:640px;overflow:auto}.analytics-list article header{display:flex;justify-content:space-between;gap:12px}.analytics-list article span{font-size:11px;font-weight:700}.analytics-list article strong{font-size:11px}.analytics-list article>div{height:6px;overflow:hidden;margin-top:7px;border-radius:99px;background:#e9ecf1}.analytics-list article i{display:block;height:100%;border-radius:inherit;background:var(--gradient-brand)}.analytics-list article small{display:block;margin-top:5px;color:var(--muted);font-size:9px}
 .detail-modal{align-items:start;overflow:auto}.assistance-detail{width:min(1180px,100%);max-height:none}.user-detail{width:min(720px,100%);max-height:none}.detail-summary{display:flex;align-items:center;gap:12px;margin:17px 0;border:1px solid var(--line);border-radius:14px;background:#f8fafc;padding:11px 13px}.detail-summary>span:not(.ui-badge){display:flex;align-items:center;gap:5px;color:var(--muted);font-size:10px}.detail-summary .progress-cell{margin-left:auto;width:190px}.detail-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr);gap:14px}.detail-main,.detail-side{display:grid;align-content:start;gap:14px}.detail-block{display:grid;gap:12px;border:1px solid #e4e8ef;border-radius:17px;background:#fff;padding:17px}.detail-block h3{display:flex;align-items:center;gap:7px;margin:0;font-size:13px}.detail-block>p{margin:0;color:var(--ink-soft);font-size:12px;line-height:1.65}.detail-block dl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}.detail-block dl div{border-radius:11px;background:#f5f7fa;padding:10px}.detail-block dt{color:var(--muted);font-size:8px;font-weight:800;text-transform:uppercase}.detail-block dd{margin:4px 0 0;font-size:10px;font-weight:700}.detail-block .ui-button{justify-content:center}.progress-editor{display:grid;grid-template-columns:1fr 74px;align-items:end;gap:10px}.progress-editor label{color:var(--muted);font-size:10px;font-weight:700}.progress-editor label strong{float:right;color:var(--brand)}.progress-editor input[type=range]{width:100%;margin-top:8px;accent-color:var(--brand)}.progress-editor>input{height:40px;border:1px solid var(--line);border-radius:10px;padding:0 10px}
@@ -1692,7 +1694,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-module-badge {
   display: inline-flex; align-items: center; gap: 6px; margin: 0 0 var(--space-3);
   border-radius: var(--radius-xs); background: color-mix(in srgb, var(--ds-eyebrow-color, var(--brand)) 12%, transparent);
-  padding: 4px 10px; font-size: 12px; font-weight: var(--weight-semibold); color: var(--ds-eyebrow-color, var(--brand));
+  padding: 4px 10px; font-size: 12px; font-weight: var(--weight-semibold);
+  /* Un pelo mas profundo que el acento: sobre su propio tinte al 12 % el color puro se
+     queda en 4.3, y a 12 px el minimo legible es 4.5. */
+  color: color-mix(in oklch, var(--ds-eyebrow-color, var(--brand)) 92%, black);
 }
 
 /* Agrupa accesos rapidos del dashboard por area — la separacion entre grupos es espacio (escala de
@@ -1812,7 +1817,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .matrix-card-stats { display: flex; gap: var(--space-4); margin: var(--space-3) 0; }
 .matrix-card-stat { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
 .matrix-card-stat svg { color: var(--m-matrices); flex: none; }
-.matrix-card-empty-hint { font-size: 12px; color: var(--muted-light); font-style: italic; margin: var(--space-2) 0; }
+/* `--muted-light` es el gris mas tenue de la escala, para una nota al pie. Esto no es una
+   nota: es la instruccion de que hacer con una matriz vacia, y a 2.59 de contraste no se
+   leia en claro. */
+.matrix-card-empty-hint { font-size: 12px; color: var(--muted); font-style: italic; margin: var(--space-2) 0; }
 .matrix-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: var(--space-3); }
 
 .weight-bar { height: 8px; border-radius: 999px; background: #eceef2; overflow: hidden; margin-top: 6px; }
@@ -1931,7 +1939,9 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-datepicker-trigger:hover { border-color: color-mix(in srgb, var(--ds-accent, #4F46E5) 40%, var(--border-hairline)); }
 .ds-datepicker-trigger:focus-visible, .ds-datepicker-trigger[data-state="open"] { border-color: var(--ds-accent, #4F46E5); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-accent, #4F46E5) 14%, transparent); }
 .ds-datepicker-trigger:disabled { opacity: .6; cursor: not-allowed; }
-.ds-datepicker-placeholder { color: #9aa5b8; font-weight: 400; }
+/* «Selecciona una fecha» no es decoracion, es la instruccion del campo: a #9aa5b8 sobre
+   blanco quedaba en 2.49 de contraste. Se oscurece al gris tenue del sistema, que si se lee. */
+.ds-datepicker-placeholder { color: var(--muted); font-weight: 400; }
 .ds-datepicker-content {
   z-index: var(--z-portal);
   z-index: 90; width: 272px; border: 1px solid var(--border-hairline); border-radius: 14px; background: #fff;
@@ -1960,6 +1970,9 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border-hairline); }
 .ds-tabs-item { position: relative; border: 0; background: transparent; padding: 10px 2px; font-size: 12.5px; font-weight: 750; color: var(--muted); cursor: pointer; transition: color 150ms ease; }
 .ds-tabs-item:hover { color: var(--ink); }
+/* El acento de la pestana activa llega como --tab-accent (variable, no color en linea) para que
+   el tema oscuro pueda aclararlo: la identidad esta calculada para papel. */
+.ds-tabs-item.is-active { color: var(--tab-accent, var(--brand)); border-bottom-color: var(--tab-accent, var(--brand)); }
 /* Indicador deslizante compartido entre pestanas (framer-motion layoutId) — se anima solo entre
    posiciones al cambiar de pestana, en vez de un subrayado que aparece/desaparece de golpe. */
 .ds-tabs-indicator { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--tab-accent, var(--brand)); }
@@ -3781,11 +3794,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   display: inline-flex; align-items: center; gap: 8px;
   min-height: 40px; padding: 8px 12px; width: 100%;
   border: 1px solid var(--line); border-radius: 10px;
-  background: transparent; color: var(--muted);
+  /* Vive en el sidebar, que es oscuro en los dos temas: --muted (gris para lienzo claro)
+     se quedaba en 3.79. */
+  background: transparent; color: rgba(255,255,255,.72);
   font-size: 12.5px; font-weight: 650; cursor: pointer;
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
-.theme-toggle:hover { color: var(--ink); border-color: var(--line-strong); }
+.theme-toggle:hover { color: #fff; border-color: rgba(255,255,255,.28); }
 .theme-toggle svg { flex: none; }
 
 
@@ -6000,7 +6015,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .pmx-tag {
   display: inline-block; padding: 3px 10px; border-radius: 999px;
   font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--pmx-accent); background: color-mix(in srgb, var(--pmx-accent) 14%, transparent);
+  color: color-mix(in oklch, var(--pmx-accent) 92%, black);
+  background: color-mix(in srgb, var(--pmx-accent) 14%, transparent);
 }
 .pmx-mini { margin-top: 10px; display: grid; gap: 4px; font-size: 11.5px; color: var(--muted); }
 .pmx-mini span { display: flex; align-items: center; gap: 7px; }
@@ -6131,3 +6147,98 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* El overlay tiene el CLARO como base y el oscuro como override (bloque de mas arriba); el aviso
    sigue la misma regla, o el ambar claro quedaria ilegible sobre papel. */
 :root[data-theme="dark"] .hcfs-readonly { color: #FBBF24; }
+
+/* Paginacion del directorio de planes. */
+.pmx-pager {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-hairline);
+  font-size: 12px; color: var(--muted);
+}
+.pmx-pager-count { font-variant-numeric: tabular-nums; }
+.pmx-pager-size { display: flex; align-items: center; gap: 8px; }
+.pmx-pager-size .ds-select-trigger { width: auto; min-width: 78px; min-height: 34px; font-size: 12.5px; }
+.pmx-pager-nav { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.pmx-pager-nav button {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px;
+  border: 1px solid var(--border-hairline); background: transparent; color: var(--ink);
+  cursor: pointer; transition: border-color .15s, color .15s;
+}
+.pmx-pager-nav button:hover:not(:disabled) { border-color: var(--m-usuarios); color: var(--m-usuarios); }
+.pmx-pager-nav button:disabled { opacity: .35; cursor: not-allowed; }
+.pmx-pager-page { margin: 0 6px; font-variant-numeric: tabular-nums; }
+.pmx-pager-page b { color: var(--ink); font-weight: 800; }
+
+/* ===========================================================================
+   TEMA OSCURO — correcciones detectadas modulo a modulo.
+
+   Se auditaron las 14 rutas midiendo cada TEXTO contra el fondo EFECTIVO que
+   tiene detras (componiendo alfas y subiendo por los ancestros), no el contraste
+   del contenedor: es la trampa de §10 — un contenedor puede dar un numero
+   perfecto mientras un hijo con su propio gris de papel queda invisible encima.
+   =========================================================================== */
+
+/* --- Huella de Carbono: el modulo se quedaba EN CLARO ---------------------
+   Define sus propias superficies (`--surface-0/1/2`, `--border-subtle`) con
+   valores de papel y no tenia ningun override: en oscuro sus paneles seguian
+   blancos, y encima el texto ya claro del sistema. Resultado: estados vacios y
+   filtros ilegibles (contraste 1.04). Se remapean sus tokens; no hay que tocar
+   ninguna de sus 55 reglas. */
+:root[data-theme="dark"] .carbon-module {
+  --surface-0: var(--canvas);
+  --surface-1: var(--color-surface-card);
+  --surface-2: var(--color-surface-soft);
+  --border-subtle: var(--border-hairline);
+  /* El verde de identidad al 0.36 de luminosidad no se lee sobre oscuro. */
+  --carbon-brand: #34D399;
+  --carbon-brand-pale: color-mix(in srgb, #0ca678 18%, transparent);
+  --shadow-stack: 0 1px 2px rgba(0,0,0,.25), 0 4px 10px rgba(0,0,0,.3);
+}
+/* El fondo del modulo repetia el radial verde sobre --surface-0; con la base
+   oscura, los radiales se bajan para que no queden dos manchas luminosas. */
+:root[data-theme="dark"] .carbon-module {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(12,166,120,.10), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(37,99,235,.08), transparent 40%),
+    var(--surface-0);
+}
+
+/* --- ALMERA: el estado vacio con tinta de papel ---------------------------
+   `.mission-empty h3` fijaba `--mission-night` (tinta oscura) y el parrafo un
+   gris literal: sobre la tarjeta oscura, «Radar despejado» era tinta oscura
+   sobre fondo oscuro (contraste 1.13). Se pasan a los tokens del tema, que ya
+   se invierten solos. */
+.mission-empty { color: var(--muted); }
+.mission-empty h3 { color: var(--ink); }
+
+/* --- Identidad de modulo sobre fondo oscuro -------------------------------
+   Los colores de identidad estan calculados a luminosidad 0.55 para leerse
+   sobre papel; sobre un fondo oscuro se quedan en 3.0-3.6 de contraste. Se
+   aclaran conservando el tono. Va con color-mix sobre el valor efectivo porque
+   el acento llega en linea desde MODULE_IDENTITIES: no hay token que pisar. */
+/* 32 % del acento y el resto blanco: la identidad esta a luminosidad 0.55 y sobre el panel
+   oscuro se queda en 2.6-3.6. A 12 px hace falta 4.5, y eso pide subir a ~0.87. */
+:root[data-theme="dark"] .ds-module-badge { color: color-mix(in oklch, var(--ds-eyebrow-color, var(--brand)) 32%, white); }
+:root[data-theme="dark"] .ds-tabs-item.is-active { color: color-mix(in oklch, var(--tab-accent, var(--brand)) 36%, white); }
+:root[data-theme="dark"] .row-action { color: color-mix(in oklch, var(--row-accent, var(--brand)) 36%, white); }
+:root[data-theme="dark"] .row-action.is-danger { color: #FCA5A5; }
+:root[data-theme="dark"] .pmx-tag {
+  color: color-mix(in oklch, var(--pmx-accent) 38%, white);
+  background: color-mix(in srgb, var(--pmx-accent) 22%, transparent);
+}
+
+/* Encabezados de seccion del sidebar: al 38 % de blanco quedaban en 3.56 sobre
+   el panel oscuro. Son la unica etiqueta que ordena el menu; tienen que leerse. */
+
+/* Enlace que hereda el acento del modulo. Mismo motivo que .row-action: como variable, para que
+   el tema oscuro pueda aclararlo — la identidad esta calculada para papel. */
+.ds-accent-link { color: var(--row-accent, var(--brand)); }
+:root[data-theme="dark"] .ds-accent-link { color: color-mix(in oklch, var(--row-accent, var(--brand)) 36%, white); }
+/* `--muted-light` es el gris mas tenue de la escala: pensado para una nota al pie sobre papel, en
+   oscuro se queda en 4.03. Una pista que explica que hacer tiene que leerse. */
+
+/* Peso total de una matriz: verde si suma 100, ambar si no. Los cortes estan calculados sobre
+   papel; en oscuro se suben una parada sin cambiar el significado. */
+.weight-ok { color: #059669; }
+.weight-off { color: #B45309; }
+:root[data-theme="dark"] .weight-ok { color: #34D399; }
+:root[data-theme="dark"] .weight-off { color: #FBBF24; }
