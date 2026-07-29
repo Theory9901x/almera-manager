@@ -5289,7 +5289,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hcwin-msg {
   position: fixed; inset: 0; z-index: 200; display: grid; place-content: center; justify-items: center;
   gap: 12px; padding: 24px; text-align: center;
-  background: #0A0E22; color: #94A0C8; font-size: 13px;
+  background: var(--canvas); color: var(--muted); font-size: 13px;
 }
 .hcfs-dirty { color: #FBBF24; font-weight: 700; margin-left: 6px; }
 .hcfs-btn.is-pri.is-dirty { box-shadow: 0 0 0 2px rgba(251, 191, 36, .45); }
@@ -5636,3 +5636,156 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Las celdas heredaban el gris de papel del `td`, no solo el fondo. */
 :root[data-theme="dark"] .data-table td { color: var(--ink-soft); }
+
+/* ============================================================================
+   Matriz de HC — la vista EMBEBIDA tiene que ser usable por si sola.
+   Antes: el hero y los KPIs se comian los 768 px de un portatil y la matriz
+   quedaba fuera de pantalla; el panel de analisis le robaba 300 px de ancho
+   justo donde se califica; y el pie pegajoso tapaba las ultimas filas.
+   ============================================================================ */
+
+.hcop-detail { display: grid; gap: 14px; }
+
+/* Barra compacta de identificacion (sustituye al hero grande en el detalle). */
+.hcop-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 11px 14px; border-radius: 14px;
+  background: var(--color-surface-card); border: 1px solid var(--border-hairline);
+  box-shadow: 0 1px 3px rgba(30, 37, 64, .05);
+}
+.hcop-back {
+  display: grid; place-items: center; width: 32px; height: 32px; flex: none;
+  border: 1px solid var(--border-hairline); border-radius: 10px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.hcop-back:hover { color: var(--m-matrices); border-color: var(--m-matrices); }
+.hcop-bar-id { display: grid; gap: 1px; min-width: 0; }
+.hcop-bar-id strong { font-size: 14.5px; font-weight: 800; letter-spacing: -.01em; }
+.hcop-bar-id span { font-size: 11.5px; color: var(--muted); }
+.hcop-bar-pct { font-size: 19px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.hcop-bar-spacer { flex: 1; }
+
+/* La matriz ocupa TODO el ancho; el analisis va debajo, en columnas. */
+.hcop-matrixwrap { min-width: 0; }
+.hcop-rpanel {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px;
+  align-items: start;
+}
+
+/* Alto util: lo que queda de pantalla descontando la barra, los KPIs y el pie. Con un minimo
+   para que en pantallas cortas siga habiendo matriz que calificar. */
+.hcop-tablewrap {
+  overflow: auto;
+  /* 400px = barra + KPIs + filtros + cabecera de la tarjeta + EL PIE PEGAJOSO. Sin descontar
+     el pie, sus botones se quedaban encima de las ultimas filas y no se podian calificar. */
+  max-height: max(300px, calc(100vh - 430px));
+  /* Colchon del alto del pie pegajoso: asi, al llegar al final del scroll, la ultima fila queda
+     POR ENCIMA del pie y se puede calificar. Sin esto, las ultimas celdas eran inalcanzables. */
+  padding-bottom: 72px;
+  overscroll-behavior: contain;
+}
+
+/* En la embebida la columna de criterio no necesita 260 px: con eso y el peso y el %, en un
+   portatil quedaban 8 columnas de HC. A 200 px entran tres mas sin que el texto sufra. */
+.hc-matrix.is-embedded th.hcm-criterion,
+.hc-matrix.is-embedded td.hcm-criterion { min-width: 200px; }
+.hc-matrix.is-embedded th.hcm-weight,
+.hc-matrix.is-embedded td.hcm-weight { left: 200px; }
+.hc-matrix.is-embedded th.hcm-pct,
+.hc-matrix.is-embedded td.hcm-pct { left: 252px; }
+.hc-matrix.is-embedded.no-weights th.hcm-pct,
+.hc-matrix.is-embedded.no-weights td.hcm-pct { left: 200px; }
+
+/* El pie deja de flotar sobre la matriz: se queda al final del flujo. */
+.hcop-foot { position: sticky; bottom: 8px; }
+
+@media (max-width: 900px) {
+  /* En pantalla angosta las columnas fijas se comerian toda la vista. */
+  .hc-matrix.is-embedded th.hcm-criterion,
+  .hc-matrix.is-embedded td.hcm-criterion { min-width: 160px; }
+  .hc-matrix.is-embedded th.hcm-weight,
+  .hc-matrix.is-embedded td.hcm-weight { display: none; }
+  .hc-matrix.is-embedded th.hcm-pct,
+  .hc-matrix.is-embedded td.hcm-pct { left: 160px; }
+}
+
+/* ============================================================================
+   Modo ampliado: TEMA CLARO Y OSCURO. Antes estaba clavado en oscuro, asi que
+   quien trabaja en claro cambiaba de mundo al expandir. La paleta pasa a
+   variables y solo cambian sus valores segun el tema.
+   ============================================================================ */
+.hcfs {
+  --hcfs-bg1: #EEF1F8; --hcfs-bg2: #F6F8FC;
+  --hcfs-glow1: rgba(124, 58, 237, .10); --hcfs-glow2: rgba(59, 130, 246, .08);
+  --hcfs-panel: #FFFFFF; --hcfs-panel-2: #FAFBFE;
+  --hcfs-line: #E4E8F2; --hcfs-ink: #1E2540; --hcfs-soft: #5B6478; --hcfs-faint: #8A93AB;
+  --hcfs-head: #F4F6FC; --hcfs-scope: linear-gradient(90deg, rgba(124, 58, 237, .12), rgba(124, 58, 237, .03));
+  --hcfs-scope-crit: linear-gradient(90deg, #EDE9FE, #F5F3FF);
+  --hcfs-scope-ink: #5B21B6; --hcfs-cell: #FFFFFF; --hcfs-cell-brd: #DFE3EF;
+  --hcfs-active: rgba(124, 58, 237, .10);
+}
+:root[data-theme="dark"] .hcfs {
+  --hcfs-bg1: #0A0E22; --hcfs-bg2: #0A0E22;
+  --hcfs-glow1: rgba(124, 58, 237, .25); --hcfs-glow2: rgba(59, 130, 246, .15);
+  --hcfs-panel: #121A3A; --hcfs-panel-2: #0E1533;
+  --hcfs-line: #1E2A52; --hcfs-ink: #E6EAF5; --hcfs-soft: #94A0C8; --hcfs-faint: #5E6A96;
+  --hcfs-head: #141C40; --hcfs-scope: linear-gradient(90deg, rgba(124, 58, 237, .22), rgba(124, 58, 237, .05));
+  --hcfs-scope-crit: linear-gradient(90deg, #2A1D5A, #1A1640);
+  --hcfs-scope-ink: #FFFFFF; --hcfs-cell: rgba(20, 28, 64, .6); --hcfs-cell-brd: rgba(148, 160, 200, .25);
+  --hcfs-active: rgba(124, 58, 237, .16);
+}
+
+.hcfs {
+  background:
+    radial-gradient(900px 500px at 15% -8%, var(--hcfs-glow1), transparent 55%),
+    radial-gradient(800px 400px at 100% 0%, var(--hcfs-glow2), transparent 50%),
+    linear-gradient(160deg, var(--hcfs-bg1), var(--hcfs-bg2));
+  color: var(--hcfs-ink);
+}
+.hcfs-top { border-bottom-color: var(--hcfs-line); background: color-mix(in srgb, var(--hcfs-panel) 72%, transparent); }
+.hcfs-crumbs { color: var(--hcfs-faint); }
+.hcfs-crumbs b, .hcfs-top-l p { color: var(--hcfs-soft); }
+.hcfs-btn { border-color: var(--hcfs-line); background: var(--hcfs-panel); color: var(--hcfs-ink); }
+.hcfs-lg, .hcfs-cnt, .hcfs-search, .hcfs-toggle, .hcfs-segs { border-color: var(--hcfs-line); }
+.hcfs-lg, .hcfs-cnt, .hcfs-toggle, .hcfs-segs button { background: var(--hcfs-panel); color: var(--hcfs-soft); }
+.hcfs-search { background: var(--hcfs-panel); color: var(--hcfs-faint); }
+.hcfs-search input, .hcfs-cnt b { color: var(--hcfs-ink); }
+.hcfs-f > span, .hcfs-pins, .hcfs-showing, .hcfs-overall, .hcfs-empty { color: var(--hcfs-faint); }
+.hcfs-pin { border-color: var(--hcfs-line); color: var(--hcfs-soft); }
+.hcfs-toggle i { background: color-mix(in srgb, var(--hcfs-line) 80%, transparent); }
+.hcfs-toggle i::after { background: var(--hcfs-faint); }
+.hcfs-tablewrap { border-color: var(--hcfs-line); background: color-mix(in srgb, var(--hcfs-panel) 45%, transparent); }
+.hcfs-progress > span { background: color-mix(in srgb, var(--hcfs-line) 70%, transparent); }
+
+.hc-matrix.is-full thead th { background: var(--hcfs-head); color: var(--hcfs-soft); border-bottom-color: var(--hcfs-line); }
+.hc-matrix.is-full th.hcm-criterion,
+.hc-matrix.is-full th.hcm-weight,
+.hc-matrix.is-full th.hcm-pct { background: var(--hcfs-head); }
+.hc-matrix.is-full td { border-bottom-color: color-mix(in srgb, var(--hcfs-line) 70%, transparent); }
+.hc-matrix.is-full td.hcm-criterion,
+.hc-matrix.is-full td.hcm-weight,
+.hc-matrix.is-full td.hcm-pct { background: var(--hcfs-panel-2); color: var(--hcfs-soft); }
+.hc-matrix.is-full td.hcm-pct { border-right-color: var(--hcfs-line); }
+.hc-matrix.is-full td.hcm-criterion.is-sub { color: var(--hcfs-ink); }
+.hc-matrix.is-full .hcm-scope-row td { background: var(--hcfs-scope); }
+.hc-matrix.is-full .hcm-scope-row td.hcm-criterion { background: var(--hcfs-scope-crit); color: var(--hcfs-scope-ink); }
+.hc-matrix.is-full .hcm-scope-row td.hcm-weight,
+.hc-matrix.is-full .hcm-scope-row td.hcm-pct { background: color-mix(in srgb, var(--hcfs-scope-crit) 60%, var(--hcfs-panel-2)); }
+.hc-matrix.is-full .hcm-scope-name { color: var(--hcfs-scope-ink); }
+.hc-matrix.is-full .hcm-hc-label { color: var(--hcfs-soft); }
+.hc-matrix.is-full td.is-active { background: var(--hcfs-active) !important; }
+.hc-matrix.is-full th.hcm-hc.is-active { background: color-mix(in srgb, var(--hcfs-active) 70%, var(--hcfs-head)); color: var(--hcfs-ink); }
+.hc-matrix.is-full .hcm-total-row td { background: var(--hcfs-head); border-top-color: var(--hcfs-line); }
+.hc-matrix.is-full .hcm-total-row td.hcm-criterion { background: var(--hcfs-head); color: var(--hcfs-ink); }
+/* La celda vacia sigue el tema; las calificadas conservan su color semantico. */
+.score-selector-trigger.is-compact { background: var(--hcfs-cell); border-color: var(--hcfs-cell-brd); color: var(--hcfs-soft); }
+.hcfs-msg, .hcwin-msg { background: var(--canvas); color: var(--muted); }
+
+/* El chip de peso y el peso del criterio siguen el tema del overlay (antes estaban clavados en
+   los tonos de la version oscura y en claro eran lila sobre lila). */
+.hc-matrix.is-full .hcm-wchip {
+  background: color-mix(in srgb, var(--m-matrices) 18%, transparent);
+  color: var(--hcfs-scope-ink);
+}
+:root[data-theme="dark"] .hc-matrix.is-full .hcm-wchip { background: rgba(124, 58, 237, .3); color: #C4B5FD; }
+.hc-matrix.is-full .hcm-w { color: var(--hcfs-soft); }

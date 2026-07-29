@@ -375,33 +375,28 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
   if (selectedId && detail) {
     const isClosed = detail.evaluation.status === 'CLOSED'
     return (
-      <div className="space-y-5">
+      <div className="hcop-detail">
         <ToastStack notice={notice} error={error} onDismissError={() => setError('')} />
 
-        <button className="row-action" style={{ color: identity.color }} onClick={backToList}><ArrowLeft size={15} />Volver a evaluaciones</button>
-
-        <ModuleHero
-          badge="Evaluación de adherencia"
-          title={detail.evaluation.professional_name}
-          subtitle={`${detail.evaluation.area_name} · ${detail.evaluation.month_reported}`}
-          accent={identity.color}
-          className="matrices-hero"
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={isClosed ? 'info' : 'neutral'}>{isClosed ? 'Cerrada' : 'Borrador'}</Badge>
-              {/* Concepto EN VIVO, no el ultimo guardado: con el del servidor la cabecera decia
-                  "Sin calificar" junto a un 84 % ya calculado en pantalla. Al guardar, el
-                  servidor lo recalcula con los umbrales de la entidad y `concept` manda. */}
-              <ConceptBadge concept={(concept || conceptFromPercent(live.overall)) as Concept | null} />
-              <Button identity={identity} onClick={() => void downloadReport()} disabled={busy}><Download size={15} />Informe PDF</Button>
-            </div>
-          }
-        >
-          <div className="hero-stat-inline">
-            <div><div className="num">{detail.records.length}</div><div className="lbl">HC evaluadas</div></div>
-            <div><div className="num" style={{ color: colorForPercent(live.overall) }}>{live.overall === null ? '—' : `${Math.round(live.overall)}%`}</div><div className="lbl">Cumplimiento general</div></div>
+        {/* Barra compacta en vez del hero grande: en un portatil de 768 px de alto, el hero y
+            los KPIs dejaban la matriz fuera de pantalla. Aqui se viene a calificar. */}
+        <div className="hcop-bar">
+          <button className="hcop-back" onClick={backToList}><ArrowLeft size={15} /></button>
+          <div className="hcop-bar-id">
+            <strong>{detail.evaluation.professional_name}</strong>
+            <span>{detail.evaluation.area_name} · {detail.evaluation.month_reported}</span>
           </div>
-        </ModuleHero>
+          <Badge tone={isClosed ? 'info' : 'neutral'}>{isClosed ? 'Cerrada' : 'Borrador'}</Badge>
+          {/* Concepto EN VIVO, no el ultimo guardado: con el del servidor la cabecera decia
+              "Sin calificar" junto a un 84 % ya calculado en pantalla. Al guardar, el
+              servidor lo recalcula con los umbrales de la entidad y `concept` manda. */}
+          <ConceptBadge concept={(concept || conceptFromPercent(live.overall)) as Concept | null} />
+          <span className="hcop-bar-pct" style={{ color: colorForPercent(live.overall) }}>
+            {live.overall === null ? '—' : `${Math.round(live.overall)}%`}
+          </span>
+          <span className="hcop-bar-spacer" />
+          <Button variant="secondary" onClick={() => void downloadReport()} disabled={busy}><Download size={15} />Informe PDF</Button>
+        </div>
 
         {/* --- A1: KPIs de la evaluación, en vivo --- */}
         <div className="hcop-kpis">
@@ -462,7 +457,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         </div>
 
         {/* --- A2 + A3: matriz y panel de análisis --- */}
-        <div className="hcop-content">
+        <div className="hcop-matrixwrap">
           <Card accent={identity.color} className="overflow-hidden">
             <div className="hcop-mhead">
               <div>
@@ -550,7 +545,9 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             ) : <div className="almera-empty"><p>Agrega al menos una historia clínica para empezar a calificar.</p></div>}
           </Card>
 
-          <aside className="hcop-rpanel">
+        </div>
+
+        <aside className="hcop-rpanel">
             <Card accent={identity.color} className="p-4">
               <div className="hcop-rh"><b>Cumplimiento general</b></div>
               <div className="hcop-cmp">
@@ -613,8 +610,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                 </div>
               )) : <p className="hcop-muted">Aún no hay criterios calificados.</p>}
             </Card>
-          </aside>
-        </div>
+        </aside>
 
         {detail.records.length > 0 && (
           <Card accent={identity.color} className="p-5">

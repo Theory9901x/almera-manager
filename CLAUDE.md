@@ -406,8 +406,15 @@ denominador). Lo importan **los dos lados**: `server/routes/adherence.mjs` al gu
 el cliente con `useLiveCompliance` para recalcular mientras se califica. No duplicar la formula:
 una segunda copia en el navegador es como el porcentaje en pantalla acaba difiriendo del guardado.
 
-- `HcMatrix.tsx` es **una sola** matriz para las dos vistas (`variant="embedded"` clara /
-  `"fullscreen"` oscura). El modo ampliado no es otra tabla, es esta con mas espacio.
+- `HcMatrix.tsx` es **una sola** matriz para las dos vistas (`variant="embedded"` / `"fullscreen"`).
+  El modo ampliado no es otra tabla, es esta con mas espacio. **Las dos siguen el tema**: la
+  paleta del overlay son variables `--hcfs-*` y solo cambian sus valores; estaba clavado en
+  oscuro y quien trabaja en claro cambiaba de mundo al expandir.
+- **La vista embebida tiene que servir SOLA**, sin pasar por el modo ampliado. Tres cosas que la
+  hacian inutilizable en un portatil de 768 px: el hero grande y los KPIs dejaban la matriz fuera
+  de pantalla (ahora hay una barra compacta), el panel de analisis le robaba 300 px de ancho
+  (ahora va debajo) y el pie pegajoso tapaba las ultimas filas (ahora el contenedor lleva un
+  colchon de 72 px, el alto del pie, para que la ultima fila se pueda alcanzar).
 - El overlay (`HcMatrixFullscreen.tsx`) **no guarda estado de calificaciones**: recibe el mismo
   buffer y el mismo `onScore` de la vista embebida. Por eso abrir y cerrar no pierde nada.
 - El **zoom escala con `font-size`/`padding`, nunca con `transform`**: `transform` rompe
