@@ -5084,7 +5084,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   padding: 9px 8px; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .03em; text-align: center; white-space: nowrap;
 }
-.hc-matrix th.hcm-criterion { position: sticky; left: 0; z-index: 7; text-align: left; min-width: 260px; padding-left: 18px; }
+.hc-matrix th.hcm-criterion { position: sticky; left: 0; z-index: 7; text-align: left; padding-left: 18px; }
 .hc-matrix th.hcm-weight { position: sticky; left: 260px; z-index: 7; width: 52px; }
 .hc-matrix th.hcm-pct { position: sticky; left: 312px; z-index: 7; width: 74px; }
 .hc-matrix td { padding: 7px 8px; text-align: center; }
@@ -5094,7 +5094,31 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .hc-matrix td.hcm-weight { position: sticky; left: 260px; z-index: 3; }
 .hc-matrix td.hcm-pct { position: sticky; left: 312px; z-index: 3; }
-.hcm-hc { min-width: 76px; }
+
+/* Se queda TODO el sobrante para que las de HC no crezcan. Es una celda vacia: sin borde,
+   sin fondo y fuera del recorrido del lector. */
+/* Celda de relleno: se queda el sobrante, sin contenido y fuera del recorrido del lector. Conserva
+   la divisoria INFERIOR para que las filas lleguen al borde del panel; sin eso se cortaban en seco
+   a media tabla y parecia que faltaba algo. */
+.hcm-spacer {
+  width: 100%; min-width: 0; padding: 0 !important;
+  border-left: 0 !important; border-right: 0 !important; border-top: 0 !important;
+  background: transparent !important;
+}
+
+/* Divisorias verticales entre historias. En una tabla densa son funcionales, no decorativas
+   (§5.4): sin ellas todo es una superficie blanca y no se sabe donde acaba una HC y empieza la
+   siguiente. La primera es mas marcada porque separa lo fijo (criterio, peso, %) de lo que se
+   califica. */
+.hc-matrix th.hcm-hc, .hc-matrix tbody td:not(.hcm-criterion):not(.hcm-weight):not(.hcm-pct):not(.hcm-spacer) {
+  border-left: 1px solid var(--hcm-divider, color-mix(in srgb, var(--m-matrices) 16%, transparent));
+}
+.hc-matrix th.hcm-hc:first-of-type,
+.hc-matrix tbody tr > td.hcm-criterion + td:not(.hcm-weight):not(.hcm-pct),
+.hc-matrix tbody tr > td.hcm-weight + td:not(.hcm-pct),
+.hc-matrix tbody tr > td.hcm-pct + td {
+  border-left: 2px solid var(--hcm-divider-strong, color-mix(in srgb, var(--m-matrices) 30%, transparent));
+}
 .hcm-hc-label { display: block; font-size: 10px; margin-bottom: 4px; }
 .hcm-hc-remove {
   position: absolute; top: 2px; right: 2px; border: 0; background: transparent; cursor: pointer;
@@ -5839,22 +5863,28 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hc-matrix.is-full .hcm-w { color: var(--hcfs-soft); }
 
 /* ============================================================================
-   Ancho de la matriz: manda la EVALUACION, no el texto del criterio.
-   La tabla es `width: max-content; min-width: 100%`, asi que con pocas HC la
-   columna de criterio absorbia TODO el sobrante (llegaba a ~1100 px) y las
-   celdas de calificacion quedaban aplastadas a la derecha. Se le pone tope y
-   el sobrante se lo reparten las columnas de HC, que es donde se trabaja.
+   Ancho de la matriz. UNA sola fuente de anchos; no repartir el sobrante.
+
+   Historia de esto, porque se corrigio dos veces en direcciones opuestas:
+   la tabla es `width: max-content; min-width: 100%`, asi que SIEMPRE hay una
+   columna que absorbe el ancho sobrante. Primero lo absorbia el criterio
+   (llegaba a ~1100 px y aplastaba la evaluacion); se le puso tope y entonces
+   lo absorbieron las columnas de HC, que con 3 historias se estiraban a media
+   pantalla y dejaban las calificaciones perdidas en el medio.
+   La solucion no es elegir a quien se lo lleva, sino que no se lo lleve NADIE:
+   hay una columna de relleno (`.hcm-spacer`) al final que se queda el sobrante,
+   y todas las demas conservan su tamano estandar con cualquier numero de HC.
    ============================================================================ */
 .hc-matrix th.hcm-criterion,
 .hc-matrix td.hcm-criterion {
-  width: 300px; max-width: 300px;
+  width: 380px; max-width: 380px; min-width: 240px;
   white-space: normal; overflow-wrap: anywhere;
 }
 .hc-matrix.is-embedded th.hcm-criterion,
-.hc-matrix.is-embedded td.hcm-criterion { width: 260px; max-width: 260px; min-width: 200px; }
-/* Las columnas de HC se llevan el resto: mas anchas, mas comodas de calificar. */
-.hcm-hc { min-width: 92px; }
-.hc-matrix.is-full .hcm-hc { min-width: 84px; }
+.hc-matrix.is-embedded td.hcm-criterion { width: 300px; max-width: 300px; min-width: 200px; }
+/* Tamano estandar de la casilla de calificacion, el que se pulsa cientos de veces. */
+.hcm-hc { width: 92px; min-width: 88px; max-width: 104px; }
+.hc-matrix.is-full .hcm-hc { width: 88px; min-width: 84px; max-width: 96px; }
 
 /* Fila de observaciones dentro de la matriz. */
 .hcm-obs-row td { padding: 6px 8px; }
@@ -6131,10 +6161,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   width: calc(40px * var(--hcfs-zoom, 1)); height: calc(30px * var(--hcfs-zoom, 1));
   font-size: calc(13px * var(--hcfs-zoom, 1));
 }
-/* Divisorias verticales entre columnas de HC: en una tabla densa son funcionales (§5.4). */
-.hcfs-tablewrap .hc-matrix.is-full td, .hcfs-tablewrap .hc-matrix.is-full th.hcm-hc {
-  border-left: 1px solid var(--hcfs-line, #1E2A52);
-}
+
 
 /* Aviso de solo lectura en la matriz ampliada / ventana aparte. */
 .hcfs-readonly {
@@ -6242,3 +6269,23 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .weight-off { color: #B45309; }
 :root[data-theme="dark"] .weight-ok { color: #34D399; }
 :root[data-theme="dark"] .weight-off { color: #FBBF24; }
+
+/* Divisorias de la matriz en la vista ampliada: siguen la paleta del overlay, que tiene su propio
+   juego de variables para poder ser clara u oscura. */
+.hcfs-tablewrap .hc-matrix {
+  --hcm-divider: color-mix(in srgb, var(--hcfs-line) 85%, transparent);
+  --hcm-divider-strong: color-mix(in srgb, var(--hcfs-scope-ink) 30%, transparent);
+}
+:root[data-theme="dark"] .hc-matrix {
+  --hcm-divider: color-mix(in srgb, var(--m-matrices) 30%, transparent);
+  --hcm-divider-strong: color-mix(in srgb, var(--m-matrices) 55%, transparent);
+}
+
+/* El relleno pide `width: 100%`, que en una tabla de maquetacion automatica gana a cualquier
+   `width` de las demas: por eso el criterio se quedaba en su MINIMO aunque pidiera 380 px. Se
+   sube el minimo solo cuando hay pantalla de sobra, para que el texto del criterio respire sin
+   robarle sitio a la evaluacion en un portatil, que es lo que ya se corrigio una vez. */
+@media (min-width: 1200px) {
+  .hc-matrix th.hcm-criterion, .hc-matrix td.hcm-criterion { min-width: 360px; }
+  .hc-matrix.is-embedded th.hcm-criterion, .hc-matrix.is-embedded td.hcm-criterion { min-width: 300px; }
+}

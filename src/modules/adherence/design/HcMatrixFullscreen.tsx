@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { ConfirmDialog } from '@/design-system'
 import type { Criterion, EvaluationRecord, Score, Scope } from '../types'
-import { HcMatrix } from './HcMatrix'
+import { HcMatrix, recordLabel } from './HcMatrix'
 import { colorForPercent } from './scopeColors'
 import type { LiveCompliance, ScoreMap } from './useLiveCompliance'
 
@@ -103,7 +103,7 @@ export function HcMatrixFullscreen({
   const exportCsv = () => {
     const head = [
       'Dimensión', 'Criterio', 'Peso', '% Cumplimiento criterio',
-      ...visibleRecords.map(record => `HC ${record.record_number}`),
+      ...visibleRecords.map(record => recordLabel(record.record_number)),
     ]
     const lines: string[] = [head.map(csvCell).join(';')]
 

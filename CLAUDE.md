@@ -488,10 +488,24 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   El modo ampliado no es otra tabla, es esta con mas espacio. **Las dos siguen el tema**: la
   paleta del overlay son variables `--hcfs-*` y solo cambian sus valores; estaba clavado en
   oscuro y quien trabaja en claro cambiaba de mundo al expandir.
-- **El ancho manda para la EVALUACION, no para el texto del criterio.** La tabla es
-  `width: max-content; min-width: 100%`, asi que con pocas HC la columna de criterio absorbia
-  todo el sobrante (llego a ~1100 px) y las celdas quedaban aplastadas. Lleva tope fijo
-  (300 px ampliada / 260 px embebida) y el resto se lo reparten las columnas de HC.
+- **El ancho sobrante no se lo lleva NADIE: hay una columna de relleno.** Esto se corrigio dos
+  veces en direcciones opuestas, y la leccion es la de la segunda. La tabla es
+  `width: max-content; min-width: 100%`, asi que siempre hay una columna que absorbe el sobrante.
+  Primero lo absorbia el criterio (llego a ~1100 px y aplastaba la evaluacion); se le puso tope y
+  entonces lo absorbieron las columnas de HC, que **con 3 historias se estiraban a media pantalla**
+  y dejaban las calificaciones perdidas en el medio. La solucion no es elegir a quien se lo lleva,
+  sino que no se lo lleve ninguna: `.hcm-spacer` al final de cada fila se queda el sobrante y las
+  demas conservan su tamano estandar con cualquier numero de HC. Ojo: el relleno pide
+  `width: 100%`, que en maquetacion automatica **gana** a cualquier `width` de las demas — por eso
+  el criterio necesita `min-width` (no `width`) para respirar en pantallas anchas.
+- **Sin divisorias verticales, una matriz de pocas HC es una superficie blanca** en la que no se
+  sabe donde acaba una historia y empieza la siguiente. Llevan hairline entre columnas de HC y una
+  linea mas marcada delante de la primera, que separa lo fijo (criterio, peso, %) de lo que se
+  califica. El relleno conserva solo la divisoria INFERIOR: sin ella las filas se cortaban en seco
+  a media tabla y parecia que faltaba algo.
+- **El numero de HC ya puede traer el prefijo.** Se capturan a mano y unos llegan como `HC-100234`
+  y otros como `1123123`: anteponer «HC» siempre daba «HC HC-100234». Lo resuelve `recordLabel()`,
+  que comparten la matriz y la exportacion a Excel para que digan lo mismo.
 - **Las firmas se capturan de verdad**: nombre, CEDULA, CARGO e imagen (lienzo tactil o imagen
   adjunta), en `adherence_evaluations.*_document / *_position / *_signature`. Antes solo se
   guardaba el nombre escrito a maquina, que no acredita a nadie. `SignaturePad` vive ahora en el

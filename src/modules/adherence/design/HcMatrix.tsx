@@ -21,6 +21,15 @@ import type { LiveCompliance, ScoreMap } from './useLiveCompliance'
  * El indice se pasa explicito y no se usa :nth-child porque las columnas que van ANTES (criterio,
  * peso, %) son opcionales: con nth-child la paridad cambia al ocultar el peso.
  */
+/**
+ * Etiqueta de la columna. Los numeros de historia se capturan a mano y unos vienen ya con el
+ * prefijo («HC-100234») y otros no («1123123»): anteponerlo siempre daba «HC HC-100234».
+ */
+export function recordLabel(recordNumber: string) {
+  const text = String(recordNumber || '').trim()
+  return /^hc[\s-]/i.test(text) ? text : `HC ${text}`
+}
+
 function columnClass(index: number, isActive: boolean, isPinned?: boolean) {
   return [
     index % 2 === 1 ? 'is-alt' : '',
@@ -73,16 +82,19 @@ export function HcMatrix({
               id={`hc-col-${record.id}`}
               onPointerEnter={() => onFocusRecord?.(record.id)}
             >
-              <span className="hcm-hc-label">HC {record.record_number}</span>
+              <span className="hcm-hc-label">{recordLabel(record.record_number)}</span>
               {/* % en vivo de esa historia en su propio encabezado: de un vistazo se ve cual va mal. */}
               <ComplianceRing percent={live.byRecord.get(record.id) ?? null} size={full ? 26 : 30} strokeWidth={3} />
               {onRemoveRecord && !disabled && (
-                <button className="hcm-hc-remove" title={`Quitar HC ${record.record_number}`} onClick={() => onRemoveRecord(record.id)}>
+                <button className="hcm-hc-remove" title={`Quitar ${recordLabel(record.record_number)}`} onClick={() => onRemoveRecord(record.id)}>
                   <X size={11} />
                 </button>
               )}
             </th>
           ))}
+          {/* Columna de relleno: se queda el ancho sobrante para que las de HC conserven su
+              tamano estandar. Sin ella, con 3 historias cada celda se estiraba a media pantalla. */}
+          <th className="hcm-spacer" aria-hidden="true" />
         </tr>
       </thead>
       <tbody>
@@ -110,6 +122,7 @@ export function HcMatrix({
                 {records.map((record, index) => (
                   <td key={record.id} className={columnClass(index, activeRecordId === record.id)} />
                 ))}
+                <td className="hcm-spacer" />
               </tr>
               {scopeCriteria.map(criterion => {
                 const percent = live.byCriterion.get(criterion.id) ?? null
@@ -130,7 +143,7 @@ export function HcMatrix({
                       <td
                         key={record.id}
                         className={columnClass(index, activeRecordId === record.id)}
-                        title={`HC ${record.record_number} · ${criterion.text}`}
+                        title={`${recordLabel(record.record_number)} · ${criterion.text}`}
                       >
                         <ScoreSelector
                           compact={full}
@@ -141,6 +154,7 @@ export function HcMatrix({
                         />
                       </td>
                     ))}
+                    <td className="hcm-spacer" />
                   </tr>
                 )
               })}
@@ -160,7 +174,7 @@ export function HcMatrix({
                   defaultValue={record.observations}
                   disabled={disabled}
                   placeholder="Observación…"
-                  title={record.observations || `Observación de la HC ${record.record_number}`}
+                  title={record.observations || `Observación de ${recordLabel(record.record_number)}`}
                   onFocus={() => onFocusRecord?.(record.id)}
                   // Al salir del campo, no en cada tecla: son 25 columnas y cada guardado es una
                   // peticion al servidor.
@@ -170,6 +184,7 @@ export function HcMatrix({
                 />
               </td>
             ))}
+            <td className="hcm-spacer" />
           </tr>
         )}
 
@@ -193,6 +208,7 @@ export function HcMatrix({
               </td>
             )
           })}
+          <td className="hcm-spacer" />
         </tr>
       </tbody>
     </table>
