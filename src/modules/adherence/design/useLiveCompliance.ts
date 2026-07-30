@@ -19,6 +19,13 @@ export interface LiveCompliance {
   byScope: Map<string, number | null>
   /** % ponderado por historia clínica — la fila «% total por HC». */
   byRecord: Map<string, number | null>
+  /**
+   * % ponderado de un ámbito EN UNA historia concreta, indexado `scopeId|recordId`.
+   * Es el resumen de cierre que trae la matriz de Excel: por ámbito y por HC, no solo el
+   * consolidado de la columna. Se calcula con el mismo motor, restringido a los criterios de
+   * ese ámbito y a las respuestas de esa historia.
+   */
+  byScopeRecord: Map<string, number | null>
   overall: number | null
   /** Reparto de la escala, para la semaforización y los contadores del pie. */
   counts: { two: number; one: number; zero: number; na: number }
@@ -81,9 +88,29 @@ export function useLiveCompliance(
       if (criteria.length > 0 && rows.length === criteria.length) completedRecordIds.add(record.id)
     }
 
+    // Resumen por ambito y HC. Se agrupan los criterios una sola vez: con 25 historias y 8
+    // ambitos, filtrar dentro del bucle recorreria la lista de criterios 200 veces.
+    const criteriaByScope = new Map<string, Criterion[]>()
+    for (const criterion of criteria) {
+      const bucket = criteriaByScope.get(criterion.scope_id) || []
+      bucket.push(criterion)
+      criteriaByScope.set(criterion.scope_id, bucket)
+    }
+    const byScopeRecord = new Map<string, number | null>()
+    for (const scope of scopes) {
+      const scopeCriteria = criteriaByScope.get(scope.id) || []
+      for (const record of records) {
+        const byCrit = scores[record.id] || {}
+        const rows = scopeCriteria
+          .filter(criterion => byCrit[criterion.id] !== undefined)
+          .map(criterion => ({ criterion_id: criterion.id, score: byCrit[criterion.id] }))
+        byScopeRecord.set(`${scope.id}|${record.id}`, computeRecordCompliance(scopeCriteria, rows) as number | null)
+      }
+    }
+
     const totalCells = criteria.length * records.length
     return {
-      byCriterion, byScope, byRecord,
+      byCriterion, byScope, byRecord, byScopeRecord,
       // Sin nada calificado el general es «sin dato», no 0 %.
       overall: graded > 0 ? result.overallCompliance : null,
       counts, graded, totalCells, completedRecordIds,

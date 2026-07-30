@@ -188,28 +188,73 @@ export function HcMatrix({
           </tr>
         )}
 
-        {/* Fila de cierre: el % ponderado de cada historia. En la vista embebida tambien sirve,
-            pero es en el modo ampliado donde responde la pregunta de las 25 columnas. */}
-        <tr className="hcm-total-row">
-          <td className="hcm-criterion">% Cumplimiento total por HC</td>
-          {showWeights && <td className="hcm-weight" />}
-          {showPercent && (
-            <td className="hcm-pct">
-              <b style={{ color: colorForPercent(live.overall) }}>
-                {live.overall === null ? '—' : `${live.overall.toFixed(1)}%`}
-              </b>
-            </td>
-          )}
-          {records.map((record, index) => {
-            const percent = live.byRecord.get(record.id) ?? null
-            return (
-              <td key={record.id} className={columnClass(index, activeRecordId === record.id)}>
-                <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(1)}%`}</b>
-              </td>
-            )
-          })}
-          <td className="hcm-spacer" />
-        </tr>
+        {/* --- Resumen de cierre, como en la matriz de Excel ---------------------------------
+            Por AMBITO y GENERAL. El cumplimiento por criterio no se repite: ya esta en la
+            columna «% Cumpl.» de cada fila. Va aqui dentro y no en una tarjeta aparte para que
+            cada valor caiga en la columna de SU historia; fuera de la tabla no habria forma de
+            alinearlo. Solo se muestra si hay algo calificado: una tabla de guiones no informa. */}
+        {live.graded > 0 && (
+          <>
+            <tr className="hcm-summary-head">
+              <td className="hcm-criterion">Resumen de cumplimiento</td>
+              {showWeights && <td className="hcm-weight" />}
+              {showPercent && <td className="hcm-pct">Total</td>}
+              {records.map((record, index) => (
+                <td key={record.id} className={columnClass(index, activeRecordId === record.id)}>
+                  {recordLabel(record.record_number)}
+                </td>
+              ))}
+              <td className="hcm-spacer" />
+            </tr>
+            {scopes.map((scope, scopeIndex) => {
+              const scopePercent = live.byScope.get(scope.id) ?? null
+              return (
+                <tr className="hcm-summary-row" key={`resumen-${scope.id}`} style={{ borderLeftColor: scopeColor(scopeIndex).from }}>
+                  <td className="hcm-criterion is-sub">{scope.name}</td>
+                  {showWeights && <td className="hcm-weight" />}
+                  {showPercent && (
+                    <td className="hcm-pct">
+                      <b style={{ color: colorForPercent(scopePercent) }}>{scopePercent === null ? '—' : `${scopePercent.toFixed(1)}%`}</b>
+                    </td>
+                  )}
+                  {records.map((record, index) => {
+                    const percent = live.byScopeRecord.get(`${scope.id}|${record.id}`) ?? null
+                    return (
+                      <td
+                        key={record.id}
+                        className={columnClass(index, activeRecordId === record.id)}
+                        title={`${scope.name} · ${recordLabel(record.record_number)}`}
+                      >
+                        <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(0)}%`}</b>
+                      </td>
+                    )
+                  })}
+                  <td className="hcm-spacer" />
+                </tr>
+              )
+            })}
+            <tr className="hcm-general-row">
+              <td className="hcm-criterion">Cumplimiento general</td>
+              {showWeights && <td className="hcm-weight" />}
+              {showPercent && (
+                <td className="hcm-pct">
+                  <b style={{ color: colorForPercent(live.overall) }}>
+                    {live.overall === null ? '—' : `${live.overall.toFixed(1)}%`}
+                  </b>
+                </td>
+              )}
+              {records.map((record, index) => {
+                const percent = live.byRecord.get(record.id) ?? null
+                return (
+                  <td key={record.id} className={columnClass(index, activeRecordId === record.id)}>
+                    <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(1)}%`}</b>
+                  </td>
+                )
+              })}
+              <td className="hcm-spacer" />
+            </tr>
+          </>
+        )}
       </tbody>
     </table>
   )

@@ -558,6 +558,15 @@ una segunda copia en el navegador es como el porcentaje en pantalla acaba difiri
   casi invisible: ahora lleva borde **discontinuo** y marcado, y en la ampliada mide 40×30.
 - **Una evaluación cerrada bloquea las casillas, y hay que DECIRLO.** Sin el aviso de solo lectura,
   quien abre la ventana pulsa una celda, no pasa nada y concluye que la ventana está rota.
+- **La matriz cierra con un RESUMEN, como la hoja de Excel**: una fila por ámbito y una de
+  cumplimiento general, cada una con su total y **el valor de cada HC en su columna**. Va dentro de
+  la tabla, no en una tarjeta aparte, porque fuera de ella no habría forma de alinear cada valor
+  con su historia. El cumplimiento **por criterio no se repite ahí**: ya está en la columna
+  «% Cumpl.» de cada fila. Y se retiró la vieja fila «% Cumplimiento total por HC»: decía
+  exactamente lo mismo que la de «Cumplimiento general» del resumen.
+  El dato por ámbito y HC lo da `live.byScopeRecord` (`useLiveCompliance`), con el mismo motor
+  compartido restringido a los criterios de ese ámbito. Los criterios se agrupan por ámbito **una
+  vez** fuera del bucle: con 25 historias y 8 ámbitos, filtrar dentro recorrería la lista 200 veces.
 - **Ventana aparte para dos monitores**: ruta `/app/adherencia/matriz/:evaluationId`
   (`HcMatrixWindowPage`). Es solo para CALIFICAR — sin cierre, firmas ni plan de mejora, que
   siguen en operacion donde tienen contexto. Carga su propia copia del servidor porque una
