@@ -1,5 +1,10 @@
 const ACCENT = '#bb4717'
-const PALETTE = [ACCENT, '#e07845', '#7a2f13', '#f2b8a0', '#4a1508', '#c96a3e']
+// MISMOS colores que ya usa la pestana Estadisticas en pantalla para estos mismos donuts
+// (RadicadosDashboardPage.tsx) — nunca una paleta inventada aparte para el PDF. Antes esto
+// tenia cinco tonos de naranja/marron propios que ni estaban en ningun otro lugar del sistema
+// ni se distinguian bien entre si; el informe tiene que verse como una continuacion de la
+// pantalla, no como otro sistema de color.
+const PALETTE = [ACCENT, '#0EA5E9', '#94A3B8', '#F59E0B']
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
@@ -114,13 +119,13 @@ export function renderRadicadosReportHtml({
   .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 9px; }
   .bar-label { width: 130px; flex: none; color: #344054; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar-track { flex: 1; height: 9px; background: #f1ede9; border-radius: 5px; overflow: hidden; }
-  .bar-fill { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, ${ACCENT}, #e07845); }
+  .bar-fill { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, rgba(187,71,23,.65), ${ACCENT}); }
   .bar-value { width: 24px; flex: none; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
   .vbar-chart { display: flex; align-items: flex-end; gap: 14px; padding-top: 6px; }
   .vbar-col { display: flex; flex-direction: column; align-items: center; width: 40px; }
   .vbar-value { font-size: 8.5px; font-weight: 700; margin-bottom: 3px; color: #172033; }
   .vbar-track { width: 22px; background: #f1ede9; border-radius: 4px 4px 0 0; display: flex; align-items: flex-end; overflow: hidden; }
-  .vbar-fill { display: block; width: 100%; background: linear-gradient(180deg, #e07845, ${ACCENT}); border-radius: 4px 4px 0 0; }
+  .vbar-fill { display: block; width: 100%; background: linear-gradient(180deg, rgba(187,71,23,.65), ${ACCENT}); border-radius: 4px 4px 0 0; }
   .vbar-label { font-size: 7.5px; color: #667085; margin-top: 4px; text-align: center; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pie-wrap { display: flex; align-items: center; gap: 18px; }
   .pie { position: relative; width: 92px; height: 92px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
