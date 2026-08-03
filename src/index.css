@@ -1797,6 +1797,17 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hero-stat-inline .num { font-size: 1.75rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .hero-stat-inline .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.55); margin-top: 4px; }
 
+/* Chips de contexto del hero (fecha, entidad, rol) — vidrio translucido sobre el fondo oscuro
+   del hero, nunca un color solido: son informativos, no acciones ni metricas. */
+.hero-chip-row { display: flex; gap: 10px; margin-top: var(--space-5); flex-wrap: wrap; }
+.hero-chip {
+  display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 10px;
+  border-radius: 14px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+}
+.hero-chip .ic { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.12); color: #fff; }
+.hero-chip .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.55); font-weight: 700; }
+.hero-chip .val { font-size: 13px; font-weight: 800; color: #fff; }
+
 /* Cards de matriz — cada area es una pieza con identidad, no una fila de tabla plana. */
 .matrix-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
 .matrix-card {
