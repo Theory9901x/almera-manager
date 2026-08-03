@@ -543,10 +543,20 @@ radicadosRouter.get('/resumen/analitica', radicadosModule, view, async (request,
   try {
     const organizationId = oid(request)
     const [monthly, byTipo, byDireccion, byProceso, byCategoria] = await Promise.all([
-      // Ultimos 12 meses, incluyendo los que no tuvieron ningun radicado (generate_series).
+      // Desde el mes del PRIMER radicado de la entidad hasta el actual — nunca 12 meses fijos
+      // hacia atras. Antes arrancaba en "hoy menos 11 meses" e incluia como minimo diez meses
+      // vacios para una entidad recien empezada (no tiene sentido medir un 2025 que nunca
+      // existio). Si todavia no hay ningun radicado, el rango colapsa al mes actual solo.
       query(
         `SELECT to_char(s.mes, 'Mon YYYY') AS label, COALESCE(c.n, 0)::int AS value
-         FROM generate_series(date_trunc('month', CURRENT_DATE) - INTERVAL '11 months', date_trunc('month', CURRENT_DATE), INTERVAL '1 month') AS s(mes)
+         FROM generate_series(
+           COALESCE(
+             (SELECT date_trunc('month', MIN(fecha_radicado)) FROM radicados WHERE organization_id = $1 AND deleted_at IS NULL),
+             date_trunc('month', CURRENT_DATE)
+           ),
+           date_trunc('month', CURRENT_DATE),
+           INTERVAL '1 month'
+         ) AS s(mes)
          LEFT JOIN (
            SELECT date_trunc('month', fecha_radicado) AS mes, COUNT(*) AS n
            FROM radicados WHERE organization_id = $1 AND deleted_at IS NULL
