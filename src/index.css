@@ -117,7 +117,7 @@
   --m-listas-light:     #8B5CF6;
   --m-listas-deep:      #3B2FA8;
   --m-listas-accent:    #38BDF8;   /* cian del degradado de progreso */
-  --m-seguridad:        oklch(0.55 0.16 40);    /* naranja — libre, sin modulo asignado aun */
+  --m-seguridad:        oklch(0.55 0.16 40);    /* terracota — Radicados */
   --m-seguridad-soft:   oklch(0.95 0.03 40);
   --m-riesgos:          oklch(0.55 0.16 70);    /* ambar-dorado — libre, sin modulo asignado aun */
   --m-riesgos-soft:     oklch(0.95 0.03 70);

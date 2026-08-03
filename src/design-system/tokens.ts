@@ -66,6 +66,8 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   // --m-usuarios (rosa-fucsia, tono 350)
   admin: { key: 'admin', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
   users: { key: 'users', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
+  // --m-seguridad (terracota, tono 40) — Radicados
+  radicados: { key: 'radicados', color: '#bb4717', gradientFrom: '#bb4717', gradientTo: '#e07845' },
 }
 
 export const DEFAULT_MODULE_IDENTITY: ModuleIdentity = { key: 'default', color: '#4F46E5', gradientFrom: '#4F46E5', gradientTo: '#7C3AED' }

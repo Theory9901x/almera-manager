@@ -39,6 +39,16 @@ const ADHERENCE_FUNCTION_PERMISSIONS = {
   PROFESIONAL: ['adherence_matrix.own_plan'],
 }
 
+// Radicados: RADICADOR genera y anula (quien "radica"); CONSULTA solo ve la base, para quien
+// necesita buscar un numero sin poder emitirlos. radicados.manage (catalogos de tipo/categoria/
+// medio) queda FUERA de este mapa a proposito, como carbon.manage: es trabajo de calidad/admin,
+// nunca de un USUARIO comun aunque se le habilite el modulo. Sin funcion explicita se asume
+// RADICADOR, que es el uso mas comun del modulo.
+const RADICADOS_FUNCTION_PERMISSIONS = {
+  RADICADOR: ['radicados.view', 'radicados.create', 'radicados.void'],
+  CONSULTA: ['radicados.view'],
+}
+
 export async function getSessionContext(request) {
   const token = readCookie(request, SESSION_COOKIE)
   if (!token) return null
@@ -92,6 +102,9 @@ export async function getSessionContext(request) {
       // de colaborador eran todos auditores y deben seguir funcionando sin backfill.
       if (module.key === 'checklists') {
         return CHECKLIST_FUNCTION_PERMISSIONS[module.function_key] || CHECKLIST_FUNCTION_PERMISSIONS.AUDITOR
+      }
+      if (module.key === 'radicados') {
+        return RADICADOS_FUNCTION_PERMISSIONS[module.function_key] || RADICADOS_FUNCTION_PERMISSIONS.RADICADOR
       }
       return USUARIO_MODULE_PERMISSIONS[module.key] || []
     }))]

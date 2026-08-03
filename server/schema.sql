@@ -1366,3 +1366,171 @@ WHERE btrim(linea.texto) <> ''
 ALTER TABLE adherence_commitments DROP CONSTRAINT IF EXISTS adherence_commitments_status_changed_by_id_fkey;
 ALTER TABLE adherence_commitments ADD CONSTRAINT adherence_commitments_status_changed_by_id_fkey
   FOREIGN KEY (status_changed_by_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- ============================================================================
+-- Radicados: correspondencia y radicacion institucional. Reemplaza el Excel al
+-- que la entidad volvio tras perder su sistema anterior — el fallo que no se
+-- puede repetir es el consecutivo duplicado o con huecos bajo uso concurrente.
+--
+-- Dos pilares no negociables:
+-- 1) El consecutivo se genera con un UPSERT ATOMICO sobre radicado_counters
+--    (ultimo_consecutivo = ultimo_consecutivo + 1 RETURNING, ver
+--    server/routes/radicados.mjs), NUNCA leyendo el maximo actual en el codigo
+--    de la app: eso es exactamente la condicion de carrera que producia
+--    numeros repetidos en el Excel. INSERT ... ON CONFLICT DO UPDATE toma el
+--    lock de fila del UPSERT sin necesitar un SELECT ... FOR UPDATE aparte.
+-- 2) Un radicado, una vez generado, NO SE EDITA NI SE ELIMINA. Un error se
+--    corrige con una ANULACION (motivo + quien + cuando) sin liberar el
+--    numero: el consecutivo sigue avanzando y el hueco queda documentado.
+--
+-- Formato confirmado con el usuario: AAAA-TIPO-NNNNNN (2026-INT-000001), el
+-- contador se reinicia cada 1 de enero y es independiente por tipo (Interno
+-- vs Externo). "direccion" (Recibido/Enviado) es un dato de Externo que NO
+-- participa del numero ni del contador, solo de la consulta.
+-- ============================================================================
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('radicados', 'Radicados', 'Correspondencia y radicacion institucional: consecutivo atomico por tipo y ano, con trazabilidad completa', '/app/radicados', 'inbox', 17, TRUE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
+INSERT INTO organization_modules (organization_id, module_id, enabled)
+SELECT o.id, m.id, TRUE FROM organizations o, modules m WHERE m.key = 'radicados'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO permissions (key, name, description) VALUES
+  ('radicados.view', 'Ver radicados', 'Consultar la base de radicados, sus adjuntos y su trazabilidad'),
+  ('radicados.create', 'Generar radicados', 'Emitir nuevos numeros de radicado'),
+  ('radicados.void', 'Anular radicados', 'Anular un radicado dejando motivo, sin reutilizar su numero'),
+  ('radicados.manage', 'Administrar radicados', 'Configurar los catalogos de tipo, categoria y medio')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+-- Catalogos administrables. "codigo" de radicado_tipos es lo que aparece en el numero
+-- (2026-INT-000001); categorias y medios son solo de consulta/filtro.
+CREATE TABLE IF NOT EXISTS radicado_tipos (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  nombre TEXT NOT NULL,
+  codigo TEXT NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, codigo)
+);
+CREATE TABLE IF NOT EXISTS radicado_categorias (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  nombre TEXT NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, nombre)
+);
+CREATE TABLE IF NOT EXISTS radicado_medios (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  nombre TEXT NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, nombre)
+);
+
+-- Contador atomico: una fila por (entidad, tipo, ano). Dos radicaciones concurrentes del mismo
+-- tipo/ano SIEMPRE se serializan sobre esta fila: la segunda transaccion espera a que la
+-- primera confirme antes de poder leer/incrementar. Es la UNICA escritura capaz de producir un
+-- numero.
+CREATE TABLE IF NOT EXISTS radicado_counters (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  tipo_id BIGINT NOT NULL REFERENCES radicado_tipos(id),
+  anio INTEGER NOT NULL,
+  ultimo_consecutivo INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (organization_id, tipo_id, anio)
+);
+
+-- El radicado: INMUTABLE una vez creado. La app nunca hace UPDATE de negocio sobre esta tabla,
+-- salvo el cambio de estado a ANULADO (que no toca ningun otro campo). numero_radicado se arma
+-- en el servidor a partir del contador atomico, nunca a partir de MAX(id) ni de un conteo.
+CREATE TABLE IF NOT EXISTS radicados (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  numero_radicado TEXT NOT NULL,
+  tipo_id BIGINT NOT NULL REFERENCES radicado_tipos(id),
+  -- Solo aplica a Externo (Recibido/Enviado); Interno queda NULL. No participa del numero.
+  direccion TEXT CHECK (direccion IN ('RECIBIDO', 'ENVIADO')),
+  categoria_id BIGINT NOT NULL REFERENCES radicado_categorias(id),
+  medio_id BIGINT NOT NULL REFERENCES radicado_medios(id),
+  process_id BIGINT REFERENCES institutional_processes(id),
+  objeto TEXT NOT NULL,
+  remitente TEXT NOT NULL DEFAULT '',
+  destinatario TEXT NOT NULL DEFAULT '',
+  anio INTEGER NOT NULL,
+  consecutivo INTEGER NOT NULL,
+  fecha_radicado TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  fecha_documento DATE,
+  estado TEXT NOT NULL DEFAULT 'ACTIVO' CHECK (estado IN ('ACTIVO', 'ANULADO')),
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, numero_radicado),
+  UNIQUE (organization_id, tipo_id, anio, consecutivo)
+);
+CREATE INDEX IF NOT EXISTS radicados_org_fecha_idx ON radicados(organization_id, fecha_radicado DESC);
+CREATE INDEX IF NOT EXISTS radicados_org_estado_idx ON radicados(organization_id, estado);
+CREATE INDEX IF NOT EXISTS radicados_numero_idx ON radicados(organization_id, numero_radicado);
+
+-- Anulacion: NO libera el numero (el contador no se toca al anular). Un radicado anulado se
+-- queda en la base para siempre junto con el motivo — es evidencia de que el numero SI se
+-- genero y solo quedo invalidado, no de que nunca existio.
+CREATE TABLE IF NOT EXISTS radicado_anulaciones (
+  id BIGSERIAL PRIMARY KEY,
+  radicado_id BIGINT NOT NULL REFERENCES radicados(id) ON DELETE CASCADE,
+  motivo TEXT NOT NULL,
+  anulado_by_id BIGINT NOT NULL REFERENCES users(id),
+  anulado_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Adjuntos: solo se agregan. Sin endpoint de borrado a proposito — misma inmutabilidad que el
+-- radicado, y evita que "se me subio el archivo equivocado" borre evidencia de que se subio.
+CREATE TABLE IF NOT EXISTS radicado_adjuntos (
+  id BIGSERIAL PRIMARY KEY,
+  radicado_id BIGINT NOT NULL REFERENCES radicados(id) ON DELETE CASCADE,
+  stored_name TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS radicado_adjuntos_radicado_idx ON radicado_adjuntos(radicado_id);
+
+-- Log de auditoria INMUTABLE: la app nunca hace UPDATE ni DELETE sobre esta tabla.
+CREATE TABLE IF NOT EXISTS radicado_auditoria (
+  id BIGSERIAL PRIMARY KEY,
+  radicado_id BIGINT NOT NULL REFERENCES radicados(id) ON DELETE CASCADE,
+  accion TEXT NOT NULL CHECK (accion IN ('CREADO', 'ANULADO', 'ADJUNTO_SUBIDO')),
+  detalle TEXT NOT NULL DEFAULT '',
+  actor_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS radicado_auditoria_radicado_idx ON radicado_auditoria(radicado_id, created_at);
+
+-- Backfill de catalogos base para las entidades que ya existen (el auto-enable de arriba solo
+-- siembra el modulo/permiso; el catalogo de cada entidad se siembra aqui, idempotente por el
+-- UNIQUE de codigo/nombre). Cada entidad puede editar nombres y agregar los suyos despues.
+INSERT INTO radicado_tipos (organization_id, nombre, codigo, order_index)
+SELECT o.id, v.nombre, v.codigo, v.order_index
+FROM organizations o CROSS JOIN (VALUES ('Interno', 'INT', 1), ('Externo', 'EXT', 2)) AS v(nombre, codigo, order_index)
+ON CONFLICT (organization_id, codigo) DO NOTHING;
+
+INSERT INTO radicado_categorias (organization_id, nombre, order_index)
+SELECT o.id, v.nombre, v.order_index
+FROM organizations o
+CROSS JOIN (VALUES ('Oficio', 1), ('Memorando', 2), ('Solicitud', 3), ('PQRSF', 4), ('Circular', 5)) AS v(nombre, order_index)
+ON CONFLICT (organization_id, nombre) DO NOTHING;
+
+INSERT INTO radicado_medios (organization_id, nombre, order_index)
+SELECT o.id, v.nombre, v.order_index
+FROM organizations o
+CROSS JOIN (VALUES ('Fisico', 1), ('Correo electronico', 2), ('Ventanilla', 3), ('Pagina web', 4)) AS v(nombre, order_index)
+ON CONFLICT (organization_id, nombre) DO NOTHING;

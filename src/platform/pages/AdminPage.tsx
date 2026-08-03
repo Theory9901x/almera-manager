@@ -264,6 +264,8 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
   // Listas de Chequeo tambien pide funcion al habilitar: auditor (hace rondas) o colaborador
   // (solo subsana sus planes de mejora). Sin campos extra, asi que basta un select.
   const [checklistFn, setChecklistFn] = useState<'AUDITOR' | 'COLABORADOR' | ''>('')
+  // Radicados: Radicador (genera y anula) o Consulta (solo ve la base). Mismo patron que Listas.
+  const [radicadosFn, setRadicadosFn] = useState<'RADICADOR' | 'CONSULTA' | ''>('')
 
   const load = () => api.userModules(user.membership_id).then(setGrants).catch(cause => setError(cause instanceof Error ? cause.message : 'No fue posible cargar los modulos'))
   useEffect(() => { void load() }, [user.membership_id])
@@ -280,7 +282,7 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
         await api.revokeUserModule(user.membership_id, moduleKey)
         await load(); await reload()
         done('Modulo retirado')
-      } else if (moduleKey !== 'adherence-matrix' && moduleKey !== 'checklists') {
+      } else if (moduleKey !== 'adherence-matrix' && moduleKey !== 'checklists' && moduleKey !== 'radicados') {
         await api.grantUserModule(user.membership_id, moduleKey)
         await load(); await reload()
         done('Modulo habilitado')
@@ -318,8 +320,21 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
     finally { setBusyKey(null) }
   }
 
+  async function grantRadicados() {
+    if (!radicadosFn) return
+    setBusyKey('radicados'); setError('')
+    try {
+      await api.grantUserModule(user.membership_id, 'radicados', { function: radicadosFn })
+      setRadicadosFn('')
+      await load(); await reload()
+      done('Radicados habilitado')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible habilitar el modulo') }
+    finally { setBusyKey(null) }
+  }
+
   const matrixGrant = grants.find(item => item.module_key === 'adherence-matrix')
   const checklistGrant = grants.find(item => item.module_key === 'checklists')
+  const radicadosGrant = grants.find(item => item.module_key === 'radicados')
 
   return (
     <div className="space-y-4 p-5">
@@ -329,16 +344,22 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
           const granted = grantedKeys.has(module.key)
           const isMatrix = module.key === 'adherence-matrix'
           const isChecklists = module.key === 'checklists'
+          const isRadicados = module.key === 'radicados'
           return (
             <div key={module.id} className="rounded-xl border border-[var(--border-hairline)] p-3">
               <button
                 type="button"
-                disabled={busyKey === module.key || ((isMatrix || isChecklists) && !granted)}
+                disabled={busyKey === module.key || ((isMatrix || isChecklists || isRadicados) && !granted)}
                 onClick={() => void toggle(module.key)}
                 className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-60"
               >
                 <span>
                   <span className="block text-sm font-bold">{module.name}</span>
+                  {isRadicados && granted && (
+                    <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                      {radicadosGrant?.function_key === 'CONSULTA' ? 'Consulta (solo ve la base)' : 'Radicador (genera y anula)'}
+                    </span>
+                  )}
                   {isMatrix && granted && matrixGrant?.function_key && (
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {matrixGrant.function_key === 'AUDITOR' ? 'Auditor' : 'Profesional'}
@@ -371,6 +392,27 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
                     className="w-full"
                     disabled={busyKey === 'checklists' || !checklistFn}
                     onClick={() => void grantChecklists()}
+                  >
+                    Habilitar
+                  </Button>
+                </div>
+              )}
+              {isRadicados && !granted && (
+                <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
+                  <Select
+                    value={radicadosFn}
+                    onChange={value => setRadicadosFn(value as 'RADICADOR' | 'CONSULTA' | '')}
+                    placeholder="Función..."
+                    options={[
+                      { value: 'RADICADOR', label: 'Radicador (genera y anula radicados)' },
+                      { value: 'CONSULTA', label: 'Consulta (solo ve la base)' },
+                    ]}
+                  />
+                  <Button
+                    identity={identity}
+                    className="w-full"
+                    disabled={busyKey === 'radicados' || !radicadosFn}
+                    onClick={() => void grantRadicados()}
                   >
                     Habilitar
                   </Button>

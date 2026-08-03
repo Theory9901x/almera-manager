@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck, ClipboardList,
-  FileBarChart2, Headphones, LayoutDashboard, Leaf, ListChecks, LogOut, Menu, Moon, Search,
+  FileBarChart2, Headphones, Inbox, LayoutDashboard, Leaf, ListChecks, LogOut, Menu, Moon, Search,
   Settings, ShieldCheck, Sparkles, Sun, Users, X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -25,6 +25,7 @@ const icons = {
   settings: Settings,
   users: Users,
   building: Building2,
+  inbox: Inbox,
 }
 
 export default function AppLayout() {

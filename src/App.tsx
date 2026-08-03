@@ -28,6 +28,7 @@ import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
 import ChecklistWindowPage from '@/modules/checklists/pages/ChecklistWindowPage'
 import ChecklistPreviewPage from '@/modules/checklists/pages/ChecklistPreviewPage'
 import ChecklistPlansPage from '@/modules/checklists/pages/ChecklistPlansPage'
+import { RadicadosDashboardPage } from '@/modules/radicados/pages/RadicadosDashboardPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -154,6 +155,17 @@ function ChecklistWindowRoute() {
   return <ChecklistWindowPage />
 }
 
+function RadicadosRoute() {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('radicados.view')) return <Navigate to="/app" replace />
+  return (
+    <RadicadosDashboardPage
+      canCreate={session.permissions.includes('radicados.create')}
+      canVoid={session.permissions.includes('radicados.void')}
+    />
+  )
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -193,6 +205,7 @@ function AppRoutes() {
         <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />
         <Route path="huella-carbono/captura" element={<CarbonRoute><CarbonCapturePage /></CarbonRoute>} />
         <Route path="huella-carbono/configuracion" element={<CarbonConfigRoute />} />
+        <Route path="radicados" element={<RadicadosRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/app' : '/login'} replace />} />
