@@ -28,7 +28,7 @@ export const api = {
   updateModule: (moduleId: string, enabled: boolean) =>
     request(`/admin/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
   userModules: (membershipId: string) => request<UserModuleGrant[]>(`/admin/users/${membershipId}/modules`),
-  grantUserModule: (membershipId: string, moduleKey: string, data?: { areaId?: string; documentId?: string; positionId?: string; function?: 'AUDITOR' | 'PROFESIONAL' | 'COLABORADOR' | 'RADICADOR' | 'CONSULTA' }) =>
+  grantUserModule: (membershipId: string, moduleKey: string, data?: { areaId?: string; documentId?: string; positionId?: string; function?: 'AUDITOR' | 'PROFESIONAL' | 'COLABORADOR' | 'RADICADOR' | 'GENERADOR' | 'CONSULTA' }) =>
     request(`/admin/users/${membershipId}/modules/${moduleKey}`, { method: 'PUT', body: JSON.stringify(data || {}) }),
   revokeUserModule: (membershipId: string, moduleKey: string) =>
     request(`/admin/users/${membershipId}/modules/${moduleKey}`, { method: 'DELETE' }),

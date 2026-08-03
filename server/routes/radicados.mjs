@@ -22,6 +22,14 @@ function fail(status, message) {
   throw error
 }
 
+// Eliminar es EXCLUSIVO de superadmin y distinto de anular (ver el ALTER de schema.sql): anular
+// invalida un numero a la vista, con su motivo; eliminar lo saca de las vistas normales para
+// datos de prueba o duplicados por error de captura, pero nunca lo borra de la base.
+function requireSuperadmin(request, response, next) {
+  if (request.auth?.role?.key !== 'SUPERADMIN') return response.status(403).json({ error: 'Solo un superadministrador puede eliminar un radicado' })
+  next()
+}
+
 /** Filtra un id de la URL: `/:id` se traga cualquier cosa que no case antes, y un id no
  *  numerico manda NaN a una clave bigint (22P02, 500 donde toca 404). Ver CLAUDE.md §10. */
 const numericId = value => /^\d+$/.test(String(value ?? ''))
@@ -202,6 +210,11 @@ function buildFilter(request) {
     const idx = params.length
     clauses.push(`(r.numero_radicado ILIKE $${idx} OR r.objeto ILIKE $${idx} OR r.remitente ILIKE $${idx} OR r.destinatario ILIKE $${idx})`)
   }
+  // Los eliminados nunca se mezclan con los activos: o se ve una lista o la otra. Y solo un
+  // superadmin puede pedir la de eliminados — a cualquier otro rol, aunque lo pida, se le sigue
+  // ocultando (ver detalle abajo hace lo mismo).
+  const includeDeleted = q.includeDeleted === 'true' && request.auth?.role?.key === 'SUPERADMIN'
+  clauses.push(includeDeleted ? 'r.deleted_at IS NOT NULL' : 'r.deleted_at IS NULL')
   return { where: clauses.length ? `AND ${clauses.join(' AND ')}` : '', params }
 }
 
@@ -210,6 +223,7 @@ const LIST_SELECT = `
          c.nombre AS categoria_nombre, m.nombre AS medio_nombre,
          p.name AS process_name, p.code AS process_code,
          u.full_name AS created_by_name,
+         du.full_name AS deleted_by_name,
          (SELECT COUNT(*) FROM radicado_adjuntos a WHERE a.radicado_id = r.id)::int AS adjuntos_count
   FROM radicados r
   JOIN radicado_tipos t ON t.id = r.tipo_id
@@ -217,6 +231,7 @@ const LIST_SELECT = `
   JOIN radicado_medios m ON m.id = r.medio_id
   LEFT JOIN institutional_processes p ON p.id = r.process_id
   JOIN users u ON u.id = r.created_by_id
+  LEFT JOIN users du ON du.id = r.deleted_by_id
   WHERE r.organization_id = $1`
 
 radicadosRouter.get('/', radicadosModule, view, async (request, response, next) => {
@@ -239,6 +254,9 @@ radicadosRouter.get('/:id', radicadosModule, view, async (request, response, nex
     if (!numericId(request.params.id)) fail(404, 'Radicado no encontrado')
     const result = await query(`${LIST_SELECT} AND r.id = $2`, [oid(request), request.params.id])
     if (!result.rows[0]) fail(404, 'Radicado no encontrado')
+    // Un eliminado solo lo puede abrir un superadmin (desde "Ver eliminados"); para cualquier
+    // otro rol es como si no existiera, aunque conozca la URL exacta.
+    if (result.rows[0].deleted_at && request.auth?.role?.key !== 'SUPERADMIN') fail(404, 'Radicado no encontrado')
     const [adjuntos, auditoria, anulacion] = await Promise.all([
       query(
         `SELECT a.id, a.original_name, a.mime_type, a.size_bytes, a.created_at, u.full_name AS uploaded_by_name
@@ -273,10 +291,10 @@ radicadosRouter.post('/:id/anular', radicadosModule, voidPerm, async (request, r
     await client.query('BEGIN')
     // FOR UPDATE: dos anulaciones simultaneas del mismo radicado no deben registrarse dos veces.
     const current = await client.query(
-      'SELECT id, estado, numero_radicado FROM radicados WHERE id = $1 AND organization_id = $2 FOR UPDATE',
+      'SELECT id, estado, numero_radicado, deleted_at FROM radicados WHERE id = $1 AND organization_id = $2 FOR UPDATE',
       [request.params.id, oid(request)],
     )
-    if (!current.rows[0]) fail(404, 'Radicado no encontrado')
+    if (!current.rows[0] || current.rows[0].deleted_at) fail(404, 'Radicado no encontrado')
     if (current.rows[0].estado === 'ANULADO') fail(409, 'Este radicado ya está anulado')
 
     // El numero NO se libera: no se toca radicado_counters. Solo cambia el estado.
@@ -290,6 +308,41 @@ radicadosRouter.post('/:id/anular', radicadosModule, voidPerm, async (request, r
     )
     await client.query(
       `INSERT INTO radicado_auditoria (radicado_id, accion, detalle, actor_id) VALUES ($1, 'ANULADO', $2, $3)`,
+      [request.params.id, motivo, uid(request)],
+    )
+    await client.query('COMMIT')
+    response.json(updated.rows[0])
+  } catch (error) {
+    await client.query('ROLLBACK')
+    next(error)
+  } finally { client.release() }
+})
+
+// Eliminar (soft-delete): saca el radicado de las vistas normales, pero NO es un DELETE — sigue
+// en la base, en la auditoria y su numero sigue sin poder reutilizarse (no se toca el contador).
+// Distinto de anular: un radicado activo O anulado se puede eliminar por igual, y al reves un
+// eliminado ya no se puede anular ni recibir adjuntos (desaparecio de las vistas donde se hace eso).
+radicadosRouter.post('/:id/eliminar', radicadosModule, requireSuperadmin, async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    if (!numericId(request.params.id)) fail(404, 'Radicado no encontrado')
+    const motivo = String(request.body?.motivo || '').trim()
+    if (!motivo) fail(400, 'El motivo de la eliminación es obligatorio')
+
+    await client.query('BEGIN')
+    const current = await client.query(
+      'SELECT id, deleted_at FROM radicados WHERE id = $1 AND organization_id = $2 FOR UPDATE',
+      [request.params.id, oid(request)],
+    )
+    if (!current.rows[0]) fail(404, 'Radicado no encontrado')
+    if (current.rows[0].deleted_at) fail(409, 'Este radicado ya está eliminado')
+
+    const updated = await client.query(
+      'UPDATE radicados SET deleted_at = NOW(), deleted_by_id = $1, deleted_reason = $2 WHERE id = $3 RETURNING *',
+      [uid(request), motivo, request.params.id],
+    )
+    await client.query(
+      `INSERT INTO radicado_auditoria (radicado_id, accion, detalle, actor_id) VALUES ($1, 'ELIMINADO', $2, $3)`,
       [request.params.id, motivo, uid(request)],
     )
     await client.query('COMMIT')
@@ -337,7 +390,7 @@ const adjuntoUpload = multer({
 radicadosRouter.post('/:id/adjuntos', radicadosModule, create, adjuntoUpload.single('file'), async (request, response, next) => {
   try {
     if (!numericId(request.params.id)) fail(404, 'Radicado no encontrado')
-    const radicado = await query('SELECT id FROM radicados WHERE id = $1 AND organization_id = $2', [request.params.id, oid(request)])
+    const radicado = await query('SELECT id FROM radicados WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL', [request.params.id, oid(request)])
     if (!radicado.rows[0]) fail(404, 'Radicado no encontrado')
     if (!request.file) fail(400, 'No llegó ningún archivo')
     const inserted = await query(
@@ -388,9 +441,9 @@ radicadosRouter.get('/resumen/dashboard', radicadosModule, view, async (request,
            COUNT(*) FILTER (WHERE date_trunc('month', fecha_radicado) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month'))::int AS mes_anterior,
            COUNT(*) FILTER (WHERE estado = 'ANULADO' AND date_trunc('month', fecha_radicado) = date_trunc('month', CURRENT_DATE))::int AS anulados_mes,
            COUNT(*) FILTER (WHERE estado = 'ANULADO' AND date_trunc('month', fecha_radicado) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month'))::int AS anulados_mes_anterior,
-           (SELECT COUNT(*)::int FROM radicados r2 WHERE r2.organization_id = $1 AND r2.estado = 'ACTIVO'
+           (SELECT COUNT(*)::int FROM radicados r2 WHERE r2.organization_id = $1 AND r2.estado = 'ACTIVO' AND r2.deleted_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM radicado_adjuntos a WHERE a.radicado_id = r2.id)) AS pendientes_adjunto
-         FROM radicados WHERE organization_id = $1`,
+         FROM radicados WHERE organization_id = $1 AND deleted_at IS NULL`,
         [organizationId],
       ),
       query(
@@ -400,7 +453,7 @@ radicadosRouter.get('/resumen/dashboard', radicadosModule, view, async (request,
            COUNT(*) FILTER (WHERE direccion IS NULL)::int AS internos,
            COUNT(*)::int AS total
          FROM radicados
-         WHERE organization_id = $1 AND date_trunc('month', fecha_radicado) = date_trunc('month', CURRENT_DATE)`,
+         WHERE organization_id = $1 AND deleted_at IS NULL AND date_trunc('month', fecha_radicado) = date_trunc('month', CURRENT_DATE)`,
         [organizationId],
       ),
       query(
@@ -408,11 +461,67 @@ radicadosRouter.get('/resumen/dashboard', radicadosModule, view, async (request,
          FROM radicado_anulaciones an
          JOIN radicados r ON r.id = an.radicado_id
          JOIN radicado_categorias c ON c.id = r.categoria_id
-         WHERE r.organization_id = $1
+         WHERE r.organization_id = $1 AND r.deleted_at IS NULL
          ORDER BY an.anulado_at DESC LIMIT 5`,
         [organizationId],
       ),
     ])
     response.json({ kpis: kpis.rows[0], mix: mix.rows[0], recentVoided: anulados.rows })
+  } catch (error) { next(error) }
+})
+
+// ---------------------------------------------------------------------------
+// Analitica: generacion por mes, tipo, direccion, proceso y categoria. Igual que el
+// dashboard, todo se agrega EN SQL — nunca se traen las filas a Node para sumarlas ahi.
+// ---------------------------------------------------------------------------
+
+radicadosRouter.get('/resumen/analitica', radicadosModule, view, async (request, response, next) => {
+  try {
+    const organizationId = oid(request)
+    const [monthly, byTipo, byDireccion, byProceso, byCategoria] = await Promise.all([
+      // Ultimos 12 meses, incluyendo los que no tuvieron ningun radicado (generate_series).
+      query(
+        `SELECT to_char(s.mes, 'Mon YYYY') AS label, COALESCE(c.n, 0)::int AS value
+         FROM generate_series(date_trunc('month', CURRENT_DATE) - INTERVAL '11 months', date_trunc('month', CURRENT_DATE), INTERVAL '1 month') AS s(mes)
+         LEFT JOIN (
+           SELECT date_trunc('month', fecha_radicado) AS mes, COUNT(*) AS n
+           FROM radicados WHERE organization_id = $1 AND deleted_at IS NULL
+           GROUP BY 1
+         ) c ON c.mes = s.mes
+         ORDER BY s.mes`,
+        [organizationId],
+      ),
+      query(
+        `SELECT t.nombre AS label, COUNT(*)::int AS value
+         FROM radicados r JOIN radicado_tipos t ON t.id = r.tipo_id
+         WHERE r.organization_id = $1 AND r.deleted_at IS NULL
+         GROUP BY t.nombre ORDER BY value DESC`,
+        [organizationId],
+      ),
+      query(
+        `SELECT CASE direccion WHEN 'RECIBIDO' THEN 'Recibido' WHEN 'ENVIADO' THEN 'Enviado' ELSE 'Interno' END AS label, COUNT(*)::int AS value
+         FROM radicados WHERE organization_id = $1 AND deleted_at IS NULL
+         GROUP BY 1 ORDER BY value DESC`,
+        [organizationId],
+      ),
+      query(
+        `SELECT COALESCE(p.name, 'Sin proceso') AS label, COUNT(*)::int AS value
+         FROM radicados r LEFT JOIN institutional_processes p ON p.id = r.process_id
+         WHERE r.organization_id = $1 AND r.deleted_at IS NULL
+         GROUP BY 1 ORDER BY value DESC LIMIT 8`,
+        [organizationId],
+      ),
+      query(
+        `SELECT c.nombre AS label, COUNT(*)::int AS value
+         FROM radicados r JOIN radicado_categorias c ON c.id = r.categoria_id
+         WHERE r.organization_id = $1 AND r.deleted_at IS NULL
+         GROUP BY c.nombre ORDER BY value DESC LIMIT 8`,
+        [organizationId],
+      ),
+    ])
+    response.json({
+      monthly: monthly.rows, byTipo: byTipo.rows, byDireccion: byDireccion.rows,
+      byProceso: byProceso.rows, byCategoria: byCategoria.rows,
+    })
   } catch (error) { next(error) }
 })

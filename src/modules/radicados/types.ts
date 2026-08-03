@@ -42,6 +42,9 @@ export interface RadicadoRow {
   created_by_id: string
   created_by_name: string
   adjuntos_count: number
+  deleted_at: string | null
+  deleted_by_name: string | null
+  deleted_reason: string
 }
 
 export interface RadicadoAdjunto {
@@ -55,7 +58,7 @@ export interface RadicadoAdjunto {
 
 export interface RadicadoAuditoriaEntry {
   id: string
-  accion: 'CREADO' | 'ANULADO' | 'ADJUNTO_SUBIDO'
+  accion: 'CREADO' | 'ANULADO' | 'ADJUNTO_SUBIDO' | 'ELIMINADO'
   detalle: string
   created_at: string
   actor_name: string
@@ -85,6 +88,8 @@ export interface RadicadoFilters {
   dateFrom?: string
   dateTo?: string
   search?: string
+  /** Solo superadmin: en vez de los activos, trae los eliminados (soft-delete). */
+  includeDeleted?: 'true'
 }
 
 export interface CreateRadicadoInput {
@@ -113,4 +118,12 @@ export interface RadicadosDashboard {
   }
   mix: { recibidos: number; enviados: number; internos: number; total: number }
   recentVoided: { id: string; numero_radicado: string; categoria_nombre: string; motivo: string; anulado_at: string }[]
+}
+
+export interface RadicadosAnalytics {
+  monthly: { label: string; value: number }[]
+  byTipo: { label: string; value: number }[]
+  byDireccion: { label: string; value: number }[]
+  byProceso: { label: string; value: number }[]
+  byCategoria: { label: string; value: number }[]
 }

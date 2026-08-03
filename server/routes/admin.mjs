@@ -189,10 +189,10 @@ adminRouter.put('/users/:membershipId/modules/:moduleKey', requireAnyPermission(
         [membershipId, module.rows[0].id, functionKey],
       )
     } else if (moduleKey === 'radicados') {
-      // RADICADOR genera y anula; CONSULTA solo ve la base. Sin funcion explicita se asume
-      // RADICADOR, el uso mas comun.
+      // RADICADOR genera y anula; GENERADOR solo genera y consulta (sin anular); CONSULTA solo
+      // ve la base. Sin funcion explicita se asume RADICADOR, el uso mas comun.
       const functionKey = String(request.body?.function || 'RADICADOR').trim().toUpperCase()
-      if (!['RADICADOR', 'CONSULTA'].includes(functionKey)) fail(400, 'Elige la función: Radicador o Consulta')
+      if (!['RADICADOR', 'GENERADOR', 'CONSULTA'].includes(functionKey)) fail(400, 'Elige la función: Radicador, Generador o Consulta')
       await client.query(
         `INSERT INTO membership_modules (membership_id, module_id, function_key) VALUES ($1,$2,$3)
          ON CONFLICT (membership_id, module_id) DO UPDATE SET function_key=EXCLUDED.function_key`,

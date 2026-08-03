@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Ban, ChevronLeft, ChevronRight, Database, Eye, FilePlus2, FileText, Inbox, LayoutDashboard, PackageOpen,
-  Paperclip, Search, Send, X,
+  Ban, BarChart3, ChevronLeft, ChevronRight, Database, Eye, FilePlus2, FileText, Inbox, LayoutDashboard,
+  PackageOpen, Paperclip, Search, Send, X,
 } from 'lucide-react'
 import {
-  Badge, Button, Card, DatePicker, DonutChart, EmptyState, Field, Input, ModuleHero, Select, StatCard,
+  BarChart, Badge, Button, Card, DatePicker, DonutChart, EmptyState, Field, Input, ModuleHero, Select, StatCard,
   ToastProvider, moduleIdentity, useToast,
 } from '@/design-system'
 import { NewRadicadoDialog } from '../components/NewRadicadoDialog'
 import { RadicadoDetailDialog } from '../components/RadicadoDetailDialog'
 import { radicadosService } from '../services/radicadosService'
 import type {
-  CreateRadicadoInput, RadicadoCatalogos, RadicadoDetail, RadicadoFilters, RadicadoListPage, RadicadosDashboard,
+  CreateRadicadoInput, RadicadoCatalogos, RadicadoDetail, RadicadoFilters, RadicadoListPage, RadicadosAnalytics,
+  RadicadosDashboard,
 } from '../types'
 
 const identity = moduleIdentity('radicados')
@@ -24,17 +25,18 @@ const QUICK_FILTERS: { key: string; label: string; patch: RadicadoFilters }[] = 
   { key: 'ANULADOS', label: 'Anulados', patch: { estado: 'ANULADO' } },
 ]
 
-type Section = 'resumen' | 'base-datos' | 'consulta'
+type Section = 'resumen' | 'base-datos' | 'consulta' | 'estadisticas'
 
-export function RadicadosDashboardPage(props: { canCreate: boolean; canVoid: boolean }) {
+export function RadicadosDashboardPage(props: { canCreate: boolean; canVoid: boolean; isSuperadmin: boolean }) {
   return <ToastProvider><RadicadosDashboardContent {...props} /></ToastProvider>
 }
 
-function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean; canVoid: boolean }) {
+function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCreate: boolean; canVoid: boolean; isSuperadmin: boolean }) {
   const toast = useToast()
   const [section, setSection] = useState<Section>('resumen')
   const [catalogos, setCatalogos] = useState<RadicadoCatalogos | null>(null)
   const [dashboard, setDashboard] = useState<RadicadosDashboard | null>(null)
+  const [analytics, setAnalytics] = useState<RadicadosAnalytics | null>(null)
   const [creating, setCreating] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [selected, setSelected] = useState<RadicadoDetail | null>(null)
@@ -42,9 +44,12 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
   // Base de datos: SIN filtros y sin nada mas — el listado completo, tal cual, con todas las
   // columnas de trazabilidad. Es un espacio propio a proposito: mezclarlo con la consulta hacia
   // imposible ver "todo lo que hay" sin que un filtro puesto antes lo recortara en silencio.
+  // "Ver eliminados" es la unica excepcion, y solo para superadmin: sin ella, un eliminado no
+  // tendria forma de auditarse de nuevo aunque siga completo en la base.
   const [dbPage, setDbPage] = useState(1)
   const [dbData, setDbData] = useState<RadicadoListPage | null>(null)
   const [dbLoading, setDbLoading] = useState(true)
+  const [showDeleted, setShowDeleted] = useState(false)
 
   // Consulta: filtros combinables, aparte de la base de datos completa.
   const [filters, setFilters] = useState<RadicadoFilters>({})
@@ -65,12 +70,17 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
 
   function loadDb() {
     setDbLoading(true)
-    radicadosService.list({ page: String(dbPage), pageSize: '50' })
+    radicadosService.list({ page: String(dbPage), pageSize: '50', includeDeleted: showDeleted ? 'true' : undefined })
       .then(setDbData)
       .catch(cause => toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar la base de datos'))
       .finally(() => setDbLoading(false))
   }
-  useEffect(() => { if (section === 'base-datos') loadDb() }, [section, dbPage])
+  useEffect(() => { if (section === 'base-datos') loadDb() }, [section, dbPage, showDeleted])
+
+  function loadAnalytics() {
+    radicadosService.analytics().then(setAnalytics).catch(() => setAnalytics(null))
+  }
+  useEffect(() => { if (section === 'estadisticas' && !analytics) loadAnalytics() }, [section])
 
   function load() {
     setLoading(true)
@@ -119,6 +129,7 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
       loadDashboard()
       if (section === 'base-datos') loadDb()
       if (section === 'consulta') load()
+      if (section === 'estadisticas') loadAnalytics()
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible generar el radicado') }
     finally { setCreating(false) }
   }
@@ -128,11 +139,12 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
     catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible abrir el radicado') }
   }
 
-  function onDetailChanged() {
-    if (selected) radicadosService.detail(selected.id).then(setSelected).catch(() => {})
+  function onDetailChanged(options?: { closing?: boolean }) {
+    if (selected && !options?.closing) radicadosService.detail(selected.id).then(setSelected).catch(() => {})
     loadDashboard()
     if (section === 'base-datos') loadDb()
     if (section === 'consulta') load()
+    if (section === 'estadisticas') loadAnalytics()
   }
 
   const mixTotal = dashboard?.mix.total || 0
@@ -140,7 +152,7 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
   return (
     <div className="page-with-identity" style={{ ['--ds-accent' as string]: identity.color }}>
       <NewRadicadoDialog open={showNew} catalogos={catalogos} busy={creating} onCancel={() => setShowNew(false)} onCreate={createRadicado} />
-      <RadicadoDetailDialog radicado={selected} canVoid={canVoid} onClose={() => setSelected(null)} onChanged={onDetailChanged} />
+      <RadicadoDetailDialog radicado={selected} canVoid={canVoid} canDelete={isSuperadmin} onClose={() => setSelected(null)} onChanged={onDetailChanged} />
 
       <ModuleHero
         badge="Radicados"
@@ -167,6 +179,11 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
             style={section === 'consulta' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
             onClick={() => setSection('consulta')}
           ><Search size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Consulta</button>
+          <button
+            className={`ds-tabs-item ${section === 'estadisticas' ? 'is-active' : ''}`}
+            style={section === 'estadisticas' ? ({ ['--tab-accent' as string]: identity.color }) : undefined}
+            onClick={() => setSection('estadisticas')}
+          ><BarChart3 size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: '-2px' }} />Estadísticas</button>
         </nav>
 
         <div className="mt-5 space-y-5">
@@ -223,13 +240,31 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
               <div className="table-toolbar">
                 <div className="almera-panel-title" style={{ ['--ds-accent' as string]: identity.color }}>
                   <span><Database size={19} /></span>
-                  <div><h2>Base de datos de radicados</h2><p>{dbData ? `${dbData.total} radicado${dbData.total === 1 ? '' : 's'} en total, sin filtrar` : '…'}</p></div>
+                  <div>
+                    <h2>{showDeleted ? 'Radicados eliminados' : 'Base de datos de radicados'}</h2>
+                    <p>{dbData ? `${dbData.total} radicado${dbData.total === 1 ? '' : 's'}${showDeleted ? '' : ' en total, sin filtrar'}` : '…'}</p>
+                  </div>
                 </div>
+                {/* Alterna entre la base activa y la papelera, nunca las dos mezcladas — igual
+                    que el servidor, que responde una u otra segun includeDeleted. */}
+                {isSuperadmin && (
+                  <Button
+                    variant={showDeleted ? 'primary' : 'secondary'}
+                    identity={identity}
+                    onClick={() => { setShowDeleted(current => !current); setDbPage(1) }}
+                  >
+                    {showDeleted ? 'Ver activos' : 'Ver eliminados'}
+                  </Button>
+                )}
               </div>
 
               {!dbLoading && dbData && dbData.rows.length === 0 && (
                 <div className="p-5">
-                  <EmptyState icon={Database} title="Todavía no hay radicados" description="El primero que generes aparecerá aquí." />
+                  <EmptyState
+                    icon={Database}
+                    title={showDeleted ? 'Ningún radicado eliminado' : 'Todavía no hay radicados'}
+                    description={showDeleted ? 'Los radicados que un superadmin elimine aparecerán aquí.' : 'El primero que generes aparecerá aquí.'}
+                  />
                 </div>
               )}
 
@@ -260,7 +295,11 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
                             <td className="tabular-col">{row.fecha_documento ? new Date(row.fecha_documento).toLocaleDateString('es-CO') : '—'}</td>
                             <td>{row.created_by_name}</td>
                             <td className="tabular-col">{row.adjuntos_count}</td>
-                            <td><Badge tone={row.estado === 'ANULADO' ? 'danger' : 'success'}>{row.estado === 'ANULADO' ? 'Anulado' : 'Activo'}</Badge></td>
+                            <td>
+                              {row.deleted_at
+                                ? <Badge tone="danger">Eliminado</Badge>
+                                : <Badge tone={row.estado === 'ANULADO' ? 'danger' : 'success'}>{row.estado === 'ANULADO' ? 'Anulado' : 'Activo'}</Badge>}
+                            </td>
                             <td>
                               <button className="row-action" style={{ ['--row-accent' as string]: identity.color }} title="Ver el detalle y la trazabilidad completa" onClick={() => void openDetail(row.id)}>
                                 <Eye size={13} /> Ver
@@ -401,6 +440,64 @@ function RadicadosDashboardContent({ canCreate, canVoid }: { canCreate: boolean;
                     </div>
                   </>
                 )}
+              </Card>
+            </>
+          )}
+
+          {section === 'estadisticas' && (
+            <>
+              <Card accent={identity.color} className="p-5">
+                <p className="ds-eyebrow">Por mes</p>
+                <h2 className="mt-1 text-lg font-black">Radicados generados (últimos 12 meses)</h2>
+                {analytics && analytics.monthly.some(item => item.value > 0) ? (
+                  <div className="mt-3"><BarChart data={analytics.monthly} color={identity.color} height={260} /></div>
+                ) : <div className="mt-3"><EmptyState icon={BarChart3} title="Sin datos suficientes" description="Cuando haya radicados generados, su evolución mensual aparecerá aquí." /></div>}
+              </Card>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Card accent={identity.color} className="p-5">
+                  <p className="ds-eyebrow">Interno o externo</p>
+                  <h3 className="mt-1 text-sm font-bold">Por dirección</h3>
+                  {analytics && analytics.byDireccion.length ? (
+                    <div className="mt-3">
+                      <DonutChart
+                        height={220}
+                        centerLabel="radicados"
+                        data={analytics.byDireccion.map((item, index) => ({ ...item, color: [identity.color, '#0EA5E9', '#94A3B8'][index] || '#CBD5E1' }))}
+                      />
+                    </div>
+                  ) : <div className="mt-3"><EmptyState icon={BarChart3} title="Sin datos suficientes" /></div>}
+                </Card>
+
+                <Card accent={identity.color} className="p-5">
+                  <p className="ds-eyebrow">Catálogo</p>
+                  <h3 className="mt-1 text-sm font-bold">Por tipo de radicado</h3>
+                  {analytics && analytics.byTipo.length ? (
+                    <div className="mt-3">
+                      <DonutChart
+                        height={220}
+                        centerLabel="radicados"
+                        data={analytics.byTipo.map((item, index) => ({ ...item, color: [identity.color, '#0EA5E9', '#94A3B8', '#F59E0B'][index] || '#CBD5E1' }))}
+                      />
+                    </div>
+                  ) : <div className="mt-3"><EmptyState icon={BarChart3} title="Sin datos suficientes" /></div>}
+                </Card>
+              </div>
+
+              <Card accent={identity.color} className="p-5">
+                <p className="ds-eyebrow">Trazabilidad institucional</p>
+                <h3 className="mt-1 text-sm font-bold">Por proceso</h3>
+                {analytics && analytics.byProceso.some(item => item.value > 0) ? (
+                  <div className="mt-3"><BarChart data={analytics.byProceso} orientation="horizontal" color={identity.color} height={Math.max(160, analytics.byProceso.length * 34)} /></div>
+                ) : <div className="mt-3"><EmptyState icon={BarChart3} title="Sin datos suficientes" description="Los radicados sin proceso asignado no cuentan aquí." /></div>}
+              </Card>
+
+              <Card accent={identity.color} className="p-5">
+                <p className="ds-eyebrow">Catálogo</p>
+                <h3 className="mt-1 text-sm font-bold">Por categoría / tipo documental</h3>
+                {analytics && analytics.byCategoria.length ? (
+                  <div className="mt-3"><BarChart data={analytics.byCategoria} orientation="horizontal" color={identity.color} height={Math.max(160, analytics.byCategoria.length * 34)} /></div>
+                ) : <div className="mt-3"><EmptyState icon={BarChart3} title="Sin datos suficientes" /></div>}
               </Card>
             </>
           )}

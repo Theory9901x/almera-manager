@@ -39,13 +39,15 @@ const ADHERENCE_FUNCTION_PERMISSIONS = {
   PROFESIONAL: ['adherence_matrix.own_plan'],
 }
 
-// Radicados: RADICADOR genera y anula (quien "radica"); CONSULTA solo ve la base, para quien
-// necesita buscar un numero sin poder emitirlos. radicados.manage (catalogos de tipo/categoria/
-// medio) queda FUERA de este mapa a proposito, como carbon.manage: es trabajo de calidad/admin,
-// nunca de un USUARIO comun aunque se le habilite el modulo. Sin funcion explicita se asume
-// RADICADOR, que es el uso mas comun del modulo.
+// Radicados: RADICADOR genera y anula (quien "radica"); GENERADOR solo genera y consulta —
+// para personal de captura que NUNCA debe poder anular un numero, ni por error; CONSULTA solo
+// ve la base, para quien necesita buscar un numero sin poder emitirlos. radicados.manage
+// (catalogos de tipo/categoria/medio) queda FUERA de este mapa a proposito, como carbon.manage:
+// es trabajo de calidad/admin, nunca de un USUARIO comun aunque se le habilite el modulo. Sin
+// funcion explicita se asume RADICADOR, que es el uso mas comun del modulo.
 const RADICADOS_FUNCTION_PERMISSIONS = {
   RADICADOR: ['radicados.view', 'radicados.create', 'radicados.void'],
+  GENERADOR: ['radicados.view', 'radicados.create'],
   CONSULTA: ['radicados.view'],
 }
 

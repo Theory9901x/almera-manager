@@ -265,7 +265,7 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
   // (solo subsana sus planes de mejora). Sin campos extra, asi que basta un select.
   const [checklistFn, setChecklistFn] = useState<'AUDITOR' | 'COLABORADOR' | ''>('')
   // Radicados: Radicador (genera y anula) o Consulta (solo ve la base). Mismo patron que Listas.
-  const [radicadosFn, setRadicadosFn] = useState<'RADICADOR' | 'CONSULTA' | ''>('')
+  const [radicadosFn, setRadicadosFn] = useState<'RADICADOR' | 'GENERADOR' | 'CONSULTA' | ''>('')
 
   const load = () => api.userModules(user.membership_id).then(setGrants).catch(cause => setError(cause instanceof Error ? cause.message : 'No fue posible cargar los modulos'))
   useEffect(() => { void load() }, [user.membership_id])
@@ -357,7 +357,9 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
                   <span className="block text-sm font-bold">{module.name}</span>
                   {isRadicados && granted && (
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                      {radicadosGrant?.function_key === 'CONSULTA' ? 'Consulta (solo ve la base)' : 'Radicador (genera y anula)'}
+                      {radicadosGrant?.function_key === 'CONSULTA' ? 'Consulta (solo ve la base)'
+                        : radicadosGrant?.function_key === 'GENERADOR' ? 'Generador (solo genera y consulta)'
+                        : 'Radicador (genera y anula)'}
                     </span>
                   )}
                   {isMatrix && granted && matrixGrant?.function_key && (
@@ -401,10 +403,11 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
                 <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
                   <Select
                     value={radicadosFn}
-                    onChange={value => setRadicadosFn(value as 'RADICADOR' | 'CONSULTA' | '')}
+                    onChange={value => setRadicadosFn(value as 'RADICADOR' | 'GENERADOR' | 'CONSULTA' | '')}
                     placeholder="Función..."
                     options={[
                       { value: 'RADICADOR', label: 'Radicador (genera y anula radicados)' },
+                      { value: 'GENERADOR', label: 'Generador (solo genera y consulta, sin anular)' },
                       { value: 'CONSULTA', label: 'Consulta (solo ve la base)' },
                     ]}
                   />

@@ -1534,3 +1534,17 @@ SELECT o.id, v.nombre, v.order_index
 FROM organizations o
 CROSS JOIN (VALUES ('Fisico', 1), ('Correo electronico', 2), ('Ventanilla', 3), ('Pagina web', 4)) AS v(nombre, order_index)
 ON CONFLICT (organization_id, nombre) DO NOTHING;
+
+-- Eliminacion (soft-delete), EXCLUSIVA de superadmin y DISTINTA de la anulacion: anular invalida
+-- un numero ya generado sin ocultarlo (el error queda a la vista, con su motivo); eliminar lo
+-- saca de las vistas normales para casos como datos de prueba o duplicados por error de captura,
+-- pero sigue en la base y en la auditoria — nunca un DELETE real, porque eso si perderia la
+-- trazabilidad. El contador tampoco se toca aqui: eliminar, igual que anular, no libera el numero.
+ALTER TABLE radicados ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE radicados ADD COLUMN IF NOT EXISTS deleted_by_id BIGINT REFERENCES users(id);
+ALTER TABLE radicados ADD COLUMN IF NOT EXISTS deleted_reason TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS radicados_not_deleted_idx ON radicados(organization_id, fecha_radicado DESC) WHERE deleted_at IS NULL;
+
+ALTER TABLE radicado_auditoria DROP CONSTRAINT IF EXISTS radicado_auditoria_accion_check;
+ALTER TABLE radicado_auditoria ADD CONSTRAINT radicado_auditoria_accion_check
+  CHECK (accion IN ('CREADO', 'ANULADO', 'ADJUNTO_SUBIDO', 'ELIMINADO'));

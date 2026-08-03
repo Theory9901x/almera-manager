@@ -162,6 +162,7 @@ function RadicadosRoute() {
     <RadicadosDashboardPage
       canCreate={session.permissions.includes('radicados.create')}
       canVoid={session.permissions.includes('radicados.void')}
+      isSuperadmin={session.role.key === 'SUPERADMIN'}
     />
   )
 }

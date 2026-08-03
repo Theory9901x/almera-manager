@@ -1,5 +1,5 @@
 import type {
-  CreateRadicadoInput, RadicadoCatalogos, RadicadoDetail, RadicadoFilters, RadicadoListPage, RadicadosDashboard,
+  CreateRadicadoInput, RadicadoCatalogos, RadicadoDetail, RadicadoFilters, RadicadoListPage, RadicadosAnalytics, RadicadosDashboard,
 } from '../types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -28,6 +28,7 @@ export const radicadosService = {
   detail: (id: string) => call<RadicadoDetail>(`/${id}`),
   create: (data: CreateRadicadoInput) => call<RadicadoDetail>('/', { method: 'POST', body: JSON.stringify(data) }),
   anular: (id: string, motivo: string) => call(`/${id}/anular`, { method: 'POST', body: JSON.stringify({ motivo }) }),
+  eliminar: (id: string, motivo: string) => call(`/${id}/eliminar`, { method: 'POST', body: JSON.stringify({ motivo }) }),
 
   uploadAdjunto: async (radicadoId: string, file: File) => {
     const body = new FormData()
@@ -40,4 +41,5 @@ export const radicadosService = {
   adjuntoUrl: (radicadoId: string, adjuntoId: string) => `/api/radicados/${radicadoId}/adjuntos/${adjuntoId}`,
 
   dashboard: () => call<RadicadosDashboard>('/resumen/dashboard'),
+  analytics: () => call<RadicadosAnalytics>('/resumen/analitica'),
 }
