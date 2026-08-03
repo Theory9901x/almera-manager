@@ -98,8 +98,10 @@
      varia el tono. Ningun modulo pesa visualmente mas que otro. Usada por .module-hero y por
      cualquier modulo nuevo; los ya existentes ademas tienen su equivalente hex en tokens.ts
      (MODULE_IDENTITIES) para compatibilidad con el codigo JS que concatena alpha en hex. */
-  --m-asistencias:      oklch(0.55 0.16 25);    /* rojo-coral */
-  --m-asistencias-soft: oklch(0.95 0.03 25);
+  /* Marron unico por decision expresa del usuario — igual que --m-listas, hex literal en vez de
+     la paleta armonica OKLCH de arriba. Replicado en tokens.ts (MODULE_IDENTITIES). */
+  --m-asistencias:      #5B4033;
+  --m-asistencias-soft: #F0EBE6;
   --m-matrices:         oklch(0.55 0.16 300);   /* violeta */
   --m-matrices-soft:    oklch(0.95 0.03 300);
   --m-auditorias:       oklch(0.55 0.16 260);   /* azul-indigo */
@@ -3839,7 +3841,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
   /* Los tonos suaves de identidad estaban pensados sobre papel blanco. */
   --m-listas-soft: oklch(0.28 0.06 230);
-  --m-asistencias-soft: oklch(0.28 0.06 25);
+  --m-asistencias-soft: #2E241D;
   --m-matrices-soft: oklch(0.28 0.06 300);
   --m-encuestas-soft: oklch(0.28 0.06 195);
   --m-huella-soft: oklch(0.28 0.06 155);

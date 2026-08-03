@@ -47,9 +47,11 @@ export interface ModuleIdentity { key: string; color: string; gradientFrom: stri
 // tono, para que ningun modulo pese visualmente mas que otro.
 export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   dashboard: { key: 'dashboard', color: '#4263EB', gradientFrom: '#4263EB', gradientTo: '#748FFC' },
-  // --m-asistencias (rojo-coral, tono 25)
-  almera: { key: 'almera', color: '#bd413f', gradientFrom: '#bd413f', gradientTo: '#e2726b' },
-  'technical-assistances': { key: 'technical-assistances', color: '#bd413f', gradientFrom: '#bd413f', gradientTo: '#e2726b' },
+  // --m-asistencias: marron unico, por decision expresa del usuario sobre la maqueta — no la
+  // paleta armonica OKLCH de §5.2. Antes era rojo-coral (tono 25); un solo tono en vez del
+  // vocabulario semaforo/identidad habitual, confirmado con el usuario.
+  almera: { key: 'almera', color: '#5B4033', gradientFrom: '#5B4033', gradientTo: '#8B6F5C' },
+  'technical-assistances': { key: 'technical-assistances', color: '#5B4033', gradientFrom: '#5B4033', gradientTo: '#8B6F5C' },
   // --m-auditorias (azul-indigo, tono 260)
   'internal-audits': { key: 'internal-audits', color: '#346ecd', gradientFrom: '#346ecd', gradientTo: '#6398ee' },
   audits: { key: 'audits', color: '#346ecd', gradientFrom: '#346ecd', gradientTo: '#6398ee' },
