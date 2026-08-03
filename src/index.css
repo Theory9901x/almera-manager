@@ -27,6 +27,10 @@
   --color-brand-2: oklch(0.58 0.16 22);
   --color-critical: #c7192d;
   --color-warning: #c98212;
+  /* Cuarto estado de los KPI de prioridad ("En curso") — antes un azul suelto (#2563eb) sin
+     token, mas saturado que cualquier otro color del sistema y el unico que desentonaba en
+     modulos con identidad calida (marron, naranja...). Un solo token, mas apagado. */
+  --color-info: #3B6FA0;
   --color-neutral: #667085;
   --color-navy-900: #101827;
   --color-navy-800: #1b2940;
@@ -1566,7 +1570,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .priority-kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); font-weight: 700; }
 .priority-kpi--danger .priority-kpi-value, .priority-kpi--danger .priority-kpi-icon { color: var(--color-critical); }
 .priority-kpi--warning .priority-kpi-value, .priority-kpi--warning .priority-kpi-icon { color: var(--color-warning); }
-.priority-kpi--info .priority-kpi-value, .priority-kpi--info .priority-kpi-icon { color: #2563eb; }
+.priority-kpi--info .priority-kpi-value, .priority-kpi--info .priority-kpi-icon { color: var(--color-info); }
 .priority-kpi--neutral .priority-kpi-value, .priority-kpi--neutral .priority-kpi-icon { color: var(--ink-soft); }
 @media (max-width: 640px) { .priority-kpis { grid-template-columns: repeat(2,1fr); } }
 
@@ -1810,6 +1814,67 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   mask-image: linear-gradient(135deg, #000, transparent 70%);
   -webkit-mask-image: linear-gradient(135deg, #000, transparent 70%);
 }
+/* Asistencias Tecnicas — mismo patron que .matrices-hero (glow + malla de puntos), tenido al
+   marron de identidad del modulo en vez del navy generico: antes usaba el .module-hero base a
+   secas, que se leia como "el mismo azul oscuro de siempre" y no como parte de un modulo marron. */
+.asistencias-hero {
+  background:
+    radial-gradient(circle at 12% 18%, color-mix(in oklch, var(--m-asistencias) 48%, transparent) 0%, transparent 48%),
+    linear-gradient(135deg, oklch(0.22 0.035 55), oklch(0.15 0.025 48));
+}
+.asistencias-hero::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(135deg, #000, transparent 70%);
+  -webkit-mask-image: linear-gradient(135deg, #000, transparent 70%);
+}
+
+/* Fondo de pagina + vidrio del modulo: mismo mecanismo que Listas de Chequeo (§13), tenido al
+   marron en vez de al azul — el vidrio necesita color detras o una tarjeta translucida y una
+   opaca se ven igual, por eso el fondo lleva radiales saturados, no un degradado palido. */
+.almera-page-bg {
+  position: relative;
+  min-height: 100%;
+  /* Los radiales tienen que llegar hasta donde esta el contenido, no quedarse en las esquinas
+     del hero: sobre un fondo casi blanco una tarjeta translucida y una opaca se ven igual (§13). */
+  background:
+    radial-gradient(1600px 1200px at 6% -14%, color-mix(in oklch, var(--m-asistencias) 62%, transparent), transparent 85%),
+    radial-gradient(1300px 1050px at 104% -6%, color-mix(in oklch, var(--m-asistencias) 46%, transparent), transparent 82%),
+    radial-gradient(1100px 950px at 48% 112%, color-mix(in oklch, var(--m-asistencias) 38%, transparent), transparent 80%),
+    var(--color-surface-page);
+  padding: 10px 10px 12px;
+  border-radius: var(--radius-xl);
+}
+/* Este modulo no usa .ds-card/.surface-panel (el vocabulario nuevo del design system): sus
+   paneles son .ui-card (el Card viejo de @/shared/ui), mas .mission-queue y
+   .assistance-filter-panel, que traen su propio fondo solido. Hay que apuntar a esas clases, no
+   a las genericas, o el vidrio no se aplica a nada (asi fallo la primera vez). */
+.almera-page-bg .ui-card,
+.almera-page-bg .assistance-filter-panel,
+.almera-page-bg .mission-queue {
+  background: color-mix(in srgb, var(--glass-tint) 42%, transparent) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 78%, transparent);
+  box-shadow: 0 14px 34px color-mix(in oklch, var(--m-asistencias) 12%, transparent);
+}
+/* El glow rojo de marca que .ui-card trae grabado en su ::before desentona con la identidad
+   marron del modulo — se apaga aqui, el vidrio ya aporta su propia profundidad. */
+.almera-page-bg .ui-card::before { display: none; }
+.almera-page-bg .mission-queue-head { background: color-mix(in srgb, var(--glass-tint) 40%, transparent); }
+:root[data-theme="dark"] .almera-page-bg {
+  background:
+    radial-gradient(1300px 1000px at 4% -10%, color-mix(in oklch, var(--m-asistencias) 40%, transparent), transparent 78%),
+    radial-gradient(1050px 850px at 100% 4%, color-mix(in oklch, var(--m-asistencias) 28%, transparent), transparent 76%),
+    var(--canvas);
+}
+:root[data-theme="dark"] .almera-page-bg .ui-card,
+:root[data-theme="dark"] .almera-page-bg .assistance-filter-panel,
+:root[data-theme="dark"] .almera-page-bg .mission-queue {
+  background: color-mix(in srgb, var(--glass-tint) 55%, transparent) !important;
+}
+
 .hero-stat-inline { display: flex; gap: var(--space-8); margin-top: var(--space-5); flex-wrap: wrap; }
 .hero-stat-inline .num { font-size: 1.75rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .hero-stat-inline .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.55); margin-top: 4px; }

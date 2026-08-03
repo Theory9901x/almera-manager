@@ -119,12 +119,13 @@ export default function AlmeraPage(){
 
   const exportCsv=async()=>{setBusy(true);try{await almeraService.exportCsv({...filters,q:search});setNotice('Archivo CSV generado')}catch(caught){setError(caught instanceof Error?caught.message:'No fue posible exportar')}finally{setBusy(false)}}
 
-  return <div className="almera-shell mission-module mx-auto max-w-[1500px] space-y-5">
+  return <div className="almera-shell mission-module almera-page-bg mx-auto max-w-[1500px] space-y-5">
     <ModuleHero
       badge="Control operativo"
       title="Asistencias Técnicas"
       subtitle="Prioriza compromisos, registra avances y mantén cada solicitud bajo control."
       accent={moduleIdentity('almera').color}
+      className="asistencias-hero"
       actions={<>{canExport&&<DsButton variant="secondary" onClick={()=>void exportCsv()} disabled={busy}><Download size={16}/>Exportar CSV</DsButton>}{canCreate&&<DsButton identity={moduleIdentity('almera')} onClick={()=>setShowCreate(true)}><Plus size={16}/>Nueva asistencia</DsButton>}</>}
     />
 
