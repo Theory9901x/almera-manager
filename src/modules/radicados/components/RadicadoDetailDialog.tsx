@@ -89,10 +89,12 @@ export function RadicadoDetailDialog({ radicado, canVoid, canDelete, onClose, on
     <div className="ds-confirm-backdrop" onClick={onClose}>
       <div className="ds-confirm start-audit" style={{ maxWidth: 620 }} role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
         <button className="ds-confirm-close" onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
-        <div className="ds-confirm-icon" style={{ background: `${identity.color}1f`, color: identity.color }}>
-          <ShieldCheck size={22} />
+        {/* El numero va primero y diferenciado: es el dato que identifica el radicado para
+            siempre, no un titulo mas de la ventana. */}
+        <div className="radicado-number-plate" style={{ ['--plate-accent' as string]: identity.color }}>
+          <span className="icon"><ShieldCheck size={18} /></span>
+          <span className="num">{radicado.numero_radicado}</span>
         </div>
-        <h2 style={{ fontVariantNumeric: 'tabular-nums' }}>{radicado.numero_radicado}</h2>
         <p className="ds-confirm-body">
           {radicado.deleted_at && <Badge tone="danger">Eliminado</Badge>}
           {' '}<Badge tone={radicado.estado === 'ANULADO' ? 'danger' : 'success'}>{radicado.estado === 'ANULADO' ? 'Anulado' : 'Activo'}</Badge>

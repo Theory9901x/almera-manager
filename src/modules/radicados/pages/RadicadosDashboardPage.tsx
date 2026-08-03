@@ -283,7 +283,7 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                       <tbody>
                         {dbData.rows.map(row => (
                           <tr key={row.id} style={row.estado === 'ANULADO' ? { opacity: 0.6 } : undefined}>
-                            <td className="tabular-col"><strong>{row.numero_radicado}</strong></td>
+                            <td className="tabular-col"><span className="radicado-number-chip" style={{ ['--plate-accent' as string]: identity.color }}>{row.numero_radicado}</span></td>
                             <td>{row.tipo_nombre}{row.direccion ? <small className="repo-code">{row.direccion === 'RECIBIDO' ? 'Recibido' : 'Enviado'}</small> : null}</td>
                             <td>{row.categoria_nombre}</td>
                             <td>{row.medio_nombre}</td>
@@ -412,7 +412,7 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                         <tbody>
                           {data.rows.map(row => (
                             <tr key={row.id} style={row.estado === 'ANULADO' ? { opacity: 0.6 } : undefined}>
-                              <td className="tabular-col"><strong>{row.numero_radicado}</strong></td>
+                              <td className="tabular-col"><span className="radicado-number-chip" style={{ ['--plate-accent' as string]: identity.color }}>{row.numero_radicado}</span></td>
                               <td>{row.tipo_nombre}{row.direccion ? <small className="repo-code">{row.direccion === 'RECIBIDO' ? 'Recibido' : 'Enviado'}</small> : null}</td>
                               <td>{row.categoria_nombre}</td>
                               <td title={row.objeto}>{row.objeto.length > 48 ? `${row.objeto.slice(0, 48)}…` : row.objeto}</td>
