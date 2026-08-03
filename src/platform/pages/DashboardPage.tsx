@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Building2, Calendar, CheckCircle2, ClipboardCheck, ClipboardList, FileCheck2, FilePlus2, Gauge, Headphones,
-  LayoutDashboard, PieChart, ShieldCheck, Upload, Users,
+  Inbox, LayoutDashboard, PieChart, ShieldCheck, Upload, Users,
 } from 'lucide-react'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { api } from '@/platform/api'
@@ -35,9 +35,13 @@ export default function DashboardPage() {
   const isAuditor = session.permissions.includes('adherence_matrix.evaluate')
   const hasAlmera = session.modules.some(module => ['almera', 'technical-assistances'].includes(module.key))
   const hasAudits = session.modules.some(module => ['internal-audits', 'audits'].includes(module.key))
+  const hasRadicados = session.modules.some(module => module.key === 'radicados')
   const hasAnyRoleBlock = isAdminTier || isProfesional || isAuditor
 
-  const identity = moduleIdentity(isAdminTier ? 'admin' : isAuditor ? 'adherence-matrix' : isProfesional ? 'adherence-matrix' : 'almera')
+  const identity = moduleIdentity(
+    isAdminTier ? 'admin' : isAuditor ? 'adherence-matrix' : isProfesional ? 'adherence-matrix'
+    : hasAlmera ? 'almera' : hasRadicados ? 'radicados' : 'almera',
+  )
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -81,7 +85,8 @@ export default function DashboardPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {hasAlmera && <QuickAccessCard to="/app/modulos/almera" icon={Headphones} label="Gestión ALMERA" detail="Solicitudes y asistencias técnicas" identity={moduleIdentity('almera')} />}
                 {hasAudits && <QuickAccessCard to="/app/modulos/internal-audits" icon={ClipboardCheck} label="Auditorías" detail="Planes y hallazgos" identity={moduleIdentity('internal-audits')} />}
-                {!hasAlmera && !hasAudits && <EmptyState icon={LayoutDashboard} title="Sin módulos habilitados" description="Pide al administrador que te habilite un módulo desde Usuarios." />}
+                {hasRadicados && <QuickAccessCard to="/app/radicados" icon={Inbox} label="Radicados" detail="Generar y consultar la base" identity={moduleIdentity('radicados')} />}
+                {!hasAlmera && !hasAudits && !hasRadicados && <EmptyState icon={LayoutDashboard} title="Sin módulos habilitados" description="Pide al administrador que te habilite un módulo desde Usuarios." />}
               </div>
             </Card>
           </motion.div>

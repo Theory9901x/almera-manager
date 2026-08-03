@@ -216,8 +216,13 @@ export default function AppLayout() {
           <div className="min-w-0 flex items-center gap-2.5">
             <span className="h-2 w-2 flex-none rounded-full" style={{ background: moduleIdentity(activeModuleKey).color }} aria-hidden="true" />
             <div className="min-w-0">
-              <p className="topbar-title">{currentModule?.name || 'Panel administrativo'}</p>
-              <p className="topbar-description">{currentModule?.description || 'Gestión de usuarios, roles, permisos y entidad activa'}</p>
+              {/* El modulo "dashboard" (Inicio) no siempre esta en session.modules — solo entra
+                  ahi si esta explicitamente asignado, y un USUARIO con un unico modulo (ej.
+                  Radicados) puede no tenerlo. Sin este fallback especifico, currentModule
+                  quedaba undefined en la raiz /app y el encabezado decia "Panel administrativo",
+                  aunque la pagina fuera el Inicio de cualquiera. */}
+              <p className="topbar-title">{currentModule?.name || (location.pathname === '/app' ? 'Inicio' : 'Panel administrativo')}</p>
+              <p className="topbar-description">{currentModule?.description || (location.pathname === '/app' ? 'Resumen general y accesos rápidos' : 'Gestión de usuarios, roles, permisos y entidad activa')}</p>
             </div>
           </div>
           <div className="topbar-actions hidden md:flex">
