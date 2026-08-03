@@ -25,6 +25,7 @@ import CarbonConfigPage from '@/modules/carbon/pages/CarbonConfigPage'
 import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
 import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
 import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
+import ChecklistWindowPage from '@/modules/checklists/pages/ChecklistWindowPage'
 import ChecklistPreviewPage from '@/modules/checklists/pages/ChecklistPreviewPage'
 import ChecklistPlansPage from '@/modules/checklists/pages/ChecklistPlansPage'
 
@@ -145,6 +146,14 @@ function ChecklistAuditRoute() {
   return <ChecklistAuditPage />
 }
 
+function ChecklistWindowRoute() {
+  const { session } = useAuth()
+  // Misma guarda que la pantalla principal: el servidor revalida en cada escritura, asi que la
+  // guarda solo evita entrar a una ventana vacia.
+  if (!session?.permissions.includes('checklists.view')) return <Navigate to="/app" replace />
+  return <ChecklistWindowPage />
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -176,6 +185,9 @@ function AppRoutes() {
         <Route path="listas-chequeo/planes" element={<ChecklistPlansRoute />} />
         <Route path="listas-chequeo/planes/:planId" element={<ChecklistPlansRoute />} />
         <Route path="listas-chequeo/auditorias/:auditId" element={<ChecklistAuditRoute />} />
+        {/* La auditoria sola, para abrirla en otra ventana/monitor. Dentro de /app para heredar
+            la sesion; el overlay se pinta encima del layout y lo tapa por completo. */}
+        <Route path="listas-chequeo/auditorias/:auditId/ventana" element={<ChecklistWindowRoute />} />
         <Route path="listas-chequeo/:templateId/constructor" element={<ChecklistBuilderRoute />} />
         <Route path="listas-chequeo/:templateId/vista-previa" element={<ChecklistPreviewRoute />} />
         <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />

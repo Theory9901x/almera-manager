@@ -640,3 +640,46 @@ pierde quién responde por cada cosa.
 - La flecha de cada fila lleva **a su módulo**. Para adherencia usa
   `/app/adherencia/operacion?evaluacion=<id>`, que `EvaluationsPanel` lee al montar y **limpia
   después** (si no, recargar reabriría siempre lo mismo y pelearía con «volver al listado»).
+
+---
+
+## 15. Listas de Chequeo: la misma gestión ampliada que las Matrices
+
+El diligenciamiento (`ChecklistAuditPage.tsx`) solo vivía en la ventana principal, incómodo con
+muchos dominios. Ahora tiene el mismo trato que la matriz de adherencia (§12): pantalla completa,
+ventana aparte para dos monitores, y KPIs de avance en el pie. Piezas:
+
+- **`ChecklistFillGrid.tsx`** es EL MISMO cuerpo (acordeón de dominios + matriz criterio × sujeto)
+  en las tres superficies. No mantiene estado propio de marcas — recibe `marks`/`onMark` de quien
+  lo use, igual que `HcMatrix`. `variant="embedded"` conserva las clases de siempre (`.crit`,
+  `.checklist-fill-grid`…, pensadas para el «vidrio» de la página, ver §13); `variant="fullscreen"`
+  cambia a clases `.ckfs-*` propias, coloreadas con las variables `--hcfs-*` del overlay — así
+  heredan el cambio de tema sin duplicar el mecanismo. **No se reusa el vidrio dentro del overlay**:
+  esa superficie está pensada para papel con color detrás (§13), y sobre el fondo oscuro por
+  defecto del overlay se vería invertida.
+- **`ChecklistFillFullscreen.tsx`** reutiliza literalmente el CHASIS de `HcMatrixFullscreen`
+  (`.hcfs-top/-legend/-controls/-tablewrap/-foot`): incluso con la misma paleta violeta, porque
+  Listas y Matrices comparten familia de tono por decisión del usuario (§11 bis). Solo cambian
+  las letras de la escala (`C`/`NC`/`NA` en vez de `2`/`1`/`0`/`NA`, clases `.ck-c/.ck-nc/.ck-na`)
+  y el contenido central. El buscador salta a **dominio**, no a sujeto — al revés que en la
+  matriz, aquí lo que crece es el número de dominios (8-10), no el de "columnas" (casi siempre 1-5
+  sujetos).
+- **`ChecklistWindowPage.tsx`**: misma ventana dedicada que `HcMatrixWindowPage`, sin cabecera,
+  cierre, firmas ni creación de planes — esas siguen en la pantalla principal, que es donde tienen
+  contexto. Un plan **ya creado** sí se puede ver desde la ventana (el chip es informativo); crear
+  uno nuevo redirige con un aviso a volver a la pantalla principal.
+- **Bloqueo de una sola superficie**: igual que la matriz, `poppedOut` reemplaza la rejilla por un
+  aviso (reutiliza `.hcop-popped`, con el ícono coloreado por `identity.color` porque esa clase es
+  del módulo de adherencia) y deshabilita «Guardar borrador» / «Finalizar evaluación» en la barra
+  superior — pero **no** bloquea firmas, evidencias ni personal de turno, que no tocan el buffer de
+  marcas y siguen editándose en la pantalla principal sin riesgo.
+
+**Bug real encontrado probando esto, y no exclusivo de Listas**: `ConfirmDialog` (el «¿Guardar
+la auditoría?» / «¿Guardar las calificaciones?») se renderizaba **invisible detrás** del overlay a
+pantalla completa. `.ds-confirm-backdrop` tenía `z-index: 90` contra el `z-index: 200` de `.hcfs`
+— el mismo patrón ya documentado para el desplegable de calificación (§12), pero sin corregir en
+este componente. Se sube a `--z-portal` (400). De paso apareció la causa de que el arreglo anterior
+de `.ds-select-content`/`.ds-datepicker-content` no sirviera del todo: quedó una **declaración
+duplicada** — `z-index: var(--z-portal)` seguida, en el mismo bloque, de un `z-index: 90` residual
+que la anulaba en silencio (la última declaración gana). Verificado con capturas en los dos temas:
+sin el arreglo el diálogo de confirmación no aparecía en pantalla; con él, sí.

@@ -1912,8 +1912,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-select-trigger svg { transition: transform 150ms ease; color: var(--muted); }
 .ds-select-trigger[data-state="open"] svg { transform: rotate(180deg); color: var(--ds-accent, #4F46E5); }
 .ds-select-content {
+  /* No dejar una segunda declaracion `z-index: 90` en este bloque: la ultima gana y anula el
+     --z-portal de arriba en silencio, como paso aqui — el desplegable volvia a pintarse detras
+     de cualquier overlay a pantalla completa sin que ningun diff lo hiciera evidente. */
   z-index: var(--z-portal);
-  z-index: 90; overflow: hidden; border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
+  overflow: hidden; border: 1px solid var(--border-hairline); border-radius: 12px; background: #fff;
   box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.12); padding: 5px; min-width: var(--radix-select-trigger-width);
   animation: ds-popover-in 160ms ease;
   /* Tope + scroll: con catalogos largos (47 servicios) la lista se salia de la pantalla y las
@@ -1944,7 +1947,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-datepicker-placeholder { color: var(--muted); font-weight: 400; }
 .ds-datepicker-content {
   z-index: var(--z-portal);
-  z-index: 90; width: 272px; border: 1px solid var(--border-hairline); border-radius: 14px; background: #fff;
+  width: 272px; border: 1px solid var(--border-hairline); border-radius: 14px; background: #fff;
   box-shadow: 0 4px 10px rgba(16,24,40,.06), 0 16px 32px rgba(16,24,40,.14); padding: 12px; animation: ds-popover-in 160ms ease;
 }
 .ds-datepicker-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -3422,7 +3425,12 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* --- Confirmacion de acciones irreversibles (design system) --- */
 .ds-confirm-backdrop {
-  position: fixed; inset: 0; z-index: 90;
+  /* Portaleado a <body>, igual que los overlays a pantalla completa: tiene que ganarles siempre
+     (--z-portal, 400) o la confirmacion se pinta invisible detras (asi se descubrio: el dialogo
+     de "¿Guardar la auditoria?" de la vista ampliada de Listas de Chequeo no se veia). El mismo
+     ConfirmDialog lo usa la matriz de adherencia para su confirmar-guardar: estaba con el mismo
+     problema. */
+  position: fixed; inset: 0; z-index: var(--z-portal);
   display: grid; place-items: center; padding: 20px;
   background: rgba(8, 22, 34, .55);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -6315,3 +6323,101 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hc-matrix.is-full .hcm-summary-row td.hcm-criterion,
 .hc-matrix.is-full .hcm-general-row td.hcm-criterion { color: var(--hcfs-ink); }
 .hc-matrix.is-full .hcm-general-row td { background: var(--hcfs-scope-crit); }
+
+/* ============================================================================
+   Diligenciamiento de Listas de Chequeo en pantalla completa (CLAUDE.md §12,
+   §14bis). Reutiliza el CHASIS del overlay de la matriz de adherencia
+   (.hcfs-top/-legend/-controls/-tablewrap/-foot, ya tema claro y oscuro via
+   variables --hcfs-*) y solo aporta el CONTENIDO: el acordeon de dominios y la
+   matriz criterio x sujeto, coloreados con esas MISMAS variables para heredar
+   el cambio de tema sin duplicar el mecanismo. No es la superficie "vidrio" de
+   la pagina principal (§13): esa esta pensada para papel con color detras, y
+   sobre el overlay oscuro por defecto se veria invertida.
+   ============================================================================ */
+.ckfs-tablewrap { padding: 4px 20px 20px; }
+
+.ckfs-domain { border-bottom: 1px solid var(--hcfs-line); }
+.ckfs-domain:last-child { border-bottom: 0; }
+.ckfs-domain-head {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 6px;
+  border: 0; background: transparent; cursor: pointer; text-align: left; color: var(--hcfs-ink);
+}
+.ckfs-domain-head:hover { background: color-mix(in srgb, var(--hcfs-panel) 60%, transparent); }
+.ckfs-domain.is-active .ckfs-domain-head { background: var(--hcfs-active); }
+.ckfs-domain-num {
+  width: 26px; height: 26px; border-radius: 8px; flex: none; color: #fff;
+  font-size: 11.5px; font-weight: 800; display: grid; place-items: center;
+}
+.ckfs-domain-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 750; color: var(--hcfs-ink); }
+.ckfs-domain-state {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-size: 11px; font-weight: 700; color: var(--hcfs-faint);
+}
+.ckfs-domain-state.is-done { color: #34D399; }
+.ckfs-domain-pct { flex: none; font-size: 13px; font-weight: 850; font-variant-numeric: tabular-nums; min-width: 60px; text-align: right; }
+.ckfs-domain-body, .ckfs-dbody { border-top: 1px solid var(--hcfs-line); }
+
+.ckfs-crit {
+  display: grid; grid-template-columns: 30px 1fr auto; gap: 14px; align-items: center;
+  padding: 12px 6px; border-bottom: 1px solid color-mix(in srgb, var(--hcfs-line) 70%, transparent);
+}
+.ckfs-crit:last-child { border-bottom: 0; }
+.ckfs-cnum {
+  width: 30px; height: 30px; border-radius: 8px; background: var(--hcfs-panel-2); color: var(--hcfs-soft);
+  font-weight: 800; font-size: 11px; display: grid; place-items: center;
+}
+.ckfs-ctext { min-width: 0; grid-column: 2 / -1; }
+.ckfs-ctext b { font-size: 13px; font-weight: 600; display: block; color: var(--hcfs-ink); }
+.ckfs-ctext span { font-size: 11px; color: var(--hcfs-faint); }
+.ckfs-segs { display: flex; gap: 7px; grid-column: 2; }
+.ckfs-seg {
+  min-width: 48px; height: 38px; border-radius: 9px; border: 1.5px solid var(--hcfs-cell-brd);
+  background: var(--hcfs-cell); font-weight: 800; font-size: 12.5px; color: var(--hcfs-soft);
+  cursor: pointer; display: grid; place-items: center; transition: transform .12s, background .15s, color .15s, border-color .15s;
+}
+.ckfs-seg:active:not(:disabled) { transform: scale(.93); }
+.ckfs-seg:disabled { opacity: .5; cursor: default; }
+.ckfs-seg.C.on  { background: #16A34A; border-color: #16A34A; color: #fff; }
+.ckfs-seg.NC.on { background: #DC2626; border-color: #DC2626; color: #fff; }
+.ckfs-seg.NA.on { background: #64748B; border-color: #64748B; color: #fff; }
+.ckfs-obs {
+  grid-column: 2 / -1; border: 1px solid var(--hcfs-line); border-radius: 9px; padding: 8px 11px;
+  font-size: 12px; color: var(--hcfs-ink); background: var(--hcfs-panel-2); font-family: inherit;
+}
+.ckfs-obs::placeholder { color: var(--hcfs-faint); }
+.ckfs-obs:focus { outline: none; border-color: var(--m-listas); }
+
+/* --- Matriz criterio x sujeto (rondas con varios sujetos) --- */
+.ckfs-tablewrap-inner { overflow-x: auto; }
+.ckfs-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.ckfs-table th, .ckfs-table td { border-bottom: 1px solid var(--hcfs-line); padding: 9px 10px; text-align: center; vertical-align: top; }
+.ckfs-table thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--hcfs-head);
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--hcfs-soft); font-weight: 800;
+}
+.ckfs-fill-criterion {
+  position: sticky; left: 0; z-index: 1; background: var(--hcfs-panel-2);
+  text-align: left; min-width: 280px; max-width: 420px; white-space: normal; line-height: 1.4;
+}
+.ckfs-table thead th.ckfs-fill-criterion { z-index: 3; background: var(--hcfs-head); }
+.ckfs-fill-criterion-text { display: flex; align-items: flex-start; gap: 6px; }
+.ckfs-fill-num { font-weight: 800; color: var(--m-listas); flex: none; }
+.ckfs-fill-guidance-text { margin: 5px 0 0; font-size: 10.5px; line-height: 1.5; color: var(--hcfs-faint); }
+.ckfs-fill-subject-head { display: inline-block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hcfs-ink); }
+.ckfs-fill-value {
+  min-width: 40px; height: 34px; border-radius: 9px; border: 1.5px dashed var(--hcfs-cell-brd);
+  background: var(--hcfs-cell); color: var(--hcfs-soft); font-size: 11.5px; font-weight: 800; cursor: pointer;
+  transition: background 140ms, color 140ms, border-color 140ms, transform 120ms;
+}
+.ckfs-fill-value:hover:not(:disabled) { border-color: var(--m-listas); }
+.ckfs-fill-value:active:not(:disabled) { transform: scale(.94); }
+.ckfs-fill-value:disabled { opacity: .5; cursor: default; }
+.ckfs-fill-value--c.is-active { border-style: solid; background: #16A34A; border-color: #16A34A; color: #fff; }
+.ckfs-fill-value--nc.is-active { border-style: solid; background: #DC2626; border-color: #DC2626; color: #fff; }
+.ckfs-fill-value--na.is-active { border-style: solid; background: #64748B; border-color: #64748B; color: #fff; }
+
+/* Escala del pie/leyenda: mismas cajitas que `.sc-*` de la matriz (regla base en la seccion de
+   la matriz de adherencia), con las letras C/NC/NA en vez del numero. */
+.hcfs-lg i.ck-c, .hcfs-cnt i.ck-c { background: linear-gradient(180deg, #16A34A, #15803D); width: auto; padding: 0 6px; font-size: 9.5px; }
+.hcfs-lg i.ck-nc, .hcfs-cnt i.ck-nc { background: linear-gradient(180deg, #DC2626, #B91C1C); width: auto; padding: 0 6px; font-size: 9.5px; }
+.hcfs-lg i.ck-na, .hcfs-cnt i.ck-na { background: #475569; color: #CBD5E1; font-size: 9px; }

@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronUp,
-  CircleDashed, ClipboardCheck, ClipboardList, Clock, CreditCard, MessageSquare, Paperclip, Settings2,
+  AlertTriangle, ArrowLeft, Building2, CalendarDays, ChevronDown, ChevronUp,
+  ClipboardCheck, ClipboardList, Clock, CreditCard, ExternalLink, Maximize2, Paperclip, Settings2,
   User, UserCheck,
   Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
 } from 'lucide-react'
@@ -12,11 +12,12 @@ import {
 } from '@/design-system'
 import { checklistsService } from '../services/checklistsService'
 
+import { answerKey, ChecklistFillGrid } from '../components/ChecklistFillGrid'
+import { ChecklistFillFullscreen } from '../components/ChecklistFillFullscreen'
 import { EvidencesCard } from '../components/EvidencesCard'
 import { PlanCreateDialog, type PlanDraft } from '../components/PlanCreateDialog'
-import {
-  CHECKLIST_VALUE_LABELS, PLAN_STATUS_LABELS, type AuditDetail, type ChecklistField, type ChecklistValue,
-  type DirectorySubject, type PlanAssignee, type SignerSuggestion,
+import type {
+  AuditDetail, ChecklistField, ChecklistValue, DirectorySubject, PlanAssignee, SignerSuggestion,
 } from '../types'
 
 const identity = moduleIdentity('checklists')
@@ -35,9 +36,6 @@ function conceptOf(percent: number) {
   if (percent >= 70) return 'DEFICIENTE'
   return 'MUY_DEFICIENTE'
 }
-const VALUES: ChecklistValue[] = ['C', 'NC', 'NA']
-
-function answerKey(subjectRowId: string, criterionId: string) { return `${subjectRowId}|${criterionId}` }
 
 export default function ChecklistAuditPage() {
   return <ToastProvider><ChecklistAuditContent /></ToastProvider>
@@ -77,6 +75,14 @@ function ChecklistAuditContent() {
   // Celda recien marcada NC a la que se le pregunta "¿Requiere plan de mejora?". Si la
   // respuesta es no, no pasa nada mas; si es si, se abre la creacion del plan.
   const [askPlan, setAskPlan] = useState<{ subjectRowId: string; criterionId: string } | null>(null)
+
+  // Vista ampliada y ventana aparte: mismo patron que la matriz de adherencia (CLAUDE.md §12).
+  // `poppedOut` bloquea el diligenciamiento en ESTA pantalla mientras la ronda vive en la otra
+  // ventana — dos superficies editables sobre el mismo buffer es como se pierde una marca sin
+  // que nadie lo note.
+  const [fullscreen, setFullscreen] = useState(false)
+  const [poppedOut, setPoppedOut] = useState(false)
+  const auditWindow = useRef<Window | null>(null)
 
   function hydrate(detail: AuditDetail) {
     setAudit(detail)
@@ -259,6 +265,50 @@ function ChecklistAuditContent() {
     finally { setBusy(false) }
   }
 
+  /**
+   * Abre la auditoria en una ventana aparte (dos monitores). GUARDA PRIMERO: la ventana nueva
+   * carga su propia copia del servidor y no puede leer el buffer de esta pantalla, asi que sin
+   * guardar arrancaria sin lo ultimo marcado. Si el guardado falla, no se abre nada.
+   */
+  async function openInWindow() {
+    if (!audit) return
+    setBusy(true)
+    try {
+      if (!closed && dirty) await saveAll()
+      const url = `${window.location.origin}/app/listas-chequeo/auditorias/${audit.id}/ventana`
+      const opened = window.open(url, `sgimr-lista-${audit.id}`, 'width=1600,height=1000')
+      if (!opened) {
+        toast.push('error', 'El navegador bloqueó la ventana. Permite las ventanas emergentes de sgimr.cloud e inténtalo de nuevo.')
+        return
+      }
+      // La ronda se MUDA a la otra ventana: aqui se cierra la pantalla completa y el
+      // diligenciamiento queda bloqueado, igual que en la matriz de adherencia.
+      auditWindow.current = opened
+      setPoppedOut(true)
+      setFullscreen(false)
+      toast.push('success', 'Guardado. La auditoría se abrió en una ventana aparte.')
+    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible guardar antes de abrir la ventana') }
+    finally { setBusy(false) }
+  }
+
+  /** Devuelve la auditoria a esta pantalla: cierra la ventana y recarga lo que se guardo alli. */
+  async function bringAuditBack() {
+    try { auditWindow.current?.close() } catch { /* si ya la cerro el usuario, da igual */ }
+    auditWindow.current = null
+    setPoppedOut(false)
+    await load()
+  }
+
+  // Si se cierra la ventana a mano, esta pantalla lo detecta y recupera la ronda con lo que se
+  // haya guardado alla. `closed` es lo unico consultable de una ventana propia sin que ella avise.
+  useEffect(() => {
+    if (!poppedOut) return
+    const timer = window.setInterval(() => {
+      if (auditWindow.current && auditWindow.current.closed) void bringAuditBack()
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [poppedOut])
+
   async function exportPdf() {
     if (!audit) return
     setExporting(true)
@@ -378,11 +428,14 @@ function ChecklistAuditContent() {
   // Hallazgos: los NC marcados en pantalla. Son los que exigen accion, y el auditor tiene que
   // verlos crecer mientras marca, no al final.
   const findings = Object.values(marks).filter(value => value === 'NC').length
-  const liveOverall = (() => {
-    let c = 0, nc = 0
-    for (const value of Object.values(marks)) { if (value === 'C') c++; else if (value === 'NC') nc++ }
-    return c + nc > 0 ? (c / (c + nc)) * 100 : null
-  })()
+  // Reparto de la escala: alimenta el pie de la pantalla completa, igual que en la matriz.
+  const counts = { c: 0, nc: 0, na: 0 }
+  for (const value of Object.values(marks)) {
+    if (value === 'C') counts.c += 1
+    else if (value === 'NC') counts.nc += 1
+    else if (value === 'NA') counts.na += 1
+  }
+  const liveOverall = counts.c + counts.nc > 0 ? (counts.c / (counts.c + counts.nc)) * 100 : null
   const shownPercent = closed ? (percent === null ? null : Number(percent)) : liveOverall
   const clock = `${String(Math.floor(elapsed / 3600)).padStart(2, '0')}:${String(Math.floor(elapsed / 60) % 60).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
 
@@ -444,7 +497,7 @@ function ChecklistAuditContent() {
           </div>
         </div>
         <div className="actions">
-          {!closed && (
+          {!closed && !poppedOut && (
             <button className="btn col" onClick={() => void saveAll()} disabled={!dirty || saveState === 'saving'}>
               <span><Save size={15} /> Guardar borrador</span>
               <span className="sub">
@@ -452,9 +505,21 @@ function ChecklistAuditContent() {
               </span>
             </button>
           )}
-          {!closed
-            ? <button className="btn pri" onClick={() => void closeAudit()} disabled={busy}><Lock size={15} /> Finalizar evaluación</button>
-            : <button className="btn pri" onClick={() => void reopenAudit()} disabled={busy}><Unlock size={15} /> Reabrir evaluación</button>}
+          {!poppedOut && (
+            !closed
+              ? <button className="btn pri" onClick={() => void closeAudit()} disabled={busy}><Lock size={15} /> Finalizar evaluación</button>
+              : <button className="btn pri" onClick={() => void reopenAudit()} disabled={busy}><Unlock size={15} /> Reabrir evaluación</button>
+          )}
+          {/* Vista ampliada y ventana aparte: la misma comodidad que la matriz de adherencia
+              (CLAUDE.md §12), aplicada al diligenciamiento de listas. */}
+          {!poppedOut && (
+            <button className="btn" onClick={() => setFullscreen(true)} disabled={!audit.subjects.length || !audit.domains.length}>
+              <Maximize2 size={15} /> Pantalla completa
+            </button>
+          )}
+          <button className="btn" onClick={() => void openInWindow()} disabled={busy || poppedOut}>
+            <ExternalLink size={15} /> {poppedOut ? 'Abierta en otra ventana' : 'Ventana nueva'}
+          </button>
           <button className="btn" onClick={() => void exportPdf()} disabled={exporting}>
             <Download size={15} /> {exporting ? 'Generando…' : 'Descargar PDF'}
           </button>
@@ -645,167 +710,43 @@ function ChecklistAuditContent() {
               </button>
             </div>
 
-            {audit.domains.map((domain, domainIndex) => {
-              const tally = domainTally(domain)
-              const isCollapsed = collapsed.has(String(domain.id))
-              const complete = tally.marked === tally.cells && tally.cells > 0
-              return (
-                <section key={domain.id} id={`dom-${domain.id}`} className={`eval-domain ${isCollapsed ? 'is-collapsed' : ''}`}>
-                  <button className="eval-domain-head" onClick={() => toggleDomain(String(domain.id))} aria-expanded={!isCollapsed}>
-                    <span className="eval-domain-num" style={{ background: identity.color }}>{domainIndex + 1}</span>
-                    <span className="eval-domain-name">{domain.name}</span>
-                    <span className={`eval-domain-state ${complete ? 'is-done' : ''}`} title={complete ? 'Dominio completo' : 'Faltan marcas'}>
-                      {complete ? <CheckCircle2 size={16} /> : <CircleDashed size={16} />}
-                      {tally.marked}/{tally.cells}
-                    </span>
-                    <span className="eval-domain-pct" style={{ color: tally.percent === null ? 'var(--muted)' : semaphoreColor(tally.percent) }}>
-                      {tally.percent === null ? 'Sin marcar' : `${tally.percent.toFixed(0)} %`}
-                    </span>
-                    {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-                  </button>
-
-                  {!isCollapsed && (
-                    audit.subjects.length === 1 ? (
-                      <div className="dbody">
-                        {domain.criteria.map((criterion, criterionIndex) => {
-                          const subject = audit.subjects[0]
-                          const key = answerKey(subject.id, criterion.id)
-                          const current = marks[key]
-                          return (
-                            <div className="crit" key={criterion.id}>
-                              <div className="cnum">
-                                {audit.numbered_items && criterion.item_number
-                                  ? criterion.item_number
-                                  : `${domainIndex + 1}.${criterionIndex + 1}`}
-                              </div>
-                              <div className="ctext">
-                                <b>{criterion.text}</b>
-                                {criterion.guidance ? <span>{criterion.guidance}</span> : null}
-                                {/* Un NC es un hallazgo: desde aqui mismo se le asigna plan de
-                                    mejora, sin salir de la ronda. Si ya lo tiene, el chip lleva
-                                    a su seguimiento. */}
-                                {plansByKey.has(key) ? (
-                                  <button
-                                    type="button" className="plan-chip"
-                                    title="Ver el plan de mejora de este hallazgo"
-                                    onClick={() => navigate(`/app/listas-chequeo/planes/${plansByKey.get(key)!.id}`)}
-                                  >
-                                    <ClipboardList size={12} /> Plan · {PLAN_STATUS_LABELS[plansByKey.get(key)!.status]}
-                                  </button>
-                                ) : current === 'NC' ? (
-                                  <button
-                                    type="button" className="plan-chip is-new"
-                                    title="Crear un plan de mejora para este hallazgo"
-                                    onClick={() => void openPlanDialog(subject.id, criterion.id)}
-                                  >
-                                    <ClipboardList size={12} /> Asignar plan de mejora
-                                  </button>
-                                ) : null}
-                              </div>
-                              <div className="segs">
-                                {VALUES.map(value => (
-                                  <button
-                                    key={value} type="button" disabled={closed}
-                                    title={CHECKLIST_VALUE_LABELS[value]}
-                                    className={`seg ${value} ${current === value ? 'on' : ''}`}
-                                    onClick={() => toggle(subject.id, criterion.id, value)}
-                                  >{value}</button>
-                                ))}
-                              </div>
-                              <button
-                                className="cico" type="button" disabled={closed}
-                                title="Escribir una observación"
-                                onClick={() => document.getElementById(`obs-${criterion.id}`)?.focus()}
-                              ><MessageSquare size={15} /></button>
-                              <input
-                                id={`obs-${criterion.id}`}
-                                className="cobs" disabled={closed}
-                                placeholder="Observación (opcional)…"
-                                value={notesByAnswer[key] ?? ''}
-                                onChange={event => {
-                                  setNotesByAnswer(current => ({ ...current, [key]: event.target.value }))
-                                  setDirty(true)
-                                }}
-                              />
-                              <button
-                                className="cico" type="button" disabled={closed}
-                                title="Adjuntar evidencia a este criterio"
-                                onClick={() => document.querySelector<HTMLElement>('.eval-drop')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                              ><Paperclip size={15} /></button>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                    <div className="checklist-fill-wrap eval-domain-body">
-                      <table className="checklist-fill-grid has-many">
-                        <thead>
-                          <tr>
-                            <th className="fill-criterion">Criterio</th>
-                            {audit.subjects.map((subject, index) => (
-                              <th key={subject.id}><span className="fill-subject-head">{index + 1}. {subject.display_name}</span></th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {domain.criteria.map((criterion, criterionIndex) => (
-                            <tr key={criterion.id}>
-                              <td className="fill-criterion">
-                                <div className="fill-criterion-text">
-                                  <span className="fill-num">
-                                    {audit.numbered_items && criterion.item_number
-                                      ? criterion.item_number
-                                      : `${domainIndex + 1}.${criterionIndex + 1}`}
-                                  </span>
-                                  <span>{criterion.text}</span>
-                                </div>
-                                {criterion.guidance ? <p className="fill-guidance-text">{criterion.guidance}</p> : null}
-                              </td>
-                              {audit.subjects.map(subject => {
-                                const key = answerKey(subject.id, criterion.id)
-                                const current = marks[key]
-                                return (
-                                  <td key={subject.id} className={current ? '' : 'is-unanswered'}>
-                                    <div className="fill-value-group">
-                                      {VALUES.map(value => (
-                                        <button
-                                          key={value} type="button" disabled={closed}
-                                          title={CHECKLIST_VALUE_LABELS[value]}
-                                          className={`fill-value fill-value--${value.toLowerCase()} ${current === value ? 'is-active' : ''}`}
-                                          onClick={() => toggle(subject.id, criterion.id, value)}
-                                        >{value}</button>
-                                      ))}
-                                    </div>
-                                    {plansByKey.has(key) ? (
-                                      <button
-                                        type="button" className="plan-chip"
-                                        title="Ver el plan de mejora de este hallazgo"
-                                        onClick={() => navigate(`/app/listas-chequeo/planes/${plansByKey.get(key)!.id}`)}
-                                      >
-                                        <ClipboardList size={11} /> {PLAN_STATUS_LABELS[plansByKey.get(key)!.status]}
-                                      </button>
-                                    ) : current === 'NC' ? (
-                                      <button
-                                        type="button" className="plan-chip is-new"
-                                        title="Crear un plan de mejora para este hallazgo"
-                                        onClick={() => void openPlanDialog(subject.id, criterion.id)}
-                                      >
-                                        <ClipboardList size={11} /> Plan
-                                      </button>
-                                    ) : null}
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    )
-                  )}
-                </section>
-              )
-            })}
+            {poppedOut ? (
+              /* La ronda esta en la otra ventana. Aqui no se muestra ni se puede marcar: se
+                 diligencia en un solo sitio a la vez. */
+              <div className="hcop-popped">
+                <span className="ic" style={{ background: `${identity.color}18`, color: identity.color }}><ExternalLink size={22} /></span>
+                <h3>La auditoría está abierta en otra ventana</h3>
+                <p>
+                  Sigue marcando allí. Cuando cierres esa ventana, esta pantalla recupera la
+                  ronda con todo lo que hayas guardado.
+                </p>
+                <Button identity={identity} onClick={() => void bringAuditBack()}>
+                  <ExternalLink size={15} />Traer de vuelta ahora
+                </Button>
+              </div>
+            ) : (
+              <ChecklistFillGrid
+                variant="embedded"
+                domains={audit.domains}
+                subjects={audit.subjects}
+                numberedItems={audit.numbered_items}
+                marks={marks}
+                notesByAnswer={notesByAnswer}
+                closed={closed}
+                collapsed={collapsed}
+                onToggleDomain={toggleDomain}
+                onMark={toggle}
+                onNote={(subjectId, criterionId, value) => {
+                  setNotesByAnswer(current => ({ ...current, [answerKey(subjectId, criterionId)]: value }))
+                  setDirty(true)
+                }}
+                plansByKey={plansByKey}
+                onOpenPlan={(subjectId, criterionId) => void openPlanDialog(subjectId, criterionId)}
+                onNavigatePlan={planId => navigate(`/app/listas-chequeo/planes/${planId}`)}
+                domainTally={domainTally}
+                identityColor={identity.color}
+              />
+            )}
             <EvidencesCard
               auditId={audit.id}
               evidences={audit.evidences || []}
@@ -986,6 +927,39 @@ function ChecklistAuditContent() {
         )}
       </Card>
       )}
+
+      <ChecklistFillFullscreen
+        open={fullscreen}
+        onClose={() => setFullscreen(false)}
+        title={audit.template_name}
+        subtitle={`${audit.area_name || 'Sin servicio'} · ${audit.subject_label}${audit.subjects.length !== 1 ? 's' : ''} · ${audit.domains.length} dominios`}
+        domains={audit.domains}
+        subjects={audit.subjects}
+        numberedItems={audit.numbered_items}
+        marks={marks}
+        notesByAnswer={notesByAnswer}
+        closed={closed}
+        onMark={toggle}
+        onNote={(subjectId, criterionId, value) => {
+          setNotesByAnswer(current => ({ ...current, [answerKey(subjectId, criterionId)]: value }))
+          setDirty(true)
+        }}
+        plansByKey={plansByKey}
+        onOpenPlan={(subjectId, criterionId) => void openPlanDialog(subjectId, criterionId)}
+        onNavigatePlan={planId => navigate(`/app/listas-chequeo/planes/${planId}`)}
+        domainTally={domainTally}
+        identityColor={identity.color}
+        overallPercent={shownPercent}
+        counts={counts}
+        totalCells={totalCells}
+        markedCells={markedCells}
+        onSave={() => void saveAll()}
+        saving={saveState === 'saving'}
+        dirty={dirty}
+        onExportPdf={() => void exportPdf()}
+        exporting={exporting}
+        onOpenWindow={() => void openInWindow()}
+      />
     </div>
   )
 }
