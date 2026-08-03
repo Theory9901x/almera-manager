@@ -258,9 +258,38 @@ radicadosRouter.get('/', radicadosModule, view, async (request, response, next) 
 radicadosRouter.get('/report.pdf', radicadosModule, view, async (request, response, next) => {
   try {
     const { where, params } = buildFilter(request)
-    const [rows, orgResult] = await Promise.all([
+    // Los mismos agregados que Estadisticas (por direccion, tipo, proceso, categoria y mes),
+    // pero acotados al MISMO where que la tabla de detalle: si el informe sale filtrado, sus
+    // graficas cuentan lo filtrado, no toda la entidad — lo contrario mentiria sobre "lo que
+    // hay en este informe".
+    const [rows, orgResult, byDireccion, byTipo, byProceso, byCategoria, monthly] = await Promise.all([
       query(`${LIST_SELECT} ${where} ORDER BY r.fecha_radicado DESC, r.id DESC`, params),
       query('SELECT name FROM organizations WHERE id = $1', [oid(request)]),
+      query(
+        `SELECT CASE r.direccion WHEN 'RECIBIDO' THEN 'Recibido' WHEN 'ENVIADO' THEN 'Enviado' ELSE 'Interno' END AS label, COUNT(*)::int AS value
+         FROM radicados r WHERE r.organization_id = $1 ${where} GROUP BY 1 ORDER BY value DESC`,
+        params,
+      ),
+      query(
+        `SELECT t.nombre AS label, COUNT(*)::int AS value
+         FROM radicados r JOIN radicado_tipos t ON t.id = r.tipo_id WHERE r.organization_id = $1 ${where} GROUP BY t.nombre ORDER BY value DESC`,
+        params,
+      ),
+      query(
+        `SELECT COALESCE(p.name, 'Sin proceso') AS label, COUNT(*)::int AS value
+         FROM radicados r LEFT JOIN institutional_processes p ON p.id = r.process_id WHERE r.organization_id = $1 ${where} GROUP BY 1 ORDER BY value DESC LIMIT 10`,
+        params,
+      ),
+      query(
+        `SELECT c.nombre AS label, COUNT(*)::int AS value
+         FROM radicados r JOIN radicado_categorias c ON c.id = r.categoria_id WHERE r.organization_id = $1 ${where} GROUP BY c.nombre ORDER BY value DESC LIMIT 10`,
+        params,
+      ),
+      query(
+        `SELECT to_char(date_trunc('month', r.fecha_radicado), 'Mon YYYY') AS label, COUNT(*)::int AS value
+         FROM radicados r WHERE r.organization_id = $1 ${where} GROUP BY date_trunc('month', r.fecha_radicado) ORDER BY date_trunc('month', r.fecha_radicado)`,
+        params,
+      ),
     ])
     const filtered = ['tipoId', 'categoriaId', 'medioId', 'processId', 'direccion', 'estado', 'dateFrom', 'dateTo', 'search']
       .some(key => Boolean(request.query[key]))
@@ -271,6 +300,11 @@ radicadosRouter.get('/report.pdf', radicadosModule, view, async (request, respon
       filtered,
       total: rows.rows.length,
       radicados: rows.rows,
+      byDireccion: byDireccion.rows,
+      byTipo: byTipo.rows,
+      byProceso: byProceso.rows,
+      byCategoria: byCategoria.rows,
+      monthly: monthly.rows,
     })
     const pdf = await renderPdf(html, { landscape: true })
     response.setHeader('Content-Type', 'application/pdf')
