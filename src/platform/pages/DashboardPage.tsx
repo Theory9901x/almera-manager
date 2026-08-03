@@ -278,14 +278,11 @@ function AdminHome() {
     radicadosService.dashboard().then(setRadicadosDashboard).catch(() => setRadicadosDashboard(null))
   }, [])
 
-  const almeraTotal = records?.length ?? 0
   const almeraInReview = records?.filter(record => record.status === 'IN_REVIEW').length ?? 0
-  const almeraClosed = records?.filter(record => record.status === 'CLOSED' || record.status === 'APPROVED').length ?? 0
 
   const now = new Date()
   const drafts = evaluations?.filter(item => item.status === 'DRAFT') ?? []
   const closed = evaluations?.filter(item => item.status === 'CLOSED') ?? []
-  const closedThisMonth = closed.filter(item => new Date(item.evaluation_date).getMonth() === now.getMonth() && new Date(item.evaluation_date).getFullYear() === now.getFullYear())
   const withCompliance = closed.filter(item => item.overall_compliance !== null)
   const averageCompliance = withCompliance.length ? withCompliance.reduce((sum, item) => sum + Number(item.overall_compliance), 0) / withCompliance.length : null
 
@@ -326,15 +323,16 @@ function AdminHome() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-        <StatCard icon={ClipboardList} label="Evaluaciones en borrador" value={evaluations ? drafts.length : '—'} identity={matrixIdentity} />
-        <StatCard icon={ClipboardCheck} label="Cumplimiento promedio auditado" value={averageCompliance === null ? '—' : `${averageCompliance.toFixed(0)}%`} identity={matrixIdentity} />
-        <StatCard icon={ClipboardList} label="Pendientes por revisar" value={almeraInReview} identity={almeraIdentity} />
-        <StatCard icon={Gauge} label="Evaluaciones cerradas este mes" value={evaluations ? closedThisMonth.length : '—'} identity={matrixIdentity} />
+      {/* Un solo color en toda la fila (identidad de admin, no la de cada modulo de origen):
+          esto es el resumen del superadmin, no la pantalla de ningun modulo — mezclar cuatro
+          colores de identidad distintos aqui se leia como ruido, no como sistema. Cinco tarjetas
+          como maximo: el resto de metricas ya vive dentro de su propio modulo. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard icon={ClipboardList} label="Evaluaciones en borrador" value={evaluations ? drafts.length : '—'} identity={identity} />
+        <StatCard icon={ClipboardCheck} label="Cumplimiento promedio" value={averageCompliance === null ? '—' : `${averageCompliance.toFixed(0)}%`} identity={identity} />
+        <StatCard icon={Headphones} label="Pendientes por revisar" value={almeraInReview} identity={identity} />
         <StatCard icon={Users} label="Usuarios activos" value={userCount ?? '—'} identity={identity} />
-        <StatCard icon={Headphones} label="Solicitudes ALMERA" value={almeraTotal} identity={almeraIdentity} />
-        <StatCard icon={CheckCircle2} label="Trazabilidad cerrada" value={almeraClosed} identity={almeraIdentity} />
-        <StatCard icon={Inbox} label="Radicados este mes" value={radicadosDashboard?.kpis.mes ?? '—'} identity={radicadosIdentity} />
+        <StatCard icon={Inbox} label="Radicados este mes" value={radicadosDashboard?.kpis.mes ?? '—'} identity={identity} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">

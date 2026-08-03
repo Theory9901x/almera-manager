@@ -2025,6 +2025,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-empty-state p { margin: 0; font-size: 12px; max-width: 320px; }
 
 .ds-stat-card { display: flex; align-items: center; gap: 14px; }
+/* Sin min-width:0 el texto (segundo hijo flex) nunca se encoge por debajo de su ancho
+   intrinseco — la trampa clasica de flexbox — y una etiqueta larga en mayusculas ("CUMPLIMIENTO
+   PROMEDIO AUDITADO") se sale del borde de la tarjeta en vez de partirse en dos lineas. */
+.ds-stat-card > div { min-width: 0; }
+.ds-stat-card .ds-eyebrow { overflow-wrap: break-word; }
 .ds-stat-card-icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 999px; color: #fff; }
 .ds-stat-card-value { display: block; font-size: 22px; font-weight: 800; }
 .ds-stat-card-detail { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
