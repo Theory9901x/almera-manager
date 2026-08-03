@@ -11,6 +11,8 @@ import { listAlmeraRecords } from '@/modules/almera/services/almeraService'
 import type { AlmeraRecord } from '@/modules/almera/types'
 import { adherenceService } from '@/modules/adherence/services/adherenceService'
 import type { EvaluationSummary, ImprovementPlan } from '@/modules/adherence/types'
+import { radicadosService } from '@/modules/radicados/services/radicadosService'
+import type { RadicadosDashboard as RadicadosDashboardData } from '@/modules/radicados/types'
 import { PlanStatusBadge } from '@/modules/adherence/design/PlanStatusBadge'
 import {
   BarChart, Card, DonutChart, EmptyState, LineChart, ModuleHero, ProgressRing, SEMAPHORE_COLORS, SemaphoreBadge, StatCard,
@@ -261,14 +263,19 @@ function AdminHome() {
   const identity = moduleIdentity('admin')
   const almeraIdentity = moduleIdentity('almera')
   const matrixIdentity = moduleIdentity('adherence-matrix')
+  const radicadosIdentity = moduleIdentity('radicados')
   const [userCount, setUserCount] = useState<number | null>(null)
   const [records, setRecords] = useState<AlmeraRecord[] | null>(null)
   const [evaluations, setEvaluations] = useState<EvaluationSummary[] | null>(null)
+  const [radicadosDashboard, setRadicadosDashboard] = useState<RadicadosDashboardData | null>(null)
 
   useEffect(() => {
     api.adminOverview().then(overview => setUserCount(overview.users.filter(user => user.active).length)).catch(() => {})
     listAlmeraRecords().then(setRecords).catch(() => {})
     adherenceService.evaluations().then(setEvaluations).catch(() => setEvaluations([]))
+    // Si la entidad no tiene Radicados habilitado, el error se traga aqui y las tarjetas
+    // simplemente muestran "—" — no es motivo para romper el resto del Inicio.
+    radicadosService.dashboard().then(setRadicadosDashboard).catch(() => setRadicadosDashboard(null))
   }, [])
 
   const almeraTotal = records?.length ?? 0
@@ -319,7 +326,7 @@ function AdminHome() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         <StatCard icon={ClipboardList} label="Evaluaciones en borrador" value={evaluations ? drafts.length : '—'} identity={matrixIdentity} />
         <StatCard icon={ClipboardCheck} label="Cumplimiento promedio auditado" value={averageCompliance === null ? '—' : `${averageCompliance.toFixed(0)}%`} identity={matrixIdentity} />
         <StatCard icon={ClipboardList} label="Pendientes por revisar" value={almeraInReview} identity={almeraIdentity} />
@@ -327,6 +334,7 @@ function AdminHome() {
         <StatCard icon={Users} label="Usuarios activos" value={userCount ?? '—'} identity={identity} />
         <StatCard icon={Headphones} label="Solicitudes ALMERA" value={almeraTotal} identity={almeraIdentity} />
         <StatCard icon={CheckCircle2} label="Trazabilidad cerrada" value={almeraClosed} identity={almeraIdentity} />
+        <StatCard icon={Inbox} label="Radicados este mes" value={radicadosDashboard?.kpis.mes ?? '—'} identity={radicadosIdentity} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
@@ -364,6 +372,7 @@ function AdminHome() {
             <QuickAccessCard to="/app/adherencia/operacion?tab=dashboard" icon={LayoutDashboard} label="Dashboard por ámbito" detail="Cumplimiento y métricas" identity={matrixIdentity} />
             <QuickAccessCard to="/app/modulos/almera" icon={FilePlus2} label="Nuevo registro ALMERA" detail="Gestión operativa" identity={almeraIdentity} />
             <QuickAccessCard to="/app/adherencia/configuracion" icon={Upload} label="Matrices de adherencia" detail="Áreas, matrices, auditores" identity={matrixIdentity} />
+            <QuickAccessCard to="/app/radicados" icon={Inbox} label="Radicados" detail="Generar, consultar y exportar informes" identity={radicadosIdentity} />
             <QuickAccessCard to="/app/administracion/users" icon={Users} label="Usuarios y roles" detail="Accesos y permisos" identity={identity} />
             <QuickAccessCard to="/app/administracion/settings" icon={ClipboardList} label="Configuración" detail="Parámetros del sistema" identity={identity} />
           </div>
