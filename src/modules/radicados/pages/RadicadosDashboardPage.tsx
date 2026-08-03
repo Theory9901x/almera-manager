@@ -167,7 +167,18 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
         title="Correspondencia y radicación"
         subtitle="Consecutivo atómico por tipo y año, con trazabilidad completa de cada número"
         accent={identity.color}
-        actions={canCreate ? <Button identity={identity} onClick={() => setShowNew(true)}><FilePlus2 size={16} /> Nuevo radicado</Button> : undefined}
+        actions={(
+          <>
+            {/* Visible siempre, sin importar la pestana activa: es la queja real que motivo
+                este boton — desde el Resumen no habia forma de llegar al informe sin saber
+                que existia dentro de Base de datos. Exporta la base completa, igual que el
+                boton de esa pestana. */}
+            <Button variant="secondary" className="btn-on-hero-secondary" disabled={exportingPdf} onClick={() => void exportPdf({})}>
+              <FileDown size={16} /> {exportingPdf ? 'Generando…' : 'Informe PDF'}
+            </Button>
+            {canCreate && <Button identity={identity} onClick={() => setShowNew(true)}><FilePlus2 size={16} /> Nuevo radicado</Button>}
+          </>
+        )}
       />
 
       <div className="surface-panel is-header mt-5" style={{ ['--ds-accent' as string]: identity.color }}>
@@ -254,13 +265,8 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Solo de los activos: un informe con la papelera mezclada confundiria "lo
-                      que hay" con "lo que se saco de circulacion". */}
-                  {!showDeleted && (
-                    <Button variant="secondary" disabled={exportingPdf} onClick={() => void exportPdf({})}>
-                      <FileDown size={15} /> {exportingPdf ? 'Generando…' : 'Informe PDF'}
-                    </Button>
-                  )}
+                  {/* El boton de informe general vive en el hero (arriba, visible en cualquier
+                      pestana) — aqui solo queda el que es propio de esta pestana. */}
                   {/* Alterna entre la base activa y la papelera, nunca las dos mezcladas — igual
                       que el servidor, que responde una u otra segun includeDeleted. */}
                   {isSuperadmin && (
