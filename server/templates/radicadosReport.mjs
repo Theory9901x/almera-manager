@@ -1,4 +1,5 @@
 const ACCENT = '#bb4717'
+const PALETTE = [ACCENT, '#e07845', '#7a2f13', '#f2b8a0', '#4a1508', '#c96a3e']
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
@@ -14,7 +15,9 @@ const ESTADO_LABEL = { ACTIVO: 'Activo', ANULADO: 'Anulado' }
 /** Barras horizontales en CSS puro (sin canvas/imagen: Puppeteer las imprime igual de nitidas
  *  a cualquier resolucion). El ancho de cada barra es relativo al MAYOR valor del propio grupo,
  *  no a un 100% fijo — asi el grupo con menos variedad (ej. Direccion, casi siempre 2-3 filas)
- *  no se ve todo lleno al tope como el de Proceso, que puede tener 10. */
+ *  no se ve todo lleno al tope como el de Proceso, que puede tener 10. Se usa para los grupos
+ *  con etiquetas largas o muchas filas (Categoria, Proceso), donde una columna vertical
+ *  amontonaria las etiquetas. */
 function barRows(data) {
   const max = Math.max(1, ...data.map(item => item.value))
   return data.map(item => `
@@ -23,6 +26,48 @@ function barRows(data) {
       <span class="bar-track"><span class="bar-fill" style="width:${Math.round((item.value / max) * 100)}%"></span></span>
       <span class="bar-value">${item.value}</span>
     </div>`).join('')
+}
+
+/** Barras VERTICALES — para series con pocas categorias y etiquetas cortas (Generados por mes):
+ *  ahi la lectura natural es "de izquierda a derecha en el tiempo", que una barra horizontal no
+ *  transmite. La altura es relativa al mayor valor de la propia serie, igual que barRows. */
+function verticalBars(data, trackHeight = 80) {
+  const max = Math.max(1, ...data.map(item => item.value))
+  const cols = data.map(item => `
+    <div class="vbar-col">
+      <span class="vbar-value">${item.value}</span>
+      <div class="vbar-track" style="height:${trackHeight}px">
+        <span class="vbar-fill" style="height:${Math.max(3, Math.round((item.value / max) * 100))}%"></span>
+      </div>
+      <span class="vbar-label">${escapeHtml(item.label)}</span>
+    </div>`).join('')
+  return `<div class="vbar-chart">${cols}</div>`
+}
+
+/** Pastel via conic-gradient — un solo elemento, sin SVG ni canvas, y se imprime nitido a
+ *  cualquier resolucion porque es CSS. Para grupos de POCAS categorias (Direccion, Tipo): con
+ *  muchas, las porciones pequenas se vuelven ilegibles y ahi es mejor la barra horizontal. */
+function pieChart(data) {
+  const total = data.reduce((sum, item) => sum + item.value, 0) || 1
+  let cursor = 0
+  const stops = data.map((item, index) => {
+    const start = (cursor / total) * 360
+    cursor += item.value
+    const end = (cursor / total) * 360
+    return `${PALETTE[index % PALETTE.length]} ${start}deg ${end}deg`
+  }).join(', ')
+  const legend = data.map((item, index) => `
+    <div class="pie-legend-row">
+      <span class="pie-swatch" style="background:${PALETTE[index % PALETTE.length]}"></span>
+      <span>${escapeHtml(item.label)}</span>
+      <b>${item.value}</b>
+      <span class="muted">(${Math.round((item.value / total) * 100)}%)</span>
+    </div>`).join('')
+  return `
+    <div class="pie-wrap">
+      <div class="pie" style="background: conic-gradient(${stops})"><span class="pie-hole">${total}</span></div>
+      <div class="pie-legend">${legend}</div>
+    </div>`
 }
 
 export function renderRadicadosReportHtml({
@@ -71,6 +116,19 @@ export function renderRadicadosReportHtml({
   .bar-track { flex: 1; height: 9px; background: #f1ede9; border-radius: 5px; overflow: hidden; }
   .bar-fill { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, ${ACCENT}, #e07845); }
   .bar-value { width: 24px; flex: none; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .vbar-chart { display: flex; align-items: flex-end; gap: 14px; padding-top: 6px; }
+  .vbar-col { display: flex; flex-direction: column; align-items: center; width: 40px; }
+  .vbar-value { font-size: 8.5px; font-weight: 700; margin-bottom: 3px; color: #172033; }
+  .vbar-track { width: 22px; background: #f1ede9; border-radius: 4px 4px 0 0; display: flex; align-items: flex-end; overflow: hidden; }
+  .vbar-fill { display: block; width: 100%; background: linear-gradient(180deg, #e07845, ${ACCENT}); border-radius: 4px 4px 0 0; }
+  .vbar-label { font-size: 7.5px; color: #667085; margin-top: 4px; text-align: center; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pie-wrap { display: flex; align-items: center; gap: 18px; }
+  .pie { position: relative; width: 92px; height: 92px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+  .pie-hole { position: absolute; inset: 22%; border-radius: 50%; background: #fffefd; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: ${ACCENT}; }
+  .pie-legend { font-size: 9px; }
+  .pie-legend-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; white-space: nowrap; }
+  .pie-swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .pie-legend-row b { font-variant-numeric: tabular-nums; }
   table { width: 100%; border-collapse: collapse; }
   th, td { border: 1px solid #d2d9e3; padding: 5px 7px; text-align: left; vertical-align: top; }
   th { background: #f6f8fa; font-size: 9px; text-transform: uppercase; color: #526074; }
@@ -99,11 +157,11 @@ export function renderRadicadosReportHtml({
   <div class="charts-grid">
     <div class="chart-card">
       <h2>Interno / recibido / enviado</h2>
-      ${byDireccion.length ? barRows(byDireccion) : '<p class="muted">Sin datos</p>'}
+      ${byDireccion.length ? pieChart(byDireccion) : '<p class="muted">Sin datos</p>'}
     </div>
     <div class="chart-card">
       <h2>Por tipo de radicado</h2>
-      ${byTipo.length ? barRows(byTipo) : '<p class="muted">Sin datos</p>'}
+      ${byTipo.length ? pieChart(byTipo) : '<p class="muted">Sin datos</p>'}
     </div>
     <div class="chart-card">
       <h2>Por categoría / tipo documental</h2>
@@ -115,7 +173,7 @@ export function renderRadicadosReportHtml({
     </div>
     <div class="chart-card wide">
       <h2>Generados por mes</h2>
-      ${monthly.length ? barRows(monthly) : '<p class="muted">Sin datos</p>'}
+      ${monthly.length ? verticalBars(monthly) : '<p class="muted">Sin datos</p>'}
     </div>
   </div>
 
