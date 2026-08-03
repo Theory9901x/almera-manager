@@ -5,6 +5,8 @@ import { extname, join, resolve, sep } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requireAnyPermission, requirePermission } from '../auth.mjs'
+import { renderPdf } from '../pdf.mjs'
+import { renderRadicadosReportHtml } from '../templates/radicadosReport.mjs'
 
 export const radicadosRouter = Router()
 
@@ -246,6 +248,34 @@ radicadosRouter.get('/', radicadosModule, view, async (request, response, next) 
       params,
     )
     response.json({ rows: rows.rows, total: count.rows[0].n, page, pageSize, pages })
+  } catch (error) { next(error) }
+})
+
+// Informe en PDF: MISMO buildFilter que la consulta, asi que "todo lo que este en Base de
+// datos" (sin filtros) o un listado filtrado de Consulta usan el mismo endpoint — depende
+// simplemente de que query params llegue. Sin paginacion: el informe es del listado completo.
+// Va ANTES de '/:id': si quedara despues, Express lo capturaria como si "report.pdf" fuera un id.
+radicadosRouter.get('/report.pdf', radicadosModule, view, async (request, response, next) => {
+  try {
+    const { where, params } = buildFilter(request)
+    const [rows, orgResult] = await Promise.all([
+      query(`${LIST_SELECT} ${where} ORDER BY r.fecha_radicado DESC, r.id DESC`, params),
+      query('SELECT name FROM organizations WHERE id = $1', [oid(request)]),
+    ])
+    const filtered = ['tipoId', 'categoriaId', 'medioId', 'processId', 'direccion', 'estado', 'dateFrom', 'dateTo', 'search']
+      .some(key => Boolean(request.query[key]))
+    const html = renderRadicadosReportHtml({
+      organizationName: orgResult.rows[0]?.name || '',
+      generatedAt: new Date().toISOString(),
+      generatedBy: request.auth.user.fullName,
+      filtered,
+      total: rows.rows.length,
+      radicados: rows.rows,
+    })
+    const pdf = await renderPdf(html, { landscape: true })
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', 'attachment; filename="radicados.pdf"')
+    response.send(pdf)
   } catch (error) { next(error) }
 })
 

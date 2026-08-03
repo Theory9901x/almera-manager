@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Ban, BarChart3, ChevronLeft, ChevronRight, Database, Eye, FilePlus2, FileText, Inbox, LayoutDashboard,
+  Ban, BarChart3, ChevronLeft, ChevronRight, Database, Eye, FileDown, FilePlus2, FileText, Inbox, LayoutDashboard,
   PackageOpen, Paperclip, Search, Send, X,
 } from 'lucide-react'
 import {
@@ -118,6 +118,14 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
 
   function clearAll() {
     setSearchDraft(''); setActiveQuickFilter('TODOS'); setPage(1); setFilters({})
+  }
+
+  const [exportingPdf, setExportingPdf] = useState(false)
+  async function exportPdf(filters: RadicadoFilters) {
+    setExportingPdf(true)
+    try { await radicadosService.exportPdf(filters) }
+    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar el informe') }
+    finally { setExportingPdf(false) }
   }
 
   async function createRadicado(input: CreateRadicadoInput) {
@@ -245,17 +253,26 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                     <p>{dbData ? `${dbData.total} radicado${dbData.total === 1 ? '' : 's'}${showDeleted ? '' : ' en total, sin filtrar'}` : '…'}</p>
                   </div>
                 </div>
-                {/* Alterna entre la base activa y la papelera, nunca las dos mezcladas — igual
-                    que el servidor, que responde una u otra segun includeDeleted. */}
-                {isSuperadmin && (
-                  <Button
-                    variant={showDeleted ? 'primary' : 'secondary'}
-                    identity={identity}
-                    onClick={() => { setShowDeleted(current => !current); setDbPage(1) }}
-                  >
-                    {showDeleted ? 'Ver activos' : 'Ver eliminados'}
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* Solo de los activos: un informe con la papelera mezclada confundiria "lo
+                      que hay" con "lo que se saco de circulacion". */}
+                  {!showDeleted && (
+                    <Button variant="secondary" disabled={exportingPdf} onClick={() => void exportPdf({})}>
+                      <FileDown size={15} /> {exportingPdf ? 'Generando…' : 'Informe PDF'}
+                    </Button>
+                  )}
+                  {/* Alterna entre la base activa y la papelera, nunca las dos mezcladas — igual
+                      que el servidor, que responde una u otra segun includeDeleted. */}
+                  {isSuperadmin && (
+                    <Button
+                      variant={showDeleted ? 'primary' : 'secondary'}
+                      identity={identity}
+                      onClick={() => { setShowDeleted(current => !current); setDbPage(1) }}
+                    >
+                      {showDeleted ? 'Ver activos' : 'Ver eliminados'}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {!dbLoading && dbData && dbData.rows.length === 0 && (
@@ -331,7 +348,12 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                     <span><Search size={19} /></span>
                     <div><h2>Consulta de radicados</h2><p>Filtros combinables sobre toda la base</p></div>
                   </div>
-                  <Button variant="secondary" onClick={clearAll} disabled={!chips.length && activeQuickFilter === 'TODOS'}><X size={15} /> Limpiar</Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary" disabled={exportingPdf} onClick={() => void exportPdf(filters)}>
+                      <FileDown size={15} /> {exportingPdf ? 'Generando…' : 'Informe PDF'}
+                    </Button>
+                    <Button variant="secondary" onClick={clearAll} disabled={!chips.length && activeQuickFilter === 'TODOS'}><X size={15} /> Limpiar</Button>
+                  </div>
                 </div>
 
                 <div className="dc-chips" style={{ marginBottom: 12 }}>

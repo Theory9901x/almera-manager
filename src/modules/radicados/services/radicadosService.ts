@@ -42,4 +42,16 @@ export const radicadosService = {
 
   dashboard: () => call<RadicadosDashboard>('/resumen/dashboard'),
   analytics: () => call<RadicadosAnalytics>('/resumen/analitica'),
+
+  exportPdf: async (filters: RadicadoFilters = {}) => {
+    const response = await fetch(`/api/radicados/report.pdf${toQueryString(filters as Record<string, string | undefined>)}`, { credentials: 'same-origin' })
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar el informe') }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'radicados.pdf'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
 }
