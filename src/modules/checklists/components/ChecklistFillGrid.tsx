@@ -161,6 +161,7 @@ export function ChecklistFillGrid({
                         {subjects.map((subject, index) => (
                           <th key={subject.id}><span className={full ? 'ckfs-fill-subject-head' : 'fill-subject-head'}>{index + 1}. {subject.display_name}</span></th>
                         ))}
+                        <th className={full ? 'ckfs-spacer' : 'fill-spacer'} aria-hidden="true" />
                       </tr>
                     </thead>
                     <tbody>
@@ -210,6 +211,7 @@ export function ChecklistFillGrid({
                               </td>
                             )
                           })}
+                          <td className={full ? 'ckfs-spacer' : 'fill-spacer'} aria-hidden="true" />
                         </tr>
                       ))}
                     </tbody>

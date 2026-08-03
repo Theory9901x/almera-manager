@@ -2903,7 +2903,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   border: 1px solid color-mix(in srgb, var(--glass-tint) 75%, transparent); border-radius: var(--radius-card-sm, 14px);
   background: color-mix(in srgb, var(--glass-tint) 42%, transparent);
 }
-.checklist-fill-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
+/* width: max-content, no 100%: con pocos sujetos (2-3) el ancho completo se repartia entre sus
+   columnas y dejaba huecos enormes alrededor de cada boton C/NC/NA. Mismo arreglo que la version
+   de pantalla completa (`.ckfs-table`) y que la matriz de adherencia (§12 CLAUDE.md): las
+   columnas de sujeto miden lo que pide su contenido y `.fill-spacer` se queda con el sobrante. */
+.checklist-fill-grid { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
 .checklist-fill-grid th, .checklist-fill-grid td { border-bottom: 1px solid rgba(0,90,135,.10); padding: 10px 12px; text-align: center; vertical-align: top; }
 .checklist-fill-grid thead th {
   position: sticky; top: 0; z-index: 2;
@@ -2913,10 +2917,21 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .checklist-fill-grid td.fill-criterion, .checklist-fill-grid th.fill-criterion {
   position: sticky; left: 0; z-index: 1;
   background: color-mix(in srgb, var(--glass-tint) 93%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  text-align: left; min-width: 320px; max-width: 460px; white-space: normal; line-height: 1.45;
+  text-align: left; min-width: 260px; max-width: 380px; white-space: normal; line-height: 1.45;
 }
 .checklist-fill-grid thead th.fill-criterion { z-index: 3; background: rgba(240,249,255,.96); }
 .checklist-fill-grid tbody tr:hover td { background: color-mix(in srgb, var(--m-listas) 6%, transparent); }
+.checklist-fill-grid th:not(.fill-criterion):not(.fill-spacer),
+.checklist-fill-grid td:not(.fill-criterion):not(.fill-spacer) { white-space: nowrap; }
+.fill-spacer { width: 100%; min-width: 0; padding: 0 !important; border: 0 !important; background: transparent !important; }
+.checklist-fill-grid th:not(.fill-criterion):not(.fill-spacer),
+.checklist-fill-grid tbody td:not(.fill-criterion):not(.fill-spacer) {
+  border-left: 1px solid rgba(0,90,135,.10);
+}
+.checklist-fill-grid th.fill-criterion + th,
+.checklist-fill-grid tbody td.fill-criterion + td {
+  border-left: 2px solid var(--m-listas);
+}
 .checklist-fill-grid tr.fill-domain-row td {
   background: linear-gradient(90deg, color-mix(in srgb, var(--m-listas) 16%, transparent), color-mix(in srgb, var(--m-listas) 5%, transparent));
   color: var(--m-listas-deep); text-align: left;
@@ -6387,9 +6402,14 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ckfs-obs::placeholder { color: var(--hcfs-faint); }
 .ckfs-obs:focus { outline: none; border-color: var(--m-listas); }
 
-/* --- Matriz criterio x sujeto (rondas con varios sujetos) --- */
+/* --- Matriz criterio x sujeto (rondas con varios sujetos) ---
+   Mismo patron que la matriz de adherencia (§12 CLAUDE.md): `width: max-content` en vez de
+   `100%` para que las columnas de sujeto midan lo que pide su contenido (el grupo C/NC/NA) y
+   no lo que sobra de dividir el ancho del panel entre 3 o 4 sujetos — eso era lo que dejaba
+   huecos enormes alrededor de cada boton con pocos sujetos en pantalla ancha. El sobrante lo
+   absorbe `.ckfs-spacer`, una celda vacia al final de cada fila, igual que `.hcm-spacer`. */
 .ckfs-tablewrap-inner { overflow-x: auto; }
-.ckfs-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.ckfs-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
 .ckfs-table th, .ckfs-table td { border-bottom: 1px solid var(--hcfs-line); padding: 9px 10px; text-align: center; vertical-align: top; }
 .ckfs-table thead th {
   position: sticky; top: 0; z-index: 2; background: var(--hcfs-head);
@@ -6397,13 +6417,17 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 }
 .ckfs-fill-criterion {
   position: sticky; left: 0; z-index: 1; background: var(--hcfs-panel-2);
-  text-align: left; min-width: 280px; max-width: 420px; white-space: normal; line-height: 1.4;
+  text-align: left; min-width: 260px; max-width: 380px; white-space: normal; line-height: 1.4;
 }
 .ckfs-table thead th.ckfs-fill-criterion { z-index: 3; background: var(--hcfs-head); }
 .ckfs-fill-criterion-text { display: flex; align-items: flex-start; gap: 6px; }
 .ckfs-fill-num { font-weight: 800; color: var(--m-listas); flex: none; }
 .ckfs-fill-guidance-text { margin: 5px 0 0; font-size: 10.5px; line-height: 1.5; color: var(--hcfs-faint); }
 .ckfs-fill-subject-head { display: inline-block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hcfs-ink); }
+/* Columnas de sujeto: al ancho de su contenido, no del que sobre. `white-space: nowrap`
+   evita que el navegador intente encoger el grupo de botones partiendo la fila. */
+.ckfs-table th:not(.ckfs-fill-criterion):not(.ckfs-spacer),
+.ckfs-table td:not(.ckfs-fill-criterion):not(.ckfs-spacer) { white-space: nowrap; }
 .ckfs-fill-value {
   min-width: 40px; height: 34px; border-radius: 9px; border: 1.5px dashed var(--hcfs-cell-brd);
   background: var(--hcfs-cell); color: var(--hcfs-soft); font-size: 11.5px; font-weight: 800; cursor: pointer;
@@ -6415,6 +6439,22 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ckfs-fill-value--c.is-active { border-style: solid; background: #16A34A; border-color: #16A34A; color: #fff; }
 .ckfs-fill-value--nc.is-active { border-style: solid; background: #DC2626; border-color: #DC2626; color: #fff; }
 .ckfs-fill-value--na.is-active { border-style: solid; background: #64748B; border-color: #64748B; color: #fff; }
+
+/* Celda de relleno: se queda con el sobrante de ancho para que las columnas de sujeto no
+   crezcan. Sin borde ni fondo, fuera del recorrido del lector (aria-hidden en el JSX). */
+.ckfs-spacer { width: 100%; min-width: 0; padding: 0 !important; border: 0 !important; background: transparent !important; }
+
+/* Divisorias verticales entre sujetos — funcionales en una tabla densa (§5.4), no decorativas:
+   sin ellas, con pocos sujetos y columnas ya compactas, no se distingue donde acaba uno y
+   empieza el siguiente. La primera es mas marcada: separa el criterio (fijo) de lo calificable. */
+.ckfs-table th:not(.ckfs-fill-criterion):not(.ckfs-spacer),
+.ckfs-table tbody td:not(.ckfs-fill-criterion):not(.ckfs-spacer) {
+  border-left: 1px solid var(--hcfs-line);
+}
+.ckfs-table th.ckfs-fill-criterion + th,
+.ckfs-table tbody td.ckfs-fill-criterion + td {
+  border-left: 2px solid var(--m-listas);
+}
 
 /* Escala del pie/leyenda: mismas cajitas que `.sc-*` de la matriz (regla base en la seccion de
    la matriz de adherencia), con las letras C/NC/NA en vez del numero. */
