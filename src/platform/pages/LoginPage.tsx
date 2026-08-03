@@ -92,6 +92,11 @@ export default function LoginPage() {
         <div className="login-glow login-glow-one" />
         <div className="login-glow login-glow-two" />
         <div className="login-circuit" />
+        <div className="login-orb" aria-hidden="true">
+          <span className="login-orb-ring" />
+          <span className="login-orb-core" />
+          <span className="login-orb-shine" />
+        </div>
 
         <div className="login-brand">
           <BrandMark />
