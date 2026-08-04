@@ -77,7 +77,7 @@ function pieChart(data) {
 
 export function renderRadicadosReportHtml({
   organizationName, generatedAt, generatedBy, filtered, total, radicados,
-  byDireccion, byTipo, byProceso, byCategoria, monthly,
+  byDireccion, byTipo, byProceso, byCategoria, monthly, byMedio, byEstado, byAdjunto, topGeneradores,
 }) {
   const rows = radicados.map(row => `
     <tr>
@@ -95,6 +95,24 @@ export function renderRadicadosReportHtml({
   const direccionSummary = byDireccion
     .map(item => `<strong>${item.value}</strong> ${escapeHtml(item.label.toLowerCase())}`)
     .join(' · ')
+
+  // Indicadores ejecutivos: mismo universo que el resto del informe (las filas de este corte,
+  // filtrado o no), nunca la entidad completa aparte — si el informe sale filtrado, el % de
+  // anulados o de adjuntos tiene que hablar de LO QUE HAY AQUI, no de todo el historico.
+  const anuladoCount = byEstado.find(item => item.label === 'Anulado')?.value || 0
+  const activoCount = total - anuladoCount
+  const conAdjuntoCount = byAdjunto.find(item => item.label === 'Con adjunto')?.value || 0
+  const pctAnulado = total ? Math.round((anuladoCount / total) * 100) : 0
+  const pctAdjunto = total ? Math.round((conAdjuntoCount / total) * 100) : 0
+
+  // Hallazgo real, no decorativo: si la mayoria no tiene proceso institucional asignado, es una
+  // brecha de trazabilidad que a un revisor de calidad le interesa ver escrita, no solo intuida
+  // de una barra casi vacia junto a las demas.
+  const sinProcesoCount = byProceso.find(item => item.label === 'Sin proceso')?.value || 0
+  const pctSinProceso = total ? Math.round((sinProcesoCount / total) * 100) : 0
+  const procesoInsight = pctSinProceso >= 40
+    ? `<p class="insight"><b>${sinProcesoCount} de ${total}</b> radicados (${pctSinProceso}%) no tienen un proceso institucional asignado — una brecha de trazabilidad para auditorías de calidad.</p>`
+    : ''
 
   return `<!doctype html>
 <html lang="es">
@@ -134,6 +152,8 @@ export function renderRadicadosReportHtml({
   .pie-legend-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; white-space: nowrap; }
   .pie-swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
   .pie-legend-row b { font-variant-numeric: tabular-nums; }
+  .insight { margin: 10px 0 0; padding: 8px 10px; border-left: 3px solid ${ACCENT}; border-radius: 0 6px 6px 0; background: #fdf3ee; font-size: 8.5px; line-height: 1.5; color: #5a3a2c; }
+  .insight b { font-variant-numeric: tabular-nums; }
   table { width: 100%; border-collapse: collapse; }
   th, td { border: 1px solid #d2d9e3; padding: 5px 7px; text-align: left; vertical-align: top; }
   th { background: #f6f8fa; font-size: 9px; text-transform: uppercase; color: #526074; }
@@ -157,6 +177,9 @@ export function renderRadicadosReportHtml({
 
   <div class="summary-box">
     <div class="summary-card"><span>Radicados en este informe</span><strong>${total}</strong>${direccionTotal ? `<p>${direccionSummary}</p>` : ''}</div>
+    <div class="summary-card"><span>Activos</span><strong>${activoCount}</strong><p>${anuladoCount} anulado${anuladoCount === 1 ? '' : 's'}</p></div>
+    <div class="summary-card"><span>Tasa de anulación</span><strong>${pctAnulado}%</strong><p>Indicador de calidad del diligenciamiento</p></div>
+    <div class="summary-card"><span>Con soporte adjunto</span><strong>${pctAdjunto}%</strong><p>${conAdjuntoCount} de ${total} con evidencia cargada</p></div>
   </div>
 
   <div class="charts-grid">
@@ -169,12 +192,29 @@ export function renderRadicadosReportHtml({
       ${byTipo.length ? pieChart(byTipo) : '<p class="muted">Sin datos</p>'}
     </div>
     <div class="chart-card">
+      <h2>Estado: activos y anulados</h2>
+      ${byEstado.length ? pieChart(byEstado) : '<p class="muted">Sin datos</p>'}
+    </div>
+    <div class="chart-card">
+      <h2>Documentación soporte</h2>
+      ${byAdjunto.length ? pieChart(byAdjunto) : '<p class="muted">Sin datos</p>'}
+    </div>
+    <div class="chart-card">
+      <h2>Por medio</h2>
+      ${byMedio.length ? barRows(byMedio) : '<p class="muted">Sin datos</p>'}
+    </div>
+    <div class="chart-card">
+      <h2>Generado por</h2>
+      ${topGeneradores.length ? barRows(topGeneradores) : '<p class="muted">Sin datos</p>'}
+    </div>
+    <div class="chart-card">
       <h2>Por categoría / tipo documental</h2>
       ${byCategoria.length ? barRows(byCategoria) : '<p class="muted">Sin datos</p>'}
     </div>
     <div class="chart-card">
       <h2>Por proceso institucional</h2>
       ${byProceso.length ? barRows(byProceso) : '<p class="muted">Sin datos</p>'}
+      ${procesoInsight}
     </div>
     <div class="chart-card wide">
       <h2>Generados por mes</h2>

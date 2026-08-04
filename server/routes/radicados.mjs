@@ -24,6 +24,20 @@ function fail(status, message) {
   throw error
 }
 
+/** Agrupa y cuenta EN MEMORIA sobre filas ya traidas de la base — no dispara una consulta nueva
+ *  por cada corte. Valido aqui porque el informe ya trae el listado COMPLETO sin paginar (nunca
+ *  una muestra), asi que contar en Node sobre esas mismas filas da el mismo resultado que un
+ *  GROUP BY y evita triplicar las idas a Postgres para Medio, Estado, Adjuntos y Generador. */
+function countBy(list, keyFn, limit) {
+  const counts = new Map()
+  for (const item of list) {
+    const key = keyFn(item)
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+  const sorted = [...counts.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+  return limit ? sorted.slice(0, limit) : sorted
+}
+
 // Eliminar es EXCLUSIVO de superadmin y distinto de anular (ver el ALTER de schema.sql): anular
 // invalida un numero a la vista, con su motivo; eliminar lo saca de las vistas normales para
 // datos de prueba o duplicados por error de captura, pero nunca lo borra de la base.
@@ -296,6 +310,9 @@ radicadosRouter.get('/report.pdf', radicadosModule, view, async (request, respon
     ])
     const filtered = ['tipoId', 'categoriaId', 'medioId', 'processId', 'direccion', 'estado', 'dateFrom', 'dateTo', 'search']
       .some(key => Boolean(request.query[key]))
+    // Medio, Estado, Adjuntos y Generador se cuentan sobre las mismas filas que ya trajo la
+    // consulta principal (ver countBy arriba) — el informe nunca pagina, asi que es el universo
+    // completo del corte, igual que los demas agregados.
     const html = renderRadicadosReportHtml({
       organizationName: orgResult.rows[0]?.name || '',
       generatedAt: new Date().toISOString(),
@@ -308,6 +325,10 @@ radicadosRouter.get('/report.pdf', radicadosModule, view, async (request, respon
       byProceso: byProceso.rows,
       byCategoria: byCategoria.rows,
       monthly: monthly.rows,
+      byMedio: countBy(rows.rows, r => r.medio_nombre, 8),
+      byEstado: countBy(rows.rows, r => r.estado === 'ANULADO' ? 'Anulado' : 'Activo'),
+      byAdjunto: countBy(rows.rows, r => r.adjuntos_count > 0 ? 'Con adjunto' : 'Sin adjunto'),
+      topGeneradores: countBy(rows.rows, r => r.created_by_name, 8),
     })
     const pdf = await renderPdf(html, { landscape: true })
     response.setHeader('Content-Type', 'application/pdf')
