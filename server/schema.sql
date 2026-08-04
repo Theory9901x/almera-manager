@@ -1548,3 +1548,30 @@ CREATE INDEX IF NOT EXISTS radicados_not_deleted_idx ON radicados(organization_i
 ALTER TABLE radicado_auditoria DROP CONSTRAINT IF EXISTS radicado_auditoria_accion_check;
 ALTER TABLE radicado_auditoria ADD CONSTRAINT radicado_auditoria_accion_check
   CHECK (accion IN ('CREADO', 'ANULADO', 'ADJUNTO_SUBIDO', 'ELIMINADO'));
+
+-- Migracion del Excel historico ("RADICADOS DE COMUNICACIONES EXTERNAS Y INTERNAS"):
+-- - subproceso: "SUBPROCESO (QUIEN ELABORA)" del Excel — el area que redacta, distinto de
+--   remitente (que hasta ahora no se usaba en ese archivo) y de destinatario.
+-- - proceso_detalle: cuando el proceso institucional "no aplica" (boton en el formulario), aqui
+--   se escribe a mano a quien se dirige en su lugar. process_id se queda NULL en ese caso.
+ALTER TABLE radicados ADD COLUMN IF NOT EXISTS subproceso TEXT NOT NULL DEFAULT '';
+ALTER TABLE radicados ADD COLUMN IF NOT EXISTS proceso_detalle TEXT NOT NULL DEFAULT '';
+
+-- Medio "No registrado": el Excel historico no distinguia medio de recepcion/envio. Es honesto
+-- dejarlo explicito en vez de inventar un Fisico/Correo que nadie confirmo.
+INSERT INTO radicado_medios (organization_id, nombre, order_index)
+SELECT o.id, 'No registrado', 99 FROM organizations o
+ON CONFLICT (organization_id, nombre) DO NOTHING;
+
+-- Categorias adicionales encontradas en el Excel historico (mas las de su pestana de
+-- desplegable que no llegaron a usarse), sumadas a las 5 que ya existian.
+INSERT INTO radicado_categorias (organization_id, nombre, order_index)
+SELECT o.id, v.nombre, v.order_index
+FROM organizations o
+CROSS JOIN (VALUES
+  ('Asistencia', 10), ('Capacitación', 11), ('Certificado', 12), ('Cobro Prejurídico', 13),
+  ('Comunicación', 14), ('Cotización', 15), ('Información', 16), ('Informe', 17),
+  ('Notificación', 18), ('Otro', 19), ('Poder', 20), ('Requerimiento', 21), ('Respuesta', 22),
+  ('Socialización', 23), ('Denuncia', 24), ('Solicitud de permiso', 25), ('Factura', 26)
+) AS v(nombre, order_index)
+ON CONFLICT (organization_id, nombre) DO NOTHING;

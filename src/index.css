@@ -3636,6 +3636,35 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 /* En tablet el dialogo no puede pasarse de alto: el teclado se come media pantalla. */
 .ds-confirm.start-audit { max-height: min(88vh, 720px); overflow: auto; }
 
+/* Formulario de radicado: mas ancho y horizontal, para llenar varios campos por fila en vez
+   de una columna larga como el resto de dialogos "start-audit". */
+.ds-confirm.radicado-form { width: min(960px, 96vw); max-height: min(90vh, 780px); overflow: auto; }
+.radicado-form-grid {
+  display: grid; gap: 16px; margin-top: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.radicado-form-grid .ds-field { display: grid; gap: 6px; }
+.radicado-form-grid .span-2 { grid-column: span 2; }
+.radicado-form-grid .span-3 { grid-column: span 3; }
+@media (max-width: 760px) {
+  .radicado-form-grid { grid-template-columns: 1fr; }
+  .radicado-form-grid .span-2, .radicado-form-grid .span-3 { grid-column: span 1; }
+}
+.radicado-form-grid .ds-textarea { min-height: 64px; resize: vertical; }
+.radicado-form-grid textarea.ds-input.is-large { min-height: 96px; }
+/* Boton "No aplica" del proceso: toggla entre el select y el campo libre de a quien se dirige. */
+.radicado-proceso-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.radicado-proceso-toggle .ds-field-label { margin: 0; }
+.radicado-noaplica-btn {
+  font-size: 11.5px; font-weight: 650; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border-hairline); background: var(--surface-soft); color: var(--ink-soft);
+}
+.radicado-noaplica-btn.is-active {
+  border-color: color-mix(in oklch, var(--m-asistencias) 45%, transparent);
+  background: color-mix(in oklch, var(--m-asistencias) 14%, transparent);
+  color: var(--m-asistencias);
+}
+
 /* ================================================================
    CENTRO DE DATOS — Listas de Chequeo
    ================================================================ */

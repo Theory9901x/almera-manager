@@ -32,8 +32,10 @@ export interface RadicadoRow {
   process_name: string | null
   process_code: string | null
   objeto: string
+  subproceso: string
   remitente: string
   destinatario: string
+  proceso_detalle: string
   anio: number
   consecutivo: number
   fecha_radicado: string
@@ -97,8 +99,12 @@ export interface CreateRadicadoInput {
   direccion?: RadicadoDireccion
   categoriaId: string
   medioId: string
+  /** Ausente (o vacío) junto con `procesoDetalle` = "No aplica": no hay proceso institucional,
+   *  se deja constancia a mano de a quién se dirige en su lugar. */
   processId?: string
+  procesoDetalle?: string
   objeto: string
+  subproceso?: string
   remitente?: string
   destinatario?: string
   fechaDocumento?: string

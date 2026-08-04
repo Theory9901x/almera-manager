@@ -164,13 +164,16 @@ radicadosRouter.post('/', radicadosModule, create, async (request, response, nex
     const inserted = await client.query(
       `INSERT INTO radicados
          (organization_id, numero_radicado, tipo_id, direccion, categoria_id, medio_id, process_id,
-          objeto, remitente, destinatario, anio, consecutivo, fecha_documento, created_by_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          objeto, subproceso, remitente, destinatario, proceso_detalle, anio, consecutivo, fecha_documento, created_by_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
         oid(request), numeroRadicado, tipoId, direccion, categoriaId, medioId,
         body.processId ? Number(body.processId) : null,
-        objeto, String(body.remitente || '').trim(), String(body.destinatario || '').trim(),
+        objeto, String(body.subproceso || '').trim(), String(body.remitente || '').trim(), String(body.destinatario || '').trim(),
+        // proceso_detalle solo tiene sentido cuando NO hay processId ("no aplica" en el
+        // formulario) — si viene un proceso institucional, se descarta el texto libre.
+        body.processId ? '' : String(body.procesoDetalle || '').trim(),
         anio, consecutivo, body.fechaDocumento || null, uid(request),
       ],
     )
@@ -210,7 +213,7 @@ function buildFilter(request) {
   if (q.search) {
     params.push(`%${q.search}%`)
     const idx = params.length
-    clauses.push(`(r.numero_radicado ILIKE $${idx} OR r.objeto ILIKE $${idx} OR r.remitente ILIKE $${idx} OR r.destinatario ILIKE $${idx})`)
+    clauses.push(`(r.numero_radicado ILIKE $${idx} OR r.objeto ILIKE $${idx} OR r.remitente ILIKE $${idx} OR r.destinatario ILIKE $${idx} OR r.subproceso ILIKE $${idx})`)
   }
   // Los eliminados nunca se mezclan con los activos: o se ve una lista o la otra. Y solo un
   // superadmin puede pedir la de eliminados — a cualquier otro rol, aunque lo pida, se le sigue

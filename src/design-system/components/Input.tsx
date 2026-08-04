@@ -1,9 +1,9 @@
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import { Search } from 'lucide-react'
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+export function Field({ label, children, hint, className = '' }: { label: string; children: ReactNode; hint?: string; className?: string }) {
   return (
-    <label className="ds-field">
+    <label className={`ds-field ${className}`.trim()}>
       <span className="ds-field-label">{label}</span>
       {children}
       {hint && <span className="ds-field-hint">{hint}</span>}

@@ -105,6 +105,8 @@ export function RadicadoDetailDialog({ radicado, canVoid, canDelete, onClose, on
           <Field label="Objeto / asunto"><p>{radicado.objeto}</p></Field>
           <Field label="Medio"><p>{radicado.medio_nombre}</p></Field>
           {radicado.process_name && <Field label="Proceso"><p>{radicado.process_code} · {radicado.process_name}</p></Field>}
+          {!radicado.process_name && radicado.proceso_detalle && <Field label="Proceso"><p>No aplica — {radicado.proceso_detalle}</p></Field>}
+          {radicado.subproceso && <Field label="Subproceso / quién elabora"><p>{radicado.subproceso}</p></Field>}
           <Field label="Remitente"><p>{radicado.remitente || '—'}</p></Field>
           <Field label="Destinatario"><p>{radicado.destinatario || '—'}</p></Field>
           <Field label="Generado por"><p>{radicado.created_by_name} · {new Date(radicado.fecha_radicado).toLocaleString('es-CO')}</p></Field>

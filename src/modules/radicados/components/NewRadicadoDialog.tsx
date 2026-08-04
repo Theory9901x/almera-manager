@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FilePlus2, X } from 'lucide-react'
-import { Button, DatePicker, Field, Input, Select, moduleIdentity } from '@/design-system'
+import { Button, DatePicker, Field, Input, Select, Textarea, moduleIdentity } from '@/design-system'
 import type { CreateRadicadoInput, RadicadoCatalogos, RadicadoDireccion } from '../types'
 
 const identity = moduleIdentity('radicados')
+
+const EMPTY_FORM: CreateRadicadoInput = { tipoId: '', categoriaId: '', medioId: '', objeto: '' }
 
 /** Formulario de radicación. Objeto y tipo son lo primero: de ahí depende si aparece o no el
  *  campo de dirección (solo Externo lo tiene — Interno no participa de Recibido/Enviado). */
@@ -15,11 +17,13 @@ export function NewRadicadoDialog({ open, catalogos, busy, onCancel, onCreate }:
   onCancel(): void
   onCreate(input: CreateRadicadoInput): void
 }) {
-  const [form, setForm] = useState<CreateRadicadoInput>({ tipoId: '', categoriaId: '', medioId: '', objeto: '' })
+  const [form, setForm] = useState<CreateRadicadoInput>(EMPTY_FORM)
   const [touched, setTouched] = useState(false)
+  // "No aplica" en Proceso: oculta el select y pide a mano a quien se dirige (proceso_detalle).
+  const [procesoNoAplica, setProcesoNoAplica] = useState(false)
 
   useEffect(() => {
-    if (open) { setForm({ tipoId: '', categoriaId: '', medioId: '', objeto: '' }); setTouched(false) }
+    if (open) { setForm(EMPTY_FORM); setTouched(false); setProcesoNoAplica(false) }
   }, [open])
 
   useEffect(() => {
@@ -43,6 +47,15 @@ export function NewRadicadoDialog({ open, catalogos, busy, onCancel, onCreate }:
   const missingDireccion = esExterno && !form.direccion
   const canSubmit = !missingTipo && !missingCategoria && !missingMedio && !missingObjeto && !missingDireccion
 
+  function toggleNoAplica(next: boolean) {
+    setProcesoNoAplica(next)
+    setForm(current => ({
+      ...current,
+      processId: next ? undefined : current.processId,
+      procesoDetalle: next ? current.procesoDetalle : undefined,
+    }))
+  }
+
   function submit() {
     setTouched(true)
     if (canSubmit) onCreate(form)
@@ -50,7 +63,7 @@ export function NewRadicadoDialog({ open, catalogos, busy, onCancel, onCreate }:
 
   return createPortal(
     <div className="ds-confirm-backdrop" onClick={() => !busy && onCancel()}>
-      <div className="ds-confirm start-audit" role="dialog" aria-modal="true" aria-labelledby="new-radicado-title" onClick={event => event.stopPropagation()}>
+      <div className="ds-confirm start-audit radicado-form" role="dialog" aria-modal="true" aria-labelledby="new-radicado-title" onClick={event => event.stopPropagation()}>
         <button className="ds-confirm-close" onClick={onCancel} aria-label="Cerrar"><X size={16} /></button>
         <div className="ds-confirm-icon" style={{ background: `${identity.color}1f`, color: identity.color }}>
           <FilePlus2 size={22} />
@@ -61,7 +74,7 @@ export function NewRadicadoDialog({ open, catalogos, busy, onCancel, onCreate }:
           anula dejando el motivo — el número no se reutiliza.
         </p>
 
-        <div className="start-audit-form">
+        <div className="radicado-form-grid">
           <Field label="Tipo *" hint={touched && missingTipo ? 'Elige el tipo' : undefined}>
             <Select
               value={form.tipoId || 'NONE'}
@@ -92,24 +105,61 @@ export function NewRadicadoDialog({ open, catalogos, busy, onCancel, onCreate }:
               options={[{ value: 'NONE', label: 'Selecciona el medio' }, ...(catalogos?.medios.filter(m => m.activo) || []).map(m => ({ value: m.id, label: m.nombre }))]}
             />
           </Field>
-          <Field label="Proceso" hint="Opcional">
-            <Select
-              value={form.processId || 'NONE'}
-              onChange={value => setForm(current => ({ ...current, processId: value === 'NONE' ? undefined : value }))}
-              options={[{ value: 'NONE', label: 'Sin proceso' }, ...(catalogos?.procesos || []).map(p => ({ value: p.id, label: `${p.code} · ${p.name}` }))]}
+
+          <div className="ds-field span-2">
+            <div className="radicado-proceso-toggle">
+              <span className="ds-field-label">Proceso</span>
+              <button
+                type="button"
+                className={`radicado-noaplica-btn${procesoNoAplica ? ' is-active' : ''}`}
+                onClick={() => toggleNoAplica(!procesoNoAplica)}
+              >
+                No aplica
+              </button>
+            </div>
+            {procesoNoAplica ? (
+              <Input
+                placeholder="A quién se dirige"
+                value={form.procesoDetalle || ''}
+                onChange={event => setForm(current => ({ ...current, procesoDetalle: event.target.value }))}
+              />
+            ) : (
+              <Select
+                value={form.processId || 'NONE'}
+                onChange={value => setForm(current => ({ ...current, processId: value === 'NONE' ? undefined : value }))}
+                options={[{ value: 'NONE', label: 'Sin proceso' }, ...(catalogos?.procesos || []).map(p => ({ value: p.id, label: `${p.code} · ${p.name}` }))]}
+              />
+            )}
+          </div>
+
+          <Field label="Fecha del documento" hint="Opcional: si difiere de hoy">
+            <DatePicker value={form.fechaDocumento || ''} onChange={value => setForm(current => ({ ...current, fechaDocumento: value || undefined }))} />
+          </Field>
+
+          <Field label="Objeto / asunto *" hint={touched && missingObjeto ? 'Describe el objeto del radicado' : undefined} className="span-3">
+            <Textarea
+              value={form.objeto}
+              placeholder="Ej. Solicitud de historia clínica"
+              onChange={event => setForm(current => ({ ...current, objeto: event.target.value }))}
             />
           </Field>
-          <Field label="Objeto / asunto *" hint={touched && missingObjeto ? 'Describe el objeto del radicado' : undefined}>
-            <Input value={form.objeto} placeholder="Ej. Solicitud de historia clínica" onChange={event => setForm(current => ({ ...current, objeto: event.target.value }))} />
+
+          <Field label="Subproceso / quién elabora" hint="Opcional" className="span-2">
+            <Textarea
+              value={form.subproceso || ''}
+              onChange={event => setForm(current => ({ ...current, subproceso: event.target.value }))}
+            />
           </Field>
+
           <Field label="Remitente / quien diligencia" hint="Opcional">
             <Input value={form.remitente || ''} onChange={event => setForm(current => ({ ...current, remitente: event.target.value }))} />
           </Field>
-          <Field label="Destinatario" hint="Opcional">
-            <Input value={form.destinatario || ''} onChange={event => setForm(current => ({ ...current, destinatario: event.target.value }))} />
-          </Field>
-          <Field label="Fecha del documento" hint="Opcional: si difiere de hoy">
-            <DatePicker value={form.fechaDocumento || ''} onChange={value => setForm(current => ({ ...current, fechaDocumento: value || undefined }))} />
+
+          <Field label="Destinatario" hint="Opcional" className="span-3">
+            <Textarea
+              value={form.destinatario || ''}
+              onChange={event => setForm(current => ({ ...current, destinatario: event.target.value }))}
+            />
           </Field>
         </div>
 

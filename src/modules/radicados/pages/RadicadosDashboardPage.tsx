@@ -298,7 +298,7 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                       <thead>
                         <tr>
                           <th>Número</th><th>Tipo</th><th>Categoría</th><th>Medio</th><th>Proceso</th>
-                          <th>Objeto / asunto</th><th>Remitente</th><th>Destinatario</th>
+                          <th>Objeto / asunto</th><th>Subproceso</th><th>Remitente</th><th>Destinatario</th>
                           <th>Fecha radicado</th><th>Fecha documento</th><th>Generado por</th>
                           <th>Adjuntos</th><th>Estado</th><th></th>
                         </tr>
@@ -312,6 +312,7 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                             <td>{row.medio_nombre}</td>
                             <td>{row.process_code || '—'}</td>
                             <td title={row.objeto}>{row.objeto.length > 40 ? `${row.objeto.slice(0, 40)}…` : row.objeto}</td>
+                            <td title={row.subproceso}>{row.subproceso ? (row.subproceso.length > 30 ? `${row.subproceso.slice(0, 30)}…` : row.subproceso) : '—'}</td>
                             <td>{row.remitente || '—'}</td>
                             <td>{row.destinatario || '—'}</td>
                             <td className="tabular-col">{new Date(row.fecha_radicado).toLocaleString('es-CO')}</td>
