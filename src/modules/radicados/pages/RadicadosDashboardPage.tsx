@@ -41,15 +41,18 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
   const [showNew, setShowNew] = useState(false)
   const [selected, setSelected] = useState<RadicadoDetail | null>(null)
 
-  // Base de datos: SIN filtros y sin nada mas — el listado completo, tal cual, con todas las
-  // columnas de trazabilidad. Es un espacio propio a proposito: mezclarlo con la consulta hacia
-  // imposible ver "todo lo que hay" sin que un filtro puesto antes lo recortara en silencio.
-  // "Ver eliminados" es la unica excepcion, y solo para superadmin: sin ella, un eliminado no
-  // tendria forma de auditarse de nuevo aunque siga completo en la base.
+  // Base de datos: el listado completo, sin los filtros combinables de Consulta (categoria,
+  // medio, proceso, fechas) — ese cruce sigue viviendo aparte. Pero SI lleva una busqueda rapida:
+  // es el primer sitio donde alguien mira justo despues de radicar, para confirmar que quedo
+  // guardado, y obligarlo a ir hasta Consulta para eso era el "no se donde quedo" real.
+  // "Ver eliminados" es la unica excepcion aparte, y solo para superadmin: sin ella, un eliminado
+  // no tendria forma de auditarse de nuevo aunque siga completo en la base.
   const [dbPage, setDbPage] = useState(1)
   const [dbData, setDbData] = useState<RadicadoListPage | null>(null)
   const [dbLoading, setDbLoading] = useState(true)
   const [showDeleted, setShowDeleted] = useState(false)
+  const [dbSearch, setDbSearch] = useState('')
+  const [dbSearchDraft, setDbSearchDraft] = useState('')
 
   // Consulta: filtros combinables, aparte de la base de datos completa.
   const [filters, setFilters] = useState<RadicadoFilters>({})
@@ -70,12 +73,12 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
 
   function loadDb() {
     setDbLoading(true)
-    radicadosService.list({ page: String(dbPage), pageSize: '50', includeDeleted: showDeleted ? 'true' : undefined })
+    radicadosService.list({ page: String(dbPage), pageSize: '50', includeDeleted: showDeleted ? 'true' : undefined, search: dbSearch || undefined })
       .then(setDbData)
       .catch(cause => toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar la base de datos'))
       .finally(() => setDbLoading(false))
   }
-  useEffect(() => { if (section === 'base-datos') loadDb() }, [section, dbPage, showDeleted])
+  useEffect(() => { if (section === 'base-datos') loadDb() }, [section, dbPage, showDeleted, dbSearch])
 
   function loadAnalytics() {
     radicadosService.analytics().then(setAnalytics).catch(() => setAnalytics(null))
@@ -159,9 +162,13 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
       toast.push('success', `Radicado ${created.numero_radicado} generado`)
       setShowNew(false)
       loadDashboard()
-      if (section === 'base-datos') loadDb()
-      if (section === 'consulta') load()
-      if (section === 'estadisticas') loadAnalytics()
+      // Un toast se esfuma solo y no dice donde quedo el radicado: la confirmacion real es abrir
+      // su detalle completo (numero, objeto, todo) ahi mismo, y dejar a quien lo genero parado en
+      // Base de datos con el nuevo radicado de PRIMERO en la lista (ORDER BY fecha DESC), no
+      // perdido en la pagina en la que estuviera antes.
+      setSection('base-datos')
+      setDbPage(1)
+      await openDetail(created.id)
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible generar el radicado') }
     finally { setCreating(false) }
   }
@@ -285,10 +292,18 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                   <span><Database size={19} /></span>
                   <div>
                     <h2>{showDeleted ? 'Radicados eliminados' : 'Base de datos de radicados'}</h2>
-                    <p>{dbData ? `${dbData.total} radicado${dbData.total === 1 ? '' : 's'}${showDeleted ? '' : ' en total, sin filtrar'}` : '…'}</p>
+                    <p>{dbData ? `${dbData.total} radicado${dbData.total === 1 ? '' : 's'}${dbSearch ? ` para "${dbSearch}"` : (showDeleted ? '' : ' en total, sin filtrar')}` : '…'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Input
+                    style={{ width: 260 }}
+                    value={dbSearchDraft}
+                    placeholder="Buscar número, objeto, remitente…"
+                    onChange={event => setDbSearchDraft(event.target.value)}
+                    onKeyDown={event => { if (event.key === 'Enter') { setDbPage(1); setDbSearch(dbSearchDraft.trim()) } }}
+                    onBlur={() => { setDbPage(1); setDbSearch(dbSearchDraft.trim()) }}
+                  />
                   {/* El boton de informe general vive en el hero (arriba, visible en cualquier
                       pestana) — aqui solo queda el que es propio de esta pestana. */}
                   {/* Alterna entre la base activa y la papelera, nunca las dos mezcladas — igual
@@ -309,8 +324,8 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                 <div className="p-5">
                   <EmptyState
                     icon={Database}
-                    title={showDeleted ? 'Ningún radicado eliminado' : 'Todavía no hay radicados'}
-                    description={showDeleted ? 'Los radicados que un superadmin elimine aparecerán aquí.' : 'El primero que generes aparecerá aquí.'}
+                    title={dbSearch ? 'Ningún radicado con esa búsqueda' : (showDeleted ? 'Ningún radicado eliminado' : 'Todavía no hay radicados')}
+                    description={dbSearch ? 'Prueba con otro número, objeto, remitente o destinatario.' : (showDeleted ? 'Los radicados que un superadmin elimine aparecerán aquí.' : 'El primero que generes aparecerá aquí.')}
                   />
                 </div>
               )}

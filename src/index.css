@@ -2084,6 +2084,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ds-table th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border-hairline); }
 .ds-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-hairline); color: var(--ink); }
 .ds-table tr:last-child td { border-bottom: 0; }
+/* La ultima columna (casi siempre una accion como "Ver") queda pegada al borde del scroll
+   horizontal, y el contenedor que la recorta (Card overflow-hidden) le comia el borde derecho.
+   Aire de sobra + un tope minimo para que el boton nunca quede a medio cortar. */
+.ds-table th:last-child, .ds-table td:last-child { padding-right: 22px; min-width: 64px; }
 
 .ds-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border-hairline); }
 .ds-tabs-item { position: relative; border: 0; background: transparent; padding: 10px 2px; font-size: 12.5px; font-weight: 750; color: var(--muted); cursor: pointer; transition: color 150ms ease; }

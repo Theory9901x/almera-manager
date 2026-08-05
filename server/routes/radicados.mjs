@@ -253,6 +253,12 @@ const LIST_SELECT = `
   LEFT JOIN users du ON du.id = r.deleted_by_id
   WHERE r.organization_id = $1`
 
+// El orden es por 'id', NUNCA por 'fecha_radicado': ese campo es libre para el historico migrado
+// del Excel (que trae errores de captura reales, alguno con fecha en 2029) y para
+// 'fechaDocumento' a mano en el formulario, asi que un radicado real generado HOY podia quedar
+// enterrado bajo uno viejo con una fecha corrupta "en el futuro" — quien lo radicaba no lo veia
+// de primero en Base de datos y pensaba que se habia perdido. 'id' es un BIGSERIAL: crece
+// exactamente en el orden de insercion, sin depender de ningun dato editable ni de una fecha.
 radicadosRouter.get('/', radicadosModule, view, async (request, response, next) => {
   try {
     const { where, params } = buildFilter(request)
@@ -261,7 +267,7 @@ radicadosRouter.get('/', radicadosModule, view, async (request, response, next) 
     const pages = Math.max(1, Math.ceil(count.rows[0].n / pageSize))
     const page = Math.min(Math.max(1, Number(request.query.page) || 1), pages)
     const rows = await query(
-      `${LIST_SELECT} ${where} ORDER BY r.fecha_radicado DESC, r.id DESC LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+      `${LIST_SELECT} ${where} ORDER BY r.id DESC LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
       params,
     )
     response.json({ rows: rows.rows, total: count.rows[0].n, page, pageSize, pages })
@@ -280,7 +286,7 @@ radicadosRouter.get('/report.pdf', radicadosModule, view, async (request, respon
     // graficas cuentan lo filtrado, no toda la entidad — lo contrario mentiria sobre "lo que
     // hay en este informe".
     const [rows, orgResult, byDireccion, byTipo, byProceso, byCategoria, monthly] = await Promise.all([
-      query(`${LIST_SELECT} ${where} ORDER BY r.fecha_radicado DESC, r.id DESC`, params),
+      query(`${LIST_SELECT} ${where} ORDER BY r.id DESC`, params),
       query('SELECT name FROM organizations WHERE id = $1', [oid(request)]),
       query(
         `SELECT CASE r.direccion WHEN 'RECIBIDO' THEN 'Recibido' WHEN 'ENVIADO' THEN 'Enviado' ELSE 'Interno' END AS label, COUNT(*)::int AS value
