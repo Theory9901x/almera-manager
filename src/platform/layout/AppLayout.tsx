@@ -121,6 +121,7 @@ export default function AppLayout() {
                   to={operationalRoute}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}
+                  style={{ ['--row-accent' as string]: identity.color }}
                 >
                   <ClipboardCheck className="item-icon" size={20} style={{ color: identity.color }} />
                   <span className="min-w-0 flex-1 truncate">Asistencias Técnicas</span>
@@ -136,6 +137,7 @@ export default function AppLayout() {
                     to={adherenceRoute}
                     onClick={() => setOpen(false)}
                     className={`sidebar-item ${isAdherenceActive ? 'is-active' : ''}`}
+                    style={{ ['--row-accent' as string]: identity.color }}
                   >
                     <ClipboardCheck className="item-icon" size={20} style={{ color: identity.color }} />
                     <span className="min-w-0 flex-1 truncate">Matrices de Adherencia</span>
@@ -162,6 +164,7 @@ export default function AppLayout() {
                   to={module.route}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}
+                  style={{ ['--row-accent' as string]: identity.color }}
                 >
                   <Icon className="item-icon" size={20} style={{ color: identity.color }} />
                   <span className="min-w-0 flex-1 truncate">{module.name}</span>
@@ -183,6 +186,7 @@ export default function AppLayout() {
                     end
                     onClick={() => setOpen(false)}
                     className={({ isActive }) => `sidebar-item ${isActive ? 'is-active' : ''}`}
+                    style={{ ['--row-accent' as string]: identity.color }}
                   >
                     <Icon className="item-icon" size={20} style={{ color: identity.color }} />
                     <span className="min-w-0 flex-1 truncate">{module.name}</span>

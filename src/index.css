@@ -474,20 +474,27 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
   gap: 0;
   padding: 0;
   background:
-    radial-gradient(circle at 50% -20%, rgba(255,255,255,.28), transparent 34%),
+    radial-gradient(900px 700px at 8% -10%, rgba(239,51,73,.20), transparent 55%),
+    radial-gradient(800px 640px at 100% 0%, rgba(139,92,246,.16), transparent 55%),
+    radial-gradient(700px 600px at 30% 100%, rgba(56,189,248,.10), transparent 60%),
     linear-gradient(150deg, #272a30, #111318 58%, #08090c);
   color: var(--ink);
 }
+/* Sidebar en vidrio real: translucido + blur, no un panel opaco con textura encima. Deja pasar
+   los brillos de .app-shell difuminados detras, que es lo que de verdad lee como "glassmorfismo"
+   en vez de solo un fondo oscuro plano con un degradado pintado. */
 .shell-sidebar {
   top: 0;
   height: 100vh;
   border: 0;
-  border-right: 1px solid rgba(255,255,255,.08);
+  border-right: 1px solid rgba(255,255,255,.09);
   background:
-    radial-gradient(circle at 0 0, rgba(239,51,73,.16), transparent 31%),
-    var(--gradient-dark);
+    radial-gradient(circle at 0 0, rgba(239,51,73,.20), transparent 31%),
+    linear-gradient(165deg, rgba(27,41,64,.72), rgba(16,24,39,.82));
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
   color: #f8fafc;
-  box-shadow: inset -1px 0 0 rgba(255,255,255,.03);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.04), inset 1px 0 0 rgba(255,255,255,.02);
 }
 .shell-sidebar::after {
   position: absolute;
@@ -538,18 +545,45 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
   color: rgba(255,255,255,.58); padding: 0 16px; margin: 0 0 var(--space-2);
 }
 .sidebar-section + .sidebar-section { padding-top: var(--space-4); border-top: 1px solid rgba(255,255,255,.06); }
+/* Cada modulo es su PROPIA fila, separada de la siguiente por una linea real (no solo espacio):
+   antes de esto la lista se leia como un bloque compacto sin jerarquia entre modulos. */
+.sidebar-section nav, .sidebar-section > a, .sidebar-section > div { position: relative; }
 .sidebar-item {
-  display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px;
+  position: relative;
+  display: flex; align-items: center; gap: 12px; margin: 2px 0; padding: 11px 16px; border-radius: 12px;
   color: rgba(255,255,255,.78); font-size: 14px; font-weight: 500;
-  transition: background 150ms, color 150ms;
+  border: 1px solid transparent;
+  transition: background 150ms, color 150ms, border-color 150ms, transform 150ms;
 }
-.sidebar-item:hover { background: rgba(255,255,255,.06); color: #fff; }
-.sidebar-item.is-active { background: rgba(255,255,255,.10); color: #fff; font-weight: 600; }
-.sidebar-item .item-icon { width: 20px; height: 20px; flex: none; }
+.sidebar-item + .sidebar-item { border-top: 1px solid rgba(255,255,255,.055); }
+.sidebar-item:hover { background: rgba(255,255,255,.07); color: #fff; transform: translateX(1px); }
+.sidebar-item.is-active {
+  background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
+  border-color: rgba(255,255,255,.12);
+  color: #fff; font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
+/* Barra de acento a la izquierda del modulo activo, en el color de identidad de ESE modulo
+   (via --row-accent, fijado inline igual que en las tablas) — asi el resaltado no es siempre
+   rojo institucional aunque se este parado en Huella de Carbono o Encuestas. */
+.sidebar-item.is-active::before {
+  position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--row-accent, var(--color-brand));
+  content: "";
+}
+/* El icono va en su propio "chip" de vidrio, tenido con el color de identidad del modulo
+   (currentColor, que ya trae el style inline) — separa visualmente cada fila del texto plano de
+   antes y da la sensacion de modulos independientes, no una lista de enlaces. */
+.sidebar-item .item-icon {
+  width: 20px; height: 20px; flex: none; box-sizing: content-box;
+  padding: 6px; margin: -6px 0; border-radius: 9px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.sidebar-item:hover .item-icon { background: color-mix(in srgb, currentColor 24%, transparent); }
 /* Subitem de un modulo (ej. Configuracion/Operacion/Mis planes bajo Matrices) — indentado y
    subordinado a su padre, nunca suelto al mismo nivel que un modulo de primer nivel. */
 .sidebar-subitem {
-  display: block; padding: 8px 16px 8px 44px; border-radius: 10px;
+  display: block; margin: 1px 0; padding: 8px 16px 8px 44px; border-radius: 10px;
   font-size: 13.5px; color: rgba(255,255,255,.62); transition: background 150ms, color 150ms;
 }
 .sidebar-subitem:hover { background: rgba(255,255,255,.05); color: #fff; }
