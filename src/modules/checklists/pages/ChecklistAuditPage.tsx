@@ -8,8 +8,10 @@ import {
 } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, ProgressRing, SaveStatusIndicator,
-  Select, SignaturePad, ToastProvider, moduleIdentity, semaphoreColor, useToast,
+  Select, SignaturePad, ToastProvider, moduleIdentity, useToast,
 } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor, checklistLevel } from '../scale'
 import { checklistsService } from '../services/checklistsService'
 
 import { answerKey, ChecklistFillGrid } from '../components/ChecklistFillGrid'
@@ -26,15 +28,11 @@ const identity = moduleIdentity('checklists')
  *  el mismo dato. La fecha, el servicio y el auditor se fijan al abrir la ronda. */
 const YA_EN_LA_BANDA = /^(fecha|servicio|área|area|centro de atenci|evaluador|responsable|auditor|turno)/i
 
-/** Etiqueta del anillo. Usa los mismos cortes que el semaforo del sistema, no unos propios. */
+/** Etiqueta del anillo. El NIVEL sale de la escala del modulo (verde desde 85 %), no de unos
+ *  cortes propios repetidos aqui: tenerlos duplicados era como el anillo decia "Bueno" en ambar
+ *  mientras el color ya era verde. Solo el texto es propio de esta pantalla. */
 const CONCEPT_TEXT: Record<string, string> = {
   OPTIMO: 'Excelente', ACEPTABLE: 'Bueno', DEFICIENTE: 'Regular', MUY_DEFICIENTE: 'Crítico',
-}
-function conceptOf(percent: number) {
-  if (percent >= 90) return 'OPTIMO'
-  if (percent >= 80) return 'ACEPTABLE'
-  if (percent >= 70) return 'DEFICIENTE'
-  return 'MUY_DEFICIENTE'
 }
 
 export default function ChecklistAuditPage() {
@@ -761,7 +759,7 @@ function ChecklistAuditContent() {
                         <div className="tag" style={{
                           background: `color-mix(in srgb, ${semaphoreColor(shownPercent)} 14%, white)`,
                           color: semaphoreColor(shownPercent),
-                        }}>● {CONCEPT_TEXT[conceptOf(shownPercent)]}</div>
+                        }}>● {CONCEPT_TEXT[checklistLevel(shownPercent) || 'MUY_DEFICIENTE']}</div>
                       )}
                     </div>
                   </div>

@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { Archive, ChevronLeft, ChevronRight, Download, Eye, Loader2, PenLine, Search, Trash2, X } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, DatePicker, EmptyState, Field, Input, Select, Table,
-  moduleIdentity, semaphoreColor, useToast,
+  moduleIdentity, useToast,
 } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor } from '../scale'
 import { checklistsService } from '../services/checklistsService'
 import type { DataCenterOptions, RepositoryFilters, RepositoryPage, RepositoryRow } from '../types'
 

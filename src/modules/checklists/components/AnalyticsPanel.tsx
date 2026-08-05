@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { BarChart3, Download, Loader2 } from 'lucide-react'
 import {
   BarChart, Button, Card, DatePicker, EmptyState, Field, LineChart, Select, Table,
-  moduleIdentity, semaphoreColor, useToast,
+  moduleIdentity, useToast,
 } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor } from '../scale'
 import { checklistsService } from '../services/checklistsService'
 import type { AnalyticsFilters, AnalyticsSummary, ChecklistArea, ChecklistTemplate } from '../types'
 

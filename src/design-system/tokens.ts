@@ -23,16 +23,29 @@ export const SEMAPHORE_LABELS: Record<SemaphoreLevel, string> = {
 
 export const SEMAPHORE_NO_DATA = '#94A3B8'
 
-export function semaphoreLevel(percent: number | null): SemaphoreLevel | null {
+export interface SemaphoreThresholds { optimo: number; aceptable: number; deficiente: number }
+
+/** Cortes institucionales, los de los formatos en papel. Escala por defecto de todo el sistema. */
+export const THRESHOLDS: SemaphoreThresholds = { optimo: 90, aceptable: 80, deficiente: 70 }
+
+/**
+ * Cortes de LISTAS DE CHEQUEO: verde desde el 85 %, por decision expresa del usuario para ese
+ * modulo. Los COLORES no cambian — el semaforo sigue siendo el mismo en todo el sistema y en el
+ * PDF (§5.1); lo unico propio del modulo es donde empieza el verde.
+ * Equivalente en el servidor: CHECKLIST_THRESHOLDS en server/semaphore.mjs (mantener en sincronia).
+ */
+export const CHECKLIST_THRESHOLDS: SemaphoreThresholds = { optimo: 85, aceptable: 80, deficiente: 70 }
+
+export function semaphoreLevel(percent: number | null, thresholds: SemaphoreThresholds = THRESHOLDS): SemaphoreLevel | null {
   if (percent === null) return null
-  if (percent >= 90) return 'OPTIMO'
-  if (percent >= 80) return 'ACEPTABLE'
-  if (percent >= 70) return 'DEFICIENTE'
+  if (percent >= thresholds.optimo) return 'OPTIMO'
+  if (percent >= thresholds.aceptable) return 'ACEPTABLE'
+  if (percent >= thresholds.deficiente) return 'DEFICIENTE'
   return 'MUY_DEFICIENTE'
 }
 
-export function semaphoreColor(percent: number | null): string {
-  const level = semaphoreLevel(percent)
+export function semaphoreColor(percent: number | null, thresholds: SemaphoreThresholds = THRESHOLDS): string {
+  const level = semaphoreLevel(percent, thresholds)
   return level ? SEMAPHORE_COLORS[level] : SEMAPHORE_NO_DATA
 }
 

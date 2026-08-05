@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, CheckCircle2, CircleDashed, ClipboardList, MessageSquare, Paperclip } from 'lucide-react'
-import { semaphoreColor } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor } from '../scale'
 import { CHECKLIST_VALUE_LABELS, PLAN_STATUS_LABELS, type ActionPlan, type AuditSubject, type ChecklistDomain, type ChecklistValue } from '../types'
 
 const VALUES: ChecklistValue[] = ['C', 'NC', 'NA']

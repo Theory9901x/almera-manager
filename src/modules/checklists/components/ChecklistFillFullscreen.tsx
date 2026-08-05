@@ -4,7 +4,9 @@ import {
   ChevronDown, ChevronUp, Download, ExternalLink, FileSpreadsheet, Lock, Minimize2, RefreshCw,
   Save, Search, Table2,
 } from 'lucide-react'
-import { ConfirmDialog, semaphoreColor } from '@/design-system'
+import { ConfirmDialog } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor } from '../scale'
 import type { ActionPlan, AuditSubject, ChecklistDomain, ChecklistValue } from '../types'
 import { ChecklistFillGrid, type DomainTally } from './ChecklistFillGrid'
 
@@ -158,6 +160,18 @@ export function ChecklistFillFullscreen({
           </div>
         </div>
         <div className="hcfs-top-r">
+          {/* Adherencia EN VIVO en el encabezado. Estaba solo en el pie y en letra pequena: en una
+              lista de 40 items el pie queda fuera de vista mientras se marca, asi que el dato que
+              justifica toda la ronda no se veia nunca hasta el final. Aqui esta siempre visible y
+              se mueve con cada marca — misma cifra que el pie y que el informe. */}
+          <div className="hcfs-live" style={{ ['--live-accent' as string]: overallPercent === null ? 'var(--muted)' : semaphoreColor(overallPercent) }}>
+            <span className="hcfs-live-l">Adherencia total</span>
+            <b className="hcfs-live-v">{overallPercent === null ? '—' : `${overallPercent.toFixed(1)}%`}</b>
+            <span className="hcfs-live-sub">
+              {markedCells}/{totalCells} marcados
+              {pending > 0 ? ` · faltan ${pending}` : ' · completo'}
+            </span>
+          </div>
           <button className="hcfs-btn" onClick={exportCsv} title="Exporta los dominios visibles, en el mismo orden que en pantalla">
             <FileSpreadsheet size={14} /> Excel
           </button>

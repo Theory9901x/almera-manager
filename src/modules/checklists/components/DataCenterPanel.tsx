@@ -7,8 +7,10 @@ import {
 } from 'lucide-react'
 import {
   BarChart, Button, DatePicker, DonutChart, EmptyState, LineChart, Select,
-  moduleIdentity, semaphoreColor, useCountUp, useToast,
+  moduleIdentity, useCountUp, useToast,
 } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor } from '../scale'
 import { checklistsService } from '../services/checklistsService'
 import type { DataCenter, DataCenterFilters, DataCenterOptions, DataCenterRow } from '../types'
 

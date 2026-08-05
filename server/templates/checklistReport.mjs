@@ -1,7 +1,11 @@
-import { CONCEPT_COLORS, SEMAPHORE_GREEN, SEMAPHORE_NO_DATA, conceptFromPercent } from '../semaphore.mjs'
+import { CONCEPT_COLORS, SEMAPHORE_GREEN, SEMAPHORE_NO_DATA } from '../semaphore.mjs'
+// El concepto se importa del motor del modulo, que ya lo trae atado a los cortes de Listas de
+// Chequeo (verde desde 85 %) — NO de semaphore.mjs directo, que devolveria la escala
+// institucional y haria que el informe dijera "Aceptable" donde la pantalla dice "Optimo".
+import { conceptFromPercent } from '../checklistScoring.mjs'
 // Informes PDF de Listas de Chequeo: individual (una auditoria) y consolidado (varias).
-// Misma escala de semaforo fija que el resto del sistema — un mismo porcentaje siempre se ve del
-// mismo color, en pantalla y en papel.
+// Mismos COLORES de semaforo que el resto del sistema — un mismo concepto siempre se ve del mismo
+// color, en pantalla y en papel; solo los cortes son propios del modulo.
 const CONCEPT_LABELS = { OPTIMO: 'Óptimo', ACEPTABLE: 'Aceptable', DEFICIENTE: 'Deficiente', MUY_DEFICIENTE: 'Muy deficiente' }
 const NO_DATA_COLOR = SEMAPHORE_NO_DATA
 // C/NC comparten el vocabulario del semaforo: cumple = verde, no cumple = rojo.

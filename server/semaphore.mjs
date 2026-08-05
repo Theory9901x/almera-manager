@@ -26,16 +26,28 @@ export const CONCEPT_LABELS = {
   MUY_DEFICIENTE: 'Muy deficiente',
 }
 
-export function conceptFromPercent(percent) {
+/** Cortes institucionales, los de los formatos en papel. Es la escala por defecto del sistema. */
+export const THRESHOLDS = { optimo: 90, aceptable: 80, deficiente: 70 }
+
+/**
+ * Cortes de LISTAS DE CHEQUEO: verde a partir del 85 %, por decision expresa del usuario para ese
+ * modulo. Los COLORES no cambian (§5.1: el semaforo es el mismo en todo el sistema y en el PDF);
+ * lo unico propio del modulo es donde empieza el verde. Va aqui, junto a la escala institucional,
+ * para que pantalla e informe lean el mismo numero: tener el corte duplicado en el cliente y en
+ * la plantilla del PDF es exactamente como el informe deja de coincidir con lo que se vio.
+ */
+export const CHECKLIST_THRESHOLDS = { optimo: 85, aceptable: 80, deficiente: 70 }
+
+export function conceptFromPercent(percent, thresholds = THRESHOLDS) {
   if (percent === null || percent === undefined) return null
-  if (percent >= 90) return 'OPTIMO'
-  if (percent >= 80) return 'ACEPTABLE'
-  if (percent >= 70) return 'DEFICIENTE'
+  if (percent >= thresholds.optimo) return 'OPTIMO'
+  if (percent >= thresholds.aceptable) return 'ACEPTABLE'
+  if (percent >= thresholds.deficiente) return 'DEFICIENTE'
   return 'MUY_DEFICIENTE'
 }
 
 /** Color del semaforo para un porcentaje. `null` (sin dato) devuelve gris, nunca rojo. */
-export function semaphoreColor(percent) {
-  const concept = conceptFromPercent(percent)
+export function semaphoreColor(percent, thresholds = THRESHOLDS) {
+  const concept = conceptFromPercent(percent, thresholds)
   return concept ? CONCEPT_COLORS[concept] : SEMAPHORE_NO_DATA
 }

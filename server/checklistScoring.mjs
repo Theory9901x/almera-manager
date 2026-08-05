@@ -105,6 +105,11 @@ export function computeAdherence({ domains = [], subjects = [], answers = [] }) 
   }
 }
 
-// El semaforo vive en server/semaphore.mjs (fuente unica del servidor); se reexporta aqui para
-// no cambiar los imports que ya lo consumen desde el motor.
-export { conceptFromPercent } from './semaphore.mjs'
+// El semaforo vive en server/semaphore.mjs (fuente unica del servidor). Aqui se reexporta ya
+// ATADO a los cortes de este modulo (verde desde 85 %), para que cualquiera que pida el concepto
+// "de una lista de chequeo" lo obtenga en su escala sin tener que acordarse de pasar el segundo
+// argumento — olvidarlo era la via directa a que el PDF dijera "Aceptable" y la pantalla "Optimo".
+import { CHECKLIST_THRESHOLDS, conceptFromPercent as conceptWithScale, semaphoreColor as colorWithScale } from './semaphore.mjs'
+
+export const conceptFromPercent = percent => conceptWithScale(percent, CHECKLIST_THRESHOLDS)
+export const semaphoreColor = percent => colorWithScale(percent, CHECKLIST_THRESHOLDS)

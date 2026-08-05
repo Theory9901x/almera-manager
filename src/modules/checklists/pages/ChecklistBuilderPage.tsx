@@ -5,8 +5,10 @@ import {
 } from 'lucide-react'
 import {
   Badge, Button, Card, EmptyState, Field, Input, ModuleHero, SaveStatusIndicator, Select,
-  Textarea, ToastProvider, moduleIdentity, semaphoreColor, useToast,
+  Textarea, ToastProvider, moduleIdentity, useToast,
 } from '@/design-system'
+// Semaforo del modulo: verde desde 85 % (ver src/modules/checklists/scale.ts).
+import { checklistColor as semaphoreColor } from '../scale'
 import { useAuth } from '@/platform/auth/AuthContext'
 import { checklistsService } from '../services/checklistsService'
 import {

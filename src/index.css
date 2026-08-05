@@ -6700,3 +6700,85 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hcfs-lg i.ck-c, .hcfs-cnt i.ck-c { background: linear-gradient(180deg, #16A34A, #15803D); width: auto; padding: 0 6px; font-size: 9.5px; }
 .hcfs-lg i.ck-nc, .hcfs-cnt i.ck-nc { background: linear-gradient(180deg, #DC2626, #B91C1C); width: auto; padding: 0 6px; font-size: 9.5px; }
 .hcfs-lg i.ck-na, .hcfs-cnt i.ck-na { background: #475569; color: #CBD5E1; font-size: 9px; }
+
+/* ================================================================
+   LISTAS DE CHEQUEO — adherencia en vivo, aire para la lista embebida
+   y criterios encapsulados en vidrio.
+   ================================================================ */
+
+/* --- Adherencia total EN VIVO en el encabezado de pantalla completa. Estaba solo en el pie, y
+   con 40 items el pie no se ve mientras se marca: el dato que justifica la ronda no aparecia
+   hasta el final. El color lo pone --live-accent desde el componente (semaforo del modulo). --- */
+.hcfs-live {
+  display: grid; align-content: center; gap: 1px;
+  margin-right: 6px; padding: 7px 15px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--live-accent) 45%, transparent);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--live-accent) 22%, transparent), color-mix(in srgb, var(--live-accent) 8%, transparent));
+  backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
+}
+/* Las etiquetas van con las variables del overlay, NO en blanco fijo: esta superficie sigue el
+   tema (CLAUDE.md §12) y con blanco al 72 % quedaban invisibles sobre el fondo claro. */
+.hcfs-live-l { font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--hcfs-soft); }
+.hcfs-live-v {
+  font-size: 21px; font-weight: 850; line-height: 1.05; font-variant-numeric: tabular-nums;
+  color: var(--live-accent);
+}
+.hcfs-live-sub { font-size: 9.5px; font-weight: 600; color: var(--hcfs-faint); font-variant-numeric: tabular-nums; }
+/* En oscuro el verde del semaforo (calculado para papel) se apaga: se le suma un halo del mismo
+   tono en vez de cambiar el color, que esta fijado por decision del usuario (§5.1). */
+:root[data-theme="dark"] .hcfs-live-v { text-shadow: 0 0 18px color-mix(in srgb, var(--live-accent) 55%, transparent); }
+
+/* --- Aire para la lista cuando NO esta en pantalla completa. Se veia todo "reducido y junto":
+   el panel de resumen se llevaba 320 px fijos y las filas iban a 14 px de alto util. Ahora la
+   pagina usa el ancho completo disponible, el resumen cede espacio y cada criterio respira. --- */
+/* Sube el tope de 1500 px, pero NO lo quita: sin tope, en un monitor ultra-ancho el texto de un
+   criterio se estira a media pantalla y se vuelve ilegible de leer en linea. */
+.checklists-page-bg { max-width: min(1860px, 100%); }
+@container eval (min-width: 980px) {
+  /* El resumen se encoge (280) y la grilla se queda con el resto: es donde se trabaja. */
+  .eval-shell { grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; }
+}
+.eval-body { gap: 16px; }
+/* Filas mas altas y con mas margen lateral: en una ronda de 40 criterios el alto de fila es lo
+   que decide si se lee de un vistazo o hay que apuntar con el dedo. */
+.checklists-page-bg .crit { padding: 18px 24px; gap: 18px; }
+.checklists-page-bg .ctext b { font-size: 14px; line-height: 1.45; }
+.checklists-page-bg .cnum { width: 38px; height: 38px; font-size: 12.5px; }
+.checklists-page-bg .seg { min-width: 58px; height: 44px; font-size: 13.5px; }
+
+/* --- Criterios encapsulados en vidrio. Cada fila deja de ser una linea suelta en una tabla y
+   pasa a ser su propia pieza: borde de vidrio, fondo translucido y elevacion al pasar por
+   encima. La divisoria inferior se retira aqui — con tarjetas separadas sobra. --- */
+.checklists-page-bg .dbody { border-top: 0; display: grid; gap: 10px; padding: 12px; }
+.checklists-page-bg .crit {
+  background-image: none; border-bottom: 0; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--glass-tint) 62%, transparent);
+  background: color-mix(in srgb, var(--glass-tint) 40%, transparent);
+  backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 10px rgba(16,24,40,.04);
+  transition: transform .16s cubic-bezier(.22,1,.36,1), box-shadow .16s, border-color .16s;
+}
+.checklists-page-bg .crit:hover {
+  border-color: color-mix(in srgb, var(--m-listas) 34%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 8px 22px rgba(91,75,232,.10);
+  transform: translateY(-1px);
+}
+/* El numero del criterio, tenido con la identidad del modulo, cierra la sensacion de pieza. */
+.checklists-page-bg .cnum {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--m-listas) 20%, transparent), color-mix(in srgb, var(--m-listas) 8%, transparent));
+  border: 1px solid color-mix(in srgb, var(--m-listas) 24%, transparent);
+}
+
+/* Tema oscuro: el vidrio de papel se invierte solo si se le dan sus propios valores — con los de
+   claro las tarjetas quedaban blancas con el texto ya claro encima (CLAUDE.md §10). */
+:root[data-theme="dark"] .checklists-page-bg .crit {
+  border-color: rgba(129, 140, 248, .16);
+  background: rgba(20, 27, 50, .55);
+  box-shadow: inset 0 1px 0 rgba(148,163,255,.08), 0 2px 10px rgba(2,6,18,.35);
+}
+:root[data-theme="dark"] .checklists-page-bg .crit:hover {
+  border-color: rgba(139, 92, 246, .38);
+  box-shadow: inset 0 1px 0 rgba(148,163,255,.14), 0 8px 24px rgba(76,29,149,.3);
+}
