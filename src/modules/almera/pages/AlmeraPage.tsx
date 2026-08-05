@@ -120,6 +120,10 @@ export default function AlmeraPage() {
   const [detail, setDetail] = useState<AssistanceDetail | null>(null)
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('resumen')
   const [detailLoading, setDetailLoading] = useState(false)
+  // Desde la Base de datos el detalle se abre como FICHA emergente (toda la informacion de una
+  // vez, como se lee un registro); desde el tablero sigue siendo el inspector lateral, que es
+  // donde se gestiona sin perder el contexto.
+  const [detailPresentation, setDetailPresentation] = useState<'inspector' | 'ficha'>('inspector')
 
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState(newForm)
@@ -195,12 +199,13 @@ export default function AlmeraPage() {
   const updateFilter = (key: keyof AssistanceFilters, value: string) =>
     setFilters(current => ({ ...current, [key]: value || undefined }))
 
-  const openDetail = async (id: string) => {
+  const openDetail = async (id: string, presentation?: 'inspector' | 'ficha') => {
     setDetailLoading(true)
     try {
       setError('')
       const result = await almeraService.detail(id)
       setDetail(result)
+      setDetailPresentation(presentation || (view === 'database' ? 'ficha' : 'inspector'))
       setInspectorTab('resumen')
       setAction({ description: '', result: '', completionPercent: result.assistance.completion_percent })
       setMeta({
@@ -261,7 +266,7 @@ export default function AlmeraPage() {
   const selectedId = detail?.assistance.id || null
 
   return (
-    <div className={`ats-app${detail ? ' has-inspector' : ''}`}>
+    <div className={`ats-app${detail && detailPresentation === 'inspector' ? ' has-inspector' : ''}`}>
       <div className="ats-main">
         {/* ---- Capa 1: contexto ---- */}
         <header className="ats-page-header">
@@ -420,20 +425,28 @@ export default function AlmeraPage() {
              Los mismos filtros y busqueda de arriba aplican tambien aqui. */
           <section className="ats-listwrap" aria-label="Base de datos de asistencias">
             <div className="ats-db-caption">
-              <strong>{visibleRows.length}</strong> asistencia{visibleRows.length === 1 ? '' : 's'}
-              {activeFilterCount > 0 || filters.status || search ? ' con la búsqueda y los filtros actuales' : ' en total, sin filtrar'}
+              <span>
+                <strong>{visibleRows.length}</strong> asistencia{visibleRows.length === 1 ? '' : 's'}
+                {activeFilterCount > 0 || filters.status || search ? ' con la búsqueda y los filtros actuales' : ' en total, sin filtrar'}
+              </span>
+              {canExport && (
+                <button className="ats-btn" onClick={() => void exportCsv()} disabled={busy} title="Exporta exactamente lo que muestra esta vista: búsqueda y filtros incluidos">
+                  <Download size={14} /> Exportar esta vista (CSV)
+                </button>
+              )}
             </div>
             <table className="ats-table is-db">
               <thead>
                 <tr>
-                  <th>Código</th><th>Asunto</th><th>Proceso</th><th>Módulo</th><th>Solicitante</th>
+                  <th>Estado</th><th>Código</th><th>Asunto</th><th>Proceso</th><th>Módulo</th><th>Solicitante</th>
                   <th>Responsable</th><th>Prioridad</th><th>Solicitada</th><th>Compromiso</th>
-                  <th>Avance</th><th>Estado</th><th>Cerrada</th><th>Solución / observaciones</th>
+                  <th>Avance</th><th>Cerrada</th><th>Solución / observaciones</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleRows.map(row => (
-                  <tr key={row.id} className={row.id === selectedId ? 'is-selected' : ''} onClick={() => void openDetail(row.id)}>
+                  <tr key={row.id} className={`is-lane-${laneOf(row)}${row.id === selectedId ? ' is-selected' : ''}`} onClick={() => void openDetail(row.id)}>
+                    <td><SemaphoreTile row={row} /></td>
                     <td><strong className="ats-code">{row.code}</strong></td>
                     <td className="ats-cell-wide" title={row.description}>
                       <strong>{row.subject}</strong>
@@ -454,7 +467,6 @@ export default function AlmeraPage() {
                       {row.due_soon && !row.overdue && <small className="is-warning">{timeToCommitment(row.commitment_at)}</small>}
                     </td>
                     <td><span className="ats-progress"><i style={{ width: `${row.completion_percent}%` }} /></span><b className="ats-pct">{row.completion_percent}%</b></td>
-                    <td><StatusBadge row={row} /></td>
                     <td className="ats-cell-date">{row.closed_at ? formatDate(row.closed_at) : '—'}</td>
                     <td className="ats-cell-wide" title={row.final_solution || row.general_observations || ''}>
                       {(() => {
@@ -503,8 +515,14 @@ export default function AlmeraPage() {
         )}
       </div>
 
+      {/* Ficha emergente: el registro completo de una vez, para leer desde la Base de datos.
+          "Gestionar en el panel" salta al inspector, donde viven las acciones. */}
+      {detail && detailPresentation === 'ficha' && (
+        <AssistanceFicha detail={detail} close={() => setDetail(null)} manage={() => setDetailPresentation('inspector')} />
+      )}
+
       {/* ---- Capa 5: inspector contextual ---- */}
-      {detail && (
+      {detail && detailPresentation === 'inspector' && (
         <Inspector
           detail={detail}
           tab={inspectorTab}
@@ -658,6 +676,27 @@ function BoardSkeleton() {
   )
 }
 
+/** Semaforo de la Base de datos: un recuadro de vidrio teñido por el estado OPERATIVO (vencida
+ *  manda sobre el estado nominal), con la etiqueta y el dato de tiempo que explica el color.
+ *  Es color de FLUJO, no el semaforo de cumplimiento del sistema (§5.1): aqui no hay porcentaje
+ *  que medir, hay una solicitud en un punto de su ciclo. */
+function SemaphoreTile({ row }: { row: Assistance }) {
+  const lane = laneOf(row)
+  const tone = lane === 'overdue' ? 'danger' : lane === 'progress' ? 'info' : lane === 'done' ? (row.effective_status === 'CANCELADA' ? 'neutral' : 'success') : 'warning'
+  const sub = lane === 'done'
+    ? (row.closed_at ? new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' }).format(new Date(row.closed_at)) : 'Cerrada')
+    : timeToCommitment(row.commitment_at)
+  return (
+    <span className={`ats-sem is-${tone}`}>
+      <i aria-hidden="true" />
+      <span className="ats-sem-tx">
+        <b>{STATUS_LABELS[row.effective_status]}</b>
+        <small>{sub}</small>
+      </span>
+    </span>
+  )
+}
+
 function StatusBadge({ row }: { row: Assistance }) {
   const status = row.effective_status
   const cls = status === 'COMPLETADA' ? 'is-success' : status === 'VENCIDA' ? 'is-danger' : status === 'EN_CURSO' ? 'is-info' : status === 'CANCELADA' ? 'is-neutral' : 'is-warning'
@@ -686,6 +725,115 @@ function RankPanel({ icon: Icon, title, caption, rows }: {
           </article>
         ))}
         {!rows.length && <div className="ats-empty"><BarChart3 size={26} /><p>No hay datos para consolidar.</p></div>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Ficha emergente: TODO el registro de una vez, en lectura. Desde la Base de datos un registro
+// se consulta como una ficha, no como un panel de trabajo; la gestion (avances, cierre,
+// evidencias) sigue viviendo en el inspector, al que se salta con un boton.
+
+function AssistanceFicha({ detail, close, manage }: { detail: AssistanceDetail; close: () => void; manage: () => void }) {
+  const item = detail.assistance
+  const completed = item.effective_status === 'COMPLETADA'
+  return (
+    <div className="ats-overlay" onClick={close}>
+      <div className="ats-modal is-ficha" role="dialog" aria-modal="true" aria-label={`Ficha de ${item.code}`} onClick={event => event.stopPropagation()}>
+        <header className="ats-modal-head">
+          <div className="ats-insp-id">
+            <span className="ats-code is-lg">{item.code}</span>
+            <PriorityBadge priority={item.priority} />
+            <SemaphoreTile row={item} />
+          </div>
+          <button className="ats-x" aria-label="Cerrar ficha" onClick={close}><X size={16} /></button>
+        </header>
+        <h2 className="ats-ficha-title">{item.subject}</h2>
+        <p className="ats-insp-ctx">{item.process_name} · {item.module_name}</p>
+
+        <div className="ats-ficha-grid">
+          <section className="ats-ficha-main">
+            <div className="ats-insp-section">
+              <h3>Solicitud original</h3>
+              <p className="ats-insp-desc">{item.description}</p>
+              <dl className="ats-dl">
+                <div><dt>Proceso</dt><dd>{item.process_name}</dd></div>
+                <div><dt>Módulo</dt><dd>{item.module_name}</dd></div>
+                <div><dt>Solicitada</dt><dd>{formatDate(item.received_at)}</dd></div>
+                <div><dt>Compromiso</dt><dd>{formatDate(item.commitment_at)}</dd></div>
+                <div><dt>Solicitante</dt><dd>{item.requester_name}{item.requester_position ? ` · ${item.requester_position}` : ''}</dd></div>
+                <div><dt>Responsable</dt><dd>{item.responsible_name || 'Sin asignar'}</dd></div>
+                {item.requester_contact && <div><dt>Contacto</dt><dd>{item.requester_contact}</dd></div>}
+                {item.requester_channel && <div><dt>Canal</dt><dd>{item.requester_channel}</dd></div>}
+                <div><dt>Avance</dt><dd>{item.completion_percent}%</dd></div>
+                <div><dt>Cerrada</dt><dd>{item.closed_at ? formatDate(item.closed_at) : '—'}</dd></div>
+                {item.general_observations && <div className="span-2"><dt>Observaciones generales</dt><dd>{item.general_observations}</dd></div>}
+              </dl>
+              {completed && item.final_solution && (
+                <div className="ats-insp-done">
+                  <CheckCircle2 size={15} />
+                  <div><strong>Solución final</strong><p>{item.final_solution}</p><small>Cerrada: {formatDate(item.closed_at)}</small></div>
+                </div>
+              )}
+            </div>
+
+            <div className="ats-insp-section">
+              <h3><History size={14} /> Bitácora ({detail.actions.length})</h3>
+              <div className="ats-timeline">
+                {detail.actions.map(entry => (
+                  <div className="ats-tl-item" key={entry.id}>
+                    <i aria-hidden="true" />
+                    <div>
+                      <header><strong>{entry.performed_by}</strong><time>{formatDate(entry.performed_at)}</time></header>
+                      <p>{entry.description}</p>
+                      {entry.result && <small>Resultado: {entry.result}</small>}
+                      {entry.completion_percent != null && <span className="ats-badge is-mini is-info">Avance {entry.completion_percent}%</span>}
+                    </div>
+                  </div>
+                ))}
+                {!detail.actions.length && <p className="ats-muted">Aún no se han registrado actuaciones.</p>}
+              </div>
+            </div>
+          </section>
+
+          <aside className="ats-ficha-side">
+            <div className="ats-insp-section">
+              <h3><Paperclip size={14} /> Evidencias ({detail.evidences.length})</h3>
+              <div className="ats-evidences">
+                {detail.evidences.map(file => (
+                  <a key={file.id} href={`/api/almera/assistances/${item.id}/evidences/${file.id}/download`}>
+                    <FileText size={15} />
+                    <span><strong>{file.original_name}</strong><small>{formatBytes(file.size_bytes)} · {file.uploaded_by}</small></span>
+                    <Download size={13} />
+                  </a>
+                ))}
+                {!detail.evidences.length && <p className="ats-muted">Sin evidencias adjuntas.</p>}
+              </div>
+            </div>
+            {detail.history.length > 0 && (
+              <div className="ats-insp-section">
+                <h3><Timer size={14} /> Historial ({detail.history.length})</h3>
+                <div className="ats-timeline is-compact">
+                  {detail.history.map(entry => (
+                    <div className="ats-tl-item" key={entry.id}>
+                      <i aria-hidden="true" />
+                      <div>
+                        <header><strong>{entry.actor_name}</strong><time>{formatDate(entry.created_at)}</time></header>
+                        <p>{entry.action}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+
+        <div className="ats-modal-actions">
+          <button className="ats-btn" onClick={close}>Cerrar</button>
+          <button className="ats-btn is-primary" onClick={manage}><PencilLine size={14} /> Gestionar en el panel</button>
+        </div>
       </div>
     </div>
   )

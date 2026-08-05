@@ -7263,3 +7263,39 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ats-table.is-db .ats-cell-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ats-table.is-db .ats-progress { width: 76px; }
 .ats-table .ats-code { white-space: nowrap; }
+
+/* Semaforo de la Base de datos: recuadro de vidrio teñido por el estado operativo, con punto
+   luminoso y el dato de tiempo que explica el color. Llamativo pero funcional: el color viene
+   del estado, nunca decorativo. La fila entera lleva ademas un filo lateral del mismo tono. */
+.ats-sem {
+  display: inline-flex; align-items: center; gap: 9px; padding: 7px 12px;
+  border-radius: 11px; border: 1px solid; white-space: nowrap;
+  backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+}
+.ats-sem i { width: 8px; height: 8px; flex: none; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.ats-sem-tx { display: grid; line-height: 1.25; }
+.ats-sem-tx b { font-size: .72rem; font-weight: 800; }
+.ats-sem-tx small { font-size: .64rem; font-weight: 600; opacity: .82; }
+.ats-sem.is-danger  { color: var(--ats-danger);  border-color: color-mix(in srgb, var(--ats-danger) 38%, transparent);  background: linear-gradient(150deg, color-mix(in srgb, var(--ats-danger) 18%, transparent),  color-mix(in srgb, var(--ats-danger) 7%, transparent)); }
+.ats-sem.is-warning { color: var(--ats-warning); border-color: color-mix(in srgb, var(--ats-warning) 38%, transparent); background: linear-gradient(150deg, color-mix(in srgb, var(--ats-warning) 18%, transparent), color-mix(in srgb, var(--ats-warning) 7%, transparent)); }
+.ats-sem.is-info    { color: var(--ats-info);    border-color: color-mix(in srgb, var(--ats-info) 38%, transparent);    background: linear-gradient(150deg, color-mix(in srgb, var(--ats-info) 18%, transparent),    color-mix(in srgb, var(--ats-info) 7%, transparent)); }
+.ats-sem.is-success { color: var(--ats-success); border-color: color-mix(in srgb, var(--ats-success) 38%, transparent); background: linear-gradient(150deg, color-mix(in srgb, var(--ats-success) 18%, transparent), color-mix(in srgb, var(--ats-success) 7%, transparent)); }
+.ats-sem.is-neutral { color: var(--ats-neutral); border-color: color-mix(in srgb, var(--ats-neutral) 38%, transparent); background: linear-gradient(150deg, color-mix(in srgb, var(--ats-neutral) 18%, transparent), color-mix(in srgb, var(--ats-neutral) 7%, transparent)); }
+:root[data-theme="dark"] .ats-sem { box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.ats-table.is-db tr.is-lane-overdue td:first-child  { box-shadow: inset 3px 0 0 var(--ats-danger); }
+.ats-table.is-db tr.is-lane-pending td:first-child  { box-shadow: inset 3px 0 0 var(--ats-warning); }
+.ats-table.is-db tr.is-lane-progress td:first-child { box-shadow: inset 3px 0 0 var(--ats-info); }
+.ats-table.is-db tr.is-lane-done td:first-child     { box-shadow: inset 3px 0 0 var(--ats-success); }
+.ats-db-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Ficha emergente: el registro completo en lectura, dos columnas en ancho y una en movil. */
+.ats-modal.is-ficha { width: min(1060px, 100%); }
+.ats-ficha-title { margin: 12px 0 0; font-size: 1.2rem; font-weight: 800; line-height: 1.3; }
+.ats-modal.is-ficha .ats-insp-ctx { margin: 3px 0 0; }
+.ats-ficha-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 22px; margin-top: 18px; }
+.ats-ficha-main, .ats-ficha-side { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.ats-modal.is-ficha .ats-modal-actions { margin-top: 20px; }
+@media (max-width: 900px) {
+  .ats-ficha-grid { grid-template-columns: 1fr; }
+}
