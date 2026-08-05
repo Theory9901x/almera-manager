@@ -569,6 +569,27 @@ radicadosRouter.get('/resumen/dashboard', radicadosModule, view, async (request,
 // dashboard, todo se agrega EN SQL — nunca se traen las filas a Node para sumarlas ahi.
 // ---------------------------------------------------------------------------
 
+/** Recorta el ruido de arranque: un registro historico con la fecha mal capturada (un "17/7/2027"
+ *  o un "12/96/2026" del Excel, ver scripts/migrate-radicados-excel.mjs) puede quedar meses o anos
+ *  antes de donde en realidad empieza el volumen real, y el MIN(fecha_radicado) de la consulta lo
+ *  toma como arranque — el grafico terminaba mostrando "2025" con un solo mes en 1 seguido de once
+ *  vacios. Se corta en el ULTIMO hueco de 2+ meses seguidos en cero: todo lo anterior a ese hueco
+ *  se descarta por ser un dato aislado, no una serie real que valga la pena medir mes a mes.
+ */
+function trimLeadingNoise(monthly) {
+  let start = 0
+  let zeroRun = 0
+  for (let i = 0; i < monthly.length; i++) {
+    if (monthly[i].value === 0) {
+      zeroRun++
+    } else {
+      if (zeroRun >= 2) start = i
+      zeroRun = 0
+    }
+  }
+  return monthly.slice(start)
+}
+
 radicadosRouter.get('/resumen/analitica', radicadosModule, view, async (request, response, next) => {
   try {
     const organizationId = oid(request)
@@ -624,7 +645,7 @@ radicadosRouter.get('/resumen/analitica', radicadosModule, view, async (request,
       ),
     ])
     response.json({
-      monthly: monthly.rows, byTipo: byTipo.rows, byDireccion: byDireccion.rows,
+      monthly: trimLeadingNoise(monthly.rows), byTipo: byTipo.rows, byDireccion: byDireccion.rows,
       byProceso: byProceso.rows, byCategoria: byCategoria.rows,
     })
   } catch (error) { next(error) }

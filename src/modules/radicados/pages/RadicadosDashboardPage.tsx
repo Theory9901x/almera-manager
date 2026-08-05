@@ -526,7 +526,7 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
             <>
               <Card accent={identity.color} className="p-5">
                 <p className="ds-eyebrow">Por mes</p>
-                <h2 className="mt-1 text-lg font-black">Radicados generados (últimos 12 meses)</h2>
+                <h2 className="mt-1 text-lg font-black">Radicados generados por mes</h2>
                 {analytics && analytics.monthly.some(item => item.value > 0) ? (
                   <div className="mt-3"><BarChart data={analytics.monthly} color={identity.color} height={260} /></div>
                 ) : <div className="mt-3"><EmptyState icon={BarChart3} title="Sin datos suficientes" description="Cuando haya radicados generados, su evolución mensual aparecerá aquí." /></div>}
