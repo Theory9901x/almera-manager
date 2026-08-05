@@ -480,21 +480,27 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
     linear-gradient(150deg, #272a30, #111318 58%, #08090c);
   color: var(--ink);
 }
-/* Sidebar en vidrio real: translucido + blur, no un panel opaco con textura encima. Deja pasar
-   los brillos de .app-shell difuminados detras, que es lo que de verdad lee como "glassmorfismo"
-   en vez de solo un fondo oscuro plano con un degradado pintado. */
+/* Sidebar en vidrio real. El primer intento se notaba poco: el tinte propio del panel (una navy
+   casi opaca al 72-82%) tapaba casi todo lo que el backdrop-filter alcanzaba a traer de detras.
+   Ahora el vidrio no depende SOLO del backdrop-filter (que en una captura estatica, sin nada
+   moviendose detras, apenas se nota): los propios brillos de color van PINTADOS en el fondo del
+   panel — mas transparente de base — asi el efecto es innegable incluso si el navegador no
+   soporta backdrop-filter.*/
 .shell-sidebar {
   top: 0;
   height: 100vh;
   border: 0;
-  border-right: 1px solid rgba(255,255,255,.09);
+  border-right: 1px solid rgba(255,255,255,.12);
   background:
-    radial-gradient(circle at 0 0, rgba(239,51,73,.20), transparent 31%),
-    linear-gradient(165deg, rgba(27,41,64,.72), rgba(16,24,39,.82));
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+    linear-gradient(180deg, rgba(255,255,255,.10), transparent 20%),
+    radial-gradient(460px 420px at -8% -4%, rgba(239,51,73,.55), transparent 60%),
+    radial-gradient(420px 480px at 108% 90%, rgba(139,92,246,.42), transparent 62%),
+    radial-gradient(360px 320px at 50% 45%, rgba(56,189,248,.10), transparent 65%),
+    linear-gradient(165deg, rgba(30,41,59,.52), rgba(9,13,24,.66));
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
   color: #f8fafc;
-  box-shadow: inset -1px 0 0 rgba(255,255,255,.04), inset 1px 0 0 rgba(255,255,255,.02);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.06), inset 1px 0 0 rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.10);
 }
 .shell-sidebar::after {
   position: absolute;
@@ -517,6 +523,14 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
   z-index: 1;
 }
 .sidebar-brand, .sidebar-entity, .shell-sidebar nav, .sidebar-footer { z-index: 1; }
+/* Scrollbar propia, delgada y sin flechas — la nativa de Windows/Chrome mete un boton ▲▼ arriba
+   y abajo que rompe por completo la lectura de "panel de vidrio", se ve a la legua que es el
+   scrollbar de fabrica de cualquier pagina de los 2000. */
+.shell-sidebar nav::-webkit-scrollbar { width: 6px; }
+.shell-sidebar nav::-webkit-scrollbar-track { background: transparent; }
+.shell-sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 999px; }
+.shell-sidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.28); }
+.shell-sidebar nav { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
 .sidebar-brand { display: flex; min-height: 82px; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.07); padding: 17px 18px; }
 .sidebar-brand p { margin: 0; font-size: 14px; font-weight: 900; letter-spacing: .22em; }
 .sidebar-brand span:not(.brand-symbol) { display: block; margin-top: 3px; color: #8993a3; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
