@@ -464,27 +464,30 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 .stat-card.tone-danger, .stat-card.tone-accent { border-top-color: #e98b98; }
 .stat-card.tone-info { border-top-color: #86a9e8; }
 
-/* Application shell */
+/* Application shell — a pantalla completa, sin margenes ni esquinas ovaladas: la version anterior
+   (shell flotante con padding y border-radius en sidebar/main/header) se rompia en pantallas
+   pequenas, donde ese margen y esas curvas solo restan espacio util. Ahora sidebar y contenido
+   van a borde vivo; el detalle "moderno" se mueve al vidrio (blur + degradados sutiles) en vez
+   de a la forma. */
 .app-shell {
   min-height: 100vh;
-  gap: 13px;
-  padding: 13px;
+  gap: 0;
+  padding: 0;
   background:
     radial-gradient(circle at 50% -20%, rgba(255,255,255,.28), transparent 34%),
     linear-gradient(150deg, #272a30, #111318 58%, #08090c);
   color: var(--ink);
 }
 .shell-sidebar {
-  top: 13px;
-  bottom: 13px;
-  height: calc(100vh - 26px);
-  border: 1px solid rgba(255,255,255,.075);
-  border-radius: 29px;
+  top: 0;
+  height: 100vh;
+  border: 0;
+  border-right: 1px solid rgba(255,255,255,.08);
   background:
-    radial-gradient(circle at 0 0, rgba(239,51,73,.14), transparent 31%),
+    radial-gradient(circle at 0 0, rgba(239,51,73,.16), transparent 31%),
     var(--gradient-dark);
   color: #f8fafc;
-  box-shadow: 0 22px 65px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.055);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.03);
 }
 .shell-sidebar::after {
   position: absolute;
@@ -494,6 +497,17 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
   mask-image: linear-gradient(to bottom, #000, transparent 68%);
   content: "";
   pointer-events: none;
+}
+/* Filo de degradado sobre el borde derecho del sidebar — el detalle "vidrio moderno" que
+   reemplaza la sombra flotante de antes. Solo una linea, no una tarjeta con marco completo. */
+.shell-sidebar::before {
+  position: absolute;
+  top: 0; right: -1px; bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(239,51,73,.5), rgba(139,92,246,.28) 45%, transparent 85%);
+  content: "";
+  pointer-events: none;
+  z-index: 1;
 }
 .sidebar-brand, .sidebar-entity, .shell-sidebar nav, .sidebar-footer { z-index: 1; }
 .sidebar-brand { display: flex; min-height: 82px; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.07); padding: 17px 18px; }
@@ -553,27 +567,36 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
 
 .shell-main {
   min-width: 0;
-  min-height: calc(100vh - 26px);
+  min-height: 100vh;
   flex: 1;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,.42);
-  border-radius: 29px;
+  border: 0;
   background: radial-gradient(circle at 100% 0, rgba(199,25,45,.05), transparent 27%), var(--canvas);
-  box-shadow: 0 22px 65px rgba(0,0,0,.2);
 }
 .shell-header {
-  top: 12px;
-  margin: 12px 14px 0;
-  border: 1px solid rgba(215,221,231,.82);
-  border-radius: 999px;
-  background: rgba(255,255,255,.84);
-  box-shadow: 0 8px 22px rgba(20,27,45,.045);
-  backdrop-filter: blur(18px);
+  top: 0;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(215,221,231,.82);
+  border-radius: 0;
+  background: rgba(255,255,255,.78);
+  box-shadow: 0 1px 0 rgba(20,27,45,.03);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+/* Filo de degradado bajo la cabecera — mismo lenguaje "vidrio" del sidebar, en vez del
+   contorno de pildora flotante que tenia antes. */
+.shell-header::after {
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(199,25,45,.35), rgba(139,92,246,.22) 45%, transparent 85%);
+  content: "";
+  pointer-events: none;
 }
 .topbar-title { overflow: hidden; margin: 0; color: var(--ink); font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-description { overflow: hidden; max-width: 630px; margin: 3px 0 0; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-actions { align-items: center; gap: 9px; }
-.topbar-search, .topbar-system { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.72); padding: 0 12px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.topbar-search, .topbar-system { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.72); backdrop-filter: blur(10px); padding: 0 12px; color: var(--muted); font-size: 10px; font-weight: 700; }
 .topbar-system { color: var(--brand-deep); }
 .topbar-avatar { width: 34px; height: 34px; }
 .topbar-profile { display: inline-flex; align-items: center; gap: 9px; border-radius: 999px; padding: 3px 12px 3px 3px; transition: background var(--ease); }
@@ -785,15 +808,14 @@ input::placeholder, textarea::placeholder { color: var(--muted-light); }
    Separacion visual fuerte para tarjetas, datos y controles
    ================================================================ */
 .shell-main {
-  border-color: #b8c2cf;
   background:
     radial-gradient(circle at 100% 0, rgba(199,25,45,.055), transparent 25%),
     linear-gradient(145deg, #edf1f6, #e7ecf3);
 }
 .shell-header {
-  border-color: #b8c3d1;
+  border-bottom-color: #b8c3d1;
   background: rgba(255,255,255,.96);
-  box-shadow: 0 2px 4px rgba(20,27,45,.08), 0 10px 28px rgba(20,27,45,.10);
+  box-shadow: 0 1px 0 rgba(20,27,45,.06);
 }
 .ui-card {
   border-color: #b9c4d2;
@@ -4830,10 +4852,19 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* --- Shell: cabecera superior. Tenia blanco fijo y el texto (ya claro) se fundia. --- */
 :root[data-theme="dark"] .shell-header {
-  border-color: var(--neo-line);
+  border-bottom-color: var(--neo-line-strong);
   background: rgba(13, 18, 36, .82);
   backdrop-filter: blur(18px) saturate(140%);
-  box-shadow: 0 10px 30px rgba(2, 6, 18, .5), inset 0 1px 0 rgba(148, 163, 255, .08);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 255, .08);
+}
+:root[data-theme="dark"] .shell-header::after {
+  background: linear-gradient(90deg, rgba(139,92,246,.55), rgba(56,189,248,.3) 45%, transparent 85%);
+}
+:root[data-theme="dark"] .shell-sidebar {
+  border-right-color: var(--neo-line);
+}
+:root[data-theme="dark"] .shell-sidebar::before {
+  background: linear-gradient(180deg, rgba(139,92,246,.55), rgba(56,189,248,.3) 45%, transparent 85%);
 }
 :root[data-theme="dark"] .topbar-title { color: var(--ink); }
 :root[data-theme="dark"] .topbar-description { color: var(--muted); }
@@ -4841,6 +4872,7 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 :root[data-theme="dark"] .topbar-system {
   border-color: var(--neo-line);
   background: rgba(20, 27, 50, .6);
+  backdrop-filter: blur(10px);
   color: var(--muted);
 }
 :root[data-theme="dark"] .topbar-system { color: #A5B4FC; }
