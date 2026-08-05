@@ -7253,3 +7253,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 :root[data-theme="dark"] .ats-inspector { background: rgba(16, 23, 44, 0.94); }
 :root[data-theme="dark"] .ats-overlay { background: rgba(2, 6, 18, 0.6); }
 :root[data-theme="dark"] .ats-skel { background: linear-gradient(90deg, rgba(148,163,200,.12) 25%, rgba(148,163,200,.2) 50%, rgba(148,163,200,.12) 75%); background-size: 200% 100%; }
+
+/* Base de datos de asistencias: tabla maestra con todas las variables. Ancho minimo generoso
+   y scroll horizontal propio; el asunto y la solucion tienen tope para no aplastar al resto. */
+.ats-db-caption { padding: 12px 16px 0; font-size: .78rem; color: var(--ats-text-2); }
+.ats-db-caption strong { color: var(--ats-text); font-variant-numeric: tabular-nums; }
+.ats-table.is-db { min-width: 1560px; }
+.ats-table.is-db .ats-cell-wide { min-width: 220px; max-width: 300px; }
+.ats-table.is-db .ats-cell-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ats-table.is-db .ats-progress { width: 76px; }
+.ats-table .ats-code { white-space: nowrap; }

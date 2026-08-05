@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, BarChart3, CalendarClock, CheckCircle2, ChevronDown, ClipboardCheck, Columns3,
-  Download, FileText, History, LayoutList, ListTodo, Loader2, Map, MoreHorizontal,
+  Download, FileText, History, LayoutList, ListTodo, Loader2, Map,
   Paperclip, PencilLine, Plus, RefreshCw, RotateCcw, Search, Send, Settings, SlidersHorizontal,
   Timer, Upload, X,
 } from 'lucide-react'
@@ -30,7 +30,7 @@ import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail,
 // index.css) y no toca las clases del resto del sistema.
 // ---------------------------------------------------------------------------
 
-type View = 'board' | 'list' | 'balance' | 'catalogs'
+type View = 'board' | 'database' | 'balance' | 'catalogs'
 type InspectorTab = 'resumen' | 'actividad' | 'evidencias' | 'gestion'
 
 const STATUS_LABELS: Record<AssistanceStatus, string> = {
@@ -367,7 +367,7 @@ export default function AlmeraPage() {
             <div className="ats-views" role="tablist" aria-label="Vista">
               {([
                 ['board', 'Tablero', Columns3],
-                ['list', 'Lista', LayoutList],
+                ['database', 'Base de datos', LayoutList],
                 ['balance', 'Balance', BarChart3],
                 ['catalogs', 'Catálogos', Settings],
               ] as [View, string, typeof Columns3][]).map(([key, label, Icon]) => (
@@ -414,32 +414,58 @@ export default function AlmeraPage() {
           )
         )}
 
-        {view === 'list' && (
-          <section className="ats-listwrap" aria-label="Lista de asistencias">
-            <table className="ats-table">
+        {view === 'database' && (
+          /* Base de datos: TODAS las variables de cada asistencia en una tabla plana, como un
+             registro maestro — el tablero es la consulta operativa; esto es el archivo completo.
+             Los mismos filtros y busqueda de arriba aplican tambien aqui. */
+          <section className="ats-listwrap" aria-label="Base de datos de asistencias">
+            <div className="ats-db-caption">
+              <strong>{visibleRows.length}</strong> asistencia{visibleRows.length === 1 ? '' : 's'}
+              {activeFilterCount > 0 || filters.status || search ? ' con la búsqueda y los filtros actuales' : ' en total, sin filtrar'}
+            </div>
+            <table className="ats-table is-db">
               <thead>
                 <tr>
-                  <th>Solicitud</th><th>Proceso / módulo</th><th>Compromiso</th><th>Responsable</th><th>Avance</th><th>Estado</th><th aria-label="Acciones"></th>
+                  <th>Código</th><th>Asunto</th><th>Proceso</th><th>Módulo</th><th>Solicitante</th>
+                  <th>Responsable</th><th>Prioridad</th><th>Solicitada</th><th>Compromiso</th>
+                  <th>Avance</th><th>Estado</th><th>Cerrada</th><th>Solución / observaciones</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleRows.map(row => (
                   <tr key={row.id} className={row.id === selectedId ? 'is-selected' : ''} onClick={() => void openDetail(row.id)}>
-                    <td><strong className="ats-code">{row.code}</strong><small>{row.subject}</small></td>
-                    <td><strong>{row.process_name}</strong><small>{row.module_name}</small></td>
+                    <td><strong className="ats-code">{row.code}</strong></td>
+                    <td className="ats-cell-wide" title={row.description}>
+                      <strong>{row.subject}</strong>
+                      {row.description && <small>{row.description.length > 70 ? `${row.description.slice(0, 70)}…` : row.description}</small>}
+                    </td>
+                    <td>{row.process_name}</td>
+                    <td>{row.module_name}</td>
                     <td>
+                      <strong>{row.requester_name}</strong>
+                      {row.requester_position && <small>{row.requester_position}</small>}
+                    </td>
+                    <td>{row.responsible_name || 'Sin asignar'}</td>
+                    <td><PriorityBadge priority={row.priority} /></td>
+                    <td className="ats-cell-date">{formatDate(row.received_at)}</td>
+                    <td className="ats-cell-date">
                       {formatDate(row.commitment_at)}
                       {row.overdue && <small className="is-danger">{timeToCommitment(row.commitment_at)}</small>}
                       {row.due_soon && !row.overdue && <small className="is-warning">{timeToCommitment(row.commitment_at)}</small>}
                     </td>
-                    <td>{row.responsible_name || 'Sin asignar'}</td>
                     <td><span className="ats-progress"><i style={{ width: `${row.completion_percent}%` }} /></span><b className="ats-pct">{row.completion_percent}%</b></td>
                     <td><StatusBadge row={row} /></td>
-                    <td><MoreHorizontal size={15} className="ats-rowmore" /></td>
+                    <td className="ats-cell-date">{row.closed_at ? formatDate(row.closed_at) : '—'}</td>
+                    <td className="ats-cell-wide" title={row.final_solution || row.general_observations || ''}>
+                      {(() => {
+                        const text = row.final_solution || row.general_observations || ''
+                        return text ? (text.length > 60 ? `${text.slice(0, 60)}…` : text) : '—'
+                      })()}
+                    </td>
                   </tr>
                 ))}
                 {!loading && !visibleRows.length && (
-                  <tr><td colSpan={7}>
+                  <tr><td colSpan={13}>
                     <div className="ats-empty"><ClipboardCheck size={28} /><h3>Sin resultados</h3><p>No hay asistencias para la búsqueda y los filtros actuales.</p></div>
                   </td></tr>
                 )}
