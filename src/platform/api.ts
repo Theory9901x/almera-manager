@@ -23,7 +23,7 @@ export const api = {
   adminOverview: () => request<AdminOverview>('/admin/overview'),
   createUser: (data: { fullName: string; email: string; password: string; roleId: string }) =>
     request('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
-  updateUser: (membershipId: string, data: { roleId: string; active: boolean; positionId?: string | null }) =>
+  updateUser: (membershipId: string, data: { roleId: string; active: boolean; positionId?: string | null; fullName?: string; email?: string; password?: string }) =>
     request(`/admin/users/${membershipId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateModule: (moduleId: string, enabled: boolean) =>
     request(`/admin/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),

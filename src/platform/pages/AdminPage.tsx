@@ -68,7 +68,7 @@ export default function AdminPage() {
       {notice && <div className="flex items-center gap-2 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm text-[#087A54]"><Check size={16} />{notice}</div>}
       {error && <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">{error}</div>}
       {!data ? <div className="grid min-h-64 place-items-center"><Loader2 className="animate-spin" style={{ color: identity.color }} /></div> : <>
-        {tab === 'users' && canUsers && <UsersPanel data={data} reload={load} done={done} />}
+        {tab === 'users' && canUsers && <UsersPanel data={data} reload={load} done={done} isSuperadmin={session?.role.key === 'SUPERADMIN'} />}
         {tab === 'modules' && canModules && <ModulesPanel data={data} reload={async () => { await load(); await refreshSession() }} done={done} />}
         {tab === 'entity' && canModules && <EntityPanel data={data} />}
         {tab === 'settings' && canModules && <SettingsPanel data={data} />}
@@ -77,7 +77,7 @@ export default function AdminPage() {
   )
 }
 
-function UsersPanel({ data, reload, done }: PanelProps) {
+function UsersPanel({ data, reload, done, isSuperadmin }: PanelProps & { isSuperadmin: boolean }) {
   const [query, setQuery] = useState('')
   const [role, setRole] = useState('ALL')
   const [active, setActive] = useState('ALL')
@@ -137,7 +137,7 @@ function UsersPanel({ data, reload, done }: PanelProps) {
       </Card>
 
       {showCreate && <CreateUserModal data={data} close={() => setShowCreate(false)} reload={reload} done={done} />}
-      {selectedUser && <UserDetailModal user={selectedUser} data={data} close={() => setSelectedId(null)} reload={reload} done={done} />}
+      {selectedUser && <UserDetailModal user={selectedUser} data={data} close={() => setSelectedId(null)} reload={reload} done={done} isSuperadmin={isSuperadmin} />}
     </div>
   )
 }
@@ -175,12 +175,22 @@ function CreateUserModal({ data, close, reload, done }: { data: AdminOverview; c
   )
 }
 
-function UserDetailModal({ user, data, close, reload, done }: { user: AdminUser; data: AdminOverview; close(): void; reload(): Promise<void>; done(message: string): void }) {
+function UserDetailModal({ user, data, close, reload, done, isSuperadmin }: { user: AdminUser; data: AdminOverview; close(): void; reload(): Promise<void>; done(message: string): void; isSuperadmin: boolean }) {
   const initials = user.full_name.split(' ').slice(0, 2).map(part => part[0]).join('')
   const [positions, setPositions] = useState<Position[]>([])
   const [positionId, setPositionId] = useState(user.position_id || '')
   const [newPositionName, setNewPositionName] = useState('')
   const [savingPosition, setSavingPosition] = useState(false)
+
+  // Nombre, correo y contraseña: exclusivo de SUPERADMIN (el servidor lo vuelve a exigir, esto
+  // solo evita mostrar campos que un admin normal no puede usar). Se editan como un bloque aparte
+  // de rol/estado/cargo porque tocan la cuenta (users), no la membresia.
+  const [fullName, setFullName] = useState(user.full_name)
+  const [email, setEmail] = useState(user.email)
+  const [newPassword, setNewPassword] = useState('')
+  const [savingAccount, setSavingAccount] = useState(false)
+  const [accountError, setAccountError] = useState('')
+  useEffect(() => { setFullName(user.full_name); setEmail(user.email); setNewPassword('') }, [user.full_name, user.email])
 
   useEffect(() => { void api.positions().then(setPositions) }, [])
   useEffect(() => { setPositionId(user.position_id || '') }, [user.position_id])
@@ -192,6 +202,20 @@ function UserDetailModal({ user, data, close, reload, done }: { user: AdminUser;
   async function toggleActive() {
     await api.updateUser(user.membership_id, { roleId: String(user.role_id), active: !user.membership_active })
     await reload(); done(user.membership_active ? 'Usuario desactivado' : 'Usuario activado')
+  }
+  async function saveAccount() {
+    setSavingAccount(true); setAccountError('')
+    try {
+      if (newPassword && newPassword.length < 10) { setAccountError('La contraseña debe tener mínimo 10 caracteres'); return }
+      await api.updateUser(user.membership_id, {
+        roleId: String(user.role_id), active: user.membership_active,
+        fullName: fullName.trim(), email: email.trim(),
+        ...(newPassword ? { password: newPassword } : {}),
+      })
+      setNewPassword('')
+      await reload(); done(newPassword ? 'Datos y contraseña actualizados' : 'Datos actualizados')
+    } catch (cause) { setAccountError(cause instanceof Error ? cause.message : 'No fue posible guardar') }
+    finally { setSavingAccount(false) }
   }
   async function saveCargo() {
     setSavingPosition(true)
@@ -227,6 +251,24 @@ function UserDetailModal({ user, data, close, reload, done }: { user: AdminUser;
             <div><dt>Estado</dt><dd><Button variant="secondary" onClick={() => void toggleActive()}>{user.membership_active ? 'Inactivar' : 'Activar'}</Button></dd></div>
           </dl>
         </div>
+
+        {isSuperadmin && (
+          <div className="detail-block">
+            <h3>Nombre, correo y contraseña</h3>
+            <p className="text-xs text-[var(--muted)]">Exclusivo de superadministrador. Cambiar el correo cambia con qué inicia sesión; dejar la contraseña vacía la conserva sin cambios.</p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <Field label="Nombre completo"><input className="ds-input" value={fullName} onChange={e => setFullName(e.target.value)} /></Field>
+              <Field label="Correo"><input className="ds-input" type="email" value={email} onChange={e => setEmail(e.target.value)} /></Field>
+              <Field label="Nueva contraseña" hint="Vacío = no cambiar (mínimo 10 caracteres)">
+                <input className="ds-input" type="password" placeholder="••••••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              </Field>
+            </div>
+            {accountError && <p className="mt-2 text-xs text-[#B91C1C]">{accountError}</p>}
+            <Button className="mt-3" identity={identity} disabled={savingAccount || !fullName.trim() || !email.trim()} onClick={() => void saveAccount()}>
+              {savingAccount ? 'Guardando…' : 'Guardar cambios de cuenta'}
+            </Button>
+          </div>
+        )}
 
         <div className="detail-block">
           <h3>Cargo</h3>

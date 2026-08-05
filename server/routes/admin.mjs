@@ -69,26 +69,66 @@ adminRouter.post('/users', requireAnyPermission(['users.create', 'users.manage']
 })
 
 adminRouter.patch('/users/:membershipId', requireAnyPermission(['users.edit', 'users.disable', 'users.manage']), async (request, response, next) => {
+  const client = await pool.connect()
   try {
     const organizationId = request.auth.organization.id
     const membershipId = Number(request.params.membershipId)
     const roleId = Number(request.body?.roleId)
     const active = Boolean(request.body?.active)
+
+    await client.query('BEGIN')
+
     if (Object.hasOwn(request.body || {}, 'positionId')) {
       const positionId = request.body.positionId === null || request.body.positionId === '' ? null : Number(request.body.positionId)
       if (positionId !== null) {
-        const position = await query('SELECT id FROM adherence_positions WHERE id=$1 AND organization_id=$2', [positionId, organizationId])
-        if (!position.rows[0]) return response.status(400).json({ error: 'El cargo no pertenece a esta entidad' })
+        const position = await client.query('SELECT id FROM adherence_positions WHERE id=$1 AND organization_id=$2', [positionId, organizationId])
+        if (!position.rows[0]) fail(400, 'El cargo no pertenece a esta entidad')
       }
-      await query('UPDATE memberships SET position_id=$1 WHERE id=$2 AND organization_id=$3', [positionId, membershipId, organizationId])
+      await client.query('UPDATE memberships SET position_id=$1 WHERE id=$2 AND organization_id=$3', [positionId, membershipId, organizationId])
     }
-    const result = await query(
+
+    const membership = await client.query(
       `UPDATE memberships m SET role_id=$1, active=$2
        FROM roles r WHERE m.id=$3 AND m.organization_id=$4 AND r.id=$1 AND r.organization_id=$4
-       RETURNING m.id`, [roleId, active, membershipId, organizationId])
-    if (!result.rows[0]) return response.status(404).json({ error: 'Usuario o rol no encontrado' })
+       RETURNING m.id, m.user_id`, [roleId, active, membershipId, organizationId])
+    if (!membership.rows[0]) fail(404, 'Usuario o rol no encontrado')
+
+    // Nombre, correo y contraseña tocan la cuenta (users), no la membresia, y equivalen a poder
+    // tomar la cuenta de cualquiera: se reservan a SUPERADMIN, a diferencia de rol/estado/cargo,
+    // que cualquier admin-tier con 'users.manage' ya podia cambiar.
+    const wantsAccountEdit = ['fullName', 'email', 'password'].some(key => Object.hasOwn(request.body || {}, key))
+    if (wantsAccountEdit) {
+      if (request.auth.role?.key !== 'SUPERADMIN') fail(403, 'Solo un superadministrador puede editar nombre, correo o contraseña de otro usuario')
+      const sets = []
+      const values = []
+      if (Object.hasOwn(request.body, 'fullName')) {
+        const fullName = String(request.body.fullName || '').trim()
+        if (!fullName) fail(400, 'El nombre no puede quedar vacío')
+        values.push(fullName); sets.push(`full_name = $${values.length}`)
+      }
+      if (Object.hasOwn(request.body, 'email')) {
+        const email = normalizeEmail(request.body.email)
+        if (!email) fail(400, 'El correo no es válido')
+        values.push(email); sets.push(`email = $${values.length}`)
+      }
+      if (request.body.password) {
+        const password = String(request.body.password)
+        if (password.length < 10) fail(400, 'La contraseña debe tener mínimo 10 caracteres')
+        values.push(hashPassword(password)); sets.push(`password_hash = $${values.length}`)
+      }
+      if (sets.length) {
+        values.push(membership.rows[0].user_id)
+        await client.query(`UPDATE users SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${values.length}`, values)
+      }
+    }
+
+    await client.query('COMMIT')
     response.json({ ok: true })
-  } catch (error) { next(error) }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    if (error.code === '23505') return response.status(409).json({ error: 'Ya existe un usuario con ese correo' })
+    next(error)
+  } finally { client.release() }
 })
 
 adminRouter.get('/users/:membershipId/modules', async (request, response, next) => {
