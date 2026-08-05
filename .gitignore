@@ -25,3 +25,6 @@ release/
 /errores.txt
 /.sgimr-index
 /.tmp-deploy-redesign.sh
+
+# Archivos subidos en dev local: nunca se versionan (en el VPS viven en shared/uploads)
+uploads/

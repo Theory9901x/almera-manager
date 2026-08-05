@@ -7299,3 +7299,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 @media (max-width: 900px) {
   .ats-ficha-grid { grid-template-columns: 1fr; }
 }
+
+/* Cierre con trazabilidad y boton de exito del modulo. */
+.ats-btn.is-success { border-color: transparent; background: var(--ats-success); color: #fff; box-shadow: var(--ats-shadow-xs); }
+.ats-btn.is-success:hover:not(:disabled) { background: color-mix(in srgb, var(--ats-success) 85%, black); }
+.ats-modal.is-complete { width: min(560px, 100%); }
+.ats-form.is-single { grid-template-columns: 1fr; }
+.ats-form.is-single .span-2 { grid-column: span 1; }

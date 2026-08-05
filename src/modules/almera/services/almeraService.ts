@@ -33,6 +33,17 @@ export const almeraService={
     if(!response.ok)throw new Error(data.error||'No fue posible cargar la evidencia')
     return data
   },
+  exportPdf:async(filters:AssistanceFilters={})=>{
+    const response=await fetch(`/api/almera/assistances/report.pdf${params(filters)}`,{credentials:'same-origin'})
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'No fue posible generar el informe')}
+    const blob=await response.blob()
+    const url=URL.createObjectURL(blob)
+    const anchor=document.createElement('a')
+    anchor.href=url
+    anchor.download=`asistencias-tecnicas-${new Date().toISOString().slice(0,10)}.pdf`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
   exportCsv:async(filters:AssistanceFilters={})=>{
     const response=await fetch(`/api/almera/assistances/export.csv${params(filters)}`,{credentials:'same-origin'})
     if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'No fue posible exportar')}

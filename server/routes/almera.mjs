@@ -5,6 +5,8 @@ import { Router } from 'express'
 import multer from 'multer'
 import { pool, query } from '../db.mjs'
 import { requireAnyModuleAccess, requireAnyPermission, requirePermission } from '../auth.mjs'
+import { renderPdf } from '../pdf.mjs'
+import { renderAlmeraReportHtml } from '../templates/almeraReport.mjs'
 
 export const almeraRouter = Router()
 
@@ -205,6 +207,63 @@ almeraRouter.get('/assistances/export.csv', assistanceModule, exportData, async 
     response.setHeader('Content-Type', 'text/csv; charset=utf-8')
     response.setHeader('Content-Disposition', `attachment; filename="asistencias-tecnicas-${new Date().toISOString().slice(0, 10)}.csv"`)
     response.send(csv)
+  } catch (error) { next(error) }
+})
+
+// Informe en PDF con el MISMO addFilters que la consulta y la exportacion: lo que se ve
+// filtrado en pantalla es exactamente lo que sale en el informe. Va ANTES de '/assistances/:id'
+// (CLAUDE.md §10): si quedara despues, Express capturaria "report.pdf" como si fuera un id.
+almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async (request, response, next) => {
+  try {
+    const params = [oid(request)]
+    const where = ['a.organization_id=$1', 'a.deleted_at IS NULL']
+    addFilters(request, params, where)
+    const filter = where.join(' AND ')
+    const joins = `
+       FROM technical_assistances a
+       JOIN institutional_processes p ON p.id=a.process_id AND p.organization_id=a.organization_id
+       JOIN almera_catalog_modules am ON am.id=a.almera_module_id AND am.organization_id=a.organization_id`
+    const [rows, orgResult, summary, byModule, byProcess] = await Promise.all([
+      query(
+        `SELECT a.code,a.subject,a.description,a.priority,a.received_at,a.commitment_at,a.closed_at,
+                a.completion_percent,a.requester_name,a.final_solution,a.general_observations,
+                p.name process_name,am.name module_name,u.full_name responsible_name,
+                ${effectiveStatusSql()} effective_status
+         ${joins}
+         LEFT JOIN memberships m ON m.id=a.responsible_membership_id AND m.organization_id=a.organization_id
+         LEFT JOIN users u ON u.id=m.user_id
+         WHERE ${filter} ORDER BY a.received_at DESC`, params),
+      query('SELECT name FROM organizations WHERE id=$1', [oid(request)]),
+      query(
+        `SELECT COUNT(*)::int total,
+                COUNT(*) FILTER(WHERE ${effectiveStatusSql()}='PENDIENTE')::int pending,
+                COUNT(*) FILTER(WHERE ${effectiveStatusSql()}='EN_CURSO')::int in_progress,
+                COUNT(*) FILTER(WHERE ${effectiveStatusSql()}='COMPLETADA')::int completed,
+                COUNT(*) FILTER(WHERE ${effectiveStatusSql()}='VENCIDA')::int overdue,
+                COALESCE(ROUND(AVG(a.completion_percent),1),0) average_completion
+         ${joins} WHERE ${filter}`, params),
+      query(
+        `SELECT am.name,COUNT(*)::int total ${joins} WHERE ${filter}
+         GROUP BY am.id,am.name ORDER BY total DESC,am.name`, params),
+      query(
+        `SELECT p.name,COUNT(*)::int total ${joins} WHERE ${filter}
+         GROUP BY p.id,p.name ORDER BY total DESC,p.name`, params),
+    ])
+    const filtered = ['q', 'status', 'processId', 'moduleId', 'dateFrom', 'dateTo'].some(key => Boolean(request.query[key]))
+    const html = renderAlmeraReportHtml({
+      organizationName: orgResult.rows[0]?.name || '',
+      generatedAt: new Date().toISOString(),
+      generatedBy: request.auth.user.fullName,
+      filtered,
+      rows: rows.rows,
+      summary: summary.rows[0],
+      byModule: byModule.rows,
+      byProcess: byProcess.rows,
+    })
+    const pdf = await renderPdf(html, { landscape: true })
+    response.setHeader('Content-Type', 'application/pdf')
+    response.setHeader('Content-Disposition', 'attachment; filename="asistencias-tecnicas.pdf"')
+    response.send(pdf)
   } catch (error) { next(error) }
 })
 

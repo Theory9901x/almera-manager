@@ -99,7 +99,9 @@ export default function AlmeraPage() {
   const [catalogs, setCatalogs] = useState<AlmeraCatalogs>(EMPTY_CATALOGS)
   const [dashboard, setDashboard] = useState<AssistanceDashboard>(EMPTY_DASHBOARD)
   const [filters, setFilters] = useState<AssistanceFilters>({})
-  const [view, setView] = useState<View>('board')
+  // La Base de datos es la vista inicial por decision del usuario: primero el registro
+  // completo; el tablero queda como consulta operativa.
+  const [view, setView] = useState<View>('database')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [lastSync, setLastSync] = useState<Date | null>(null)
@@ -124,6 +126,14 @@ export default function AlmeraPage() {
   // vez, como se lee un registro); desde el tablero sigue siendo el inspector lateral, que es
   // donde se gestiona sin perder el contexto.
   const [detailPresentation, setDetailPresentation] = useState<'inspector' | 'ficha'>('inspector')
+
+  // "Marcar como completada": cierre directo desde la ficha. Exige la OBSERVACION de lo
+  // realizado y al menos UNA evidencia — es lo que deja la trazabilidad del cierre; sin eso el
+  // boton no se habilita. La evidencia se sube primero y solo despues se cierra: si la subida
+  // falla, la asistencia queda abierta y nada se pierde.
+  const [showComplete, setShowComplete] = useState(false)
+  const [completeSolution, setCompleteSolution] = useState('')
+  const [completeFiles, setCompleteFiles] = useState<FileList | null>(null)
 
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState(newForm)
@@ -159,13 +169,14 @@ export default function AlmeraPage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (showComplete) { setShowComplete(false); return }
       if (showCreate) { setShowCreate(false); return }
       if (filtersOpen) { setFiltersOpen(false); return }
       if (detail) setDetail(null)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [showCreate, filtersOpen, detail])
+  }, [showComplete, showCreate, filtersOpen, detail])
 
   // El popover de filtros se cierra al hacer clic fuera.
   useEffect(() => {
@@ -253,10 +264,23 @@ export default function AlmeraPage() {
     finally { setBusy(false) }
   }
 
-  const exportCsv = async () => {
+  // SIEMPRE PDF, por orden expresa: el informe formal con graficas y detalle, nunca CSV.
+  const exportPdf = async () => {
     setBusy(true)
-    try { await almeraService.exportCsv({ ...filters, q: search }); setNotice('Archivo CSV generado'); window.setTimeout(() => setNotice(''), 3500) }
+    try { await almeraService.exportPdf({ ...filters, q: search }); setNotice('Informe PDF generado'); window.setTimeout(() => setNotice(''), 3500) }
     catch (caught) { setError(caught instanceof Error ? caught.message : 'No fue posible exportar') }
+    finally { setBusy(false) }
+  }
+
+  const completeAssistance = async () => {
+    if (!detail || !completeSolution.trim() || !completeFiles?.length) return
+    setBusy(true); setError('')
+    try {
+      await almeraService.uploadEvidence(detail.assistance.id, completeFiles, 'Evidencia de cierre')
+      await almeraService.close(detail.assistance.id, { solution: completeSolution.trim(), closedAt: null })
+      setShowComplete(false); setCompleteSolution(''); setCompleteFiles(null)
+      await refreshAfterMutation('Asistencia completada al 100% con su evidencia')
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'No fue posible completar la asistencia') }
     finally { setBusy(false) }
   }
 
@@ -280,8 +304,8 @@ export default function AlmeraPage() {
           </div>
           <div className="ats-page-actions">
             {canExport && (
-              <button className="ats-btn" onClick={() => void exportCsv()} disabled={busy}>
-                <Download size={15} /> Exportar
+              <button className="ats-btn" onClick={() => void exportPdf()} disabled={busy}>
+                <Download size={15} /> {busy ? 'Generando…' : 'Informe PDF'}
               </button>
             )}
             {canCreate && (
@@ -371,8 +395,8 @@ export default function AlmeraPage() {
 
             <div className="ats-views" role="tablist" aria-label="Vista">
               {([
-                ['board', 'Tablero', Columns3],
                 ['database', 'Base de datos', LayoutList],
+                ['board', 'Tablero', Columns3],
                 ['balance', 'Balance', BarChart3],
                 ['catalogs', 'Catálogos', Settings],
               ] as [View, string, typeof Columns3][]).map(([key, label, Icon]) => (
@@ -430,8 +454,8 @@ export default function AlmeraPage() {
                 {activeFilterCount > 0 || filters.status || search ? ' con la búsqueda y los filtros actuales' : ' en total, sin filtrar'}
               </span>
               {canExport && (
-                <button className="ats-btn" onClick={() => void exportCsv()} disabled={busy} title="Exporta exactamente lo que muestra esta vista: búsqueda y filtros incluidos">
-                  <Download size={14} /> Exportar esta vista (CSV)
+                <button className="ats-btn" onClick={() => void exportPdf()} disabled={busy} title="Exporta exactamente lo que muestra esta vista: búsqueda y filtros incluidos">
+                  <Download size={14} /> {busy ? 'Generando…' : 'Exportar informe PDF'}
                 </button>
               )}
             </div>
@@ -518,7 +542,56 @@ export default function AlmeraPage() {
       {/* Ficha emergente: el registro completo de una vez, para leer desde la Base de datos.
           "Gestionar en el panel" salta al inspector, donde viven las acciones. */}
       {detail && detailPresentation === 'ficha' && (
-        <AssistanceFicha detail={detail} close={() => setDetail(null)} manage={() => setDetailPresentation('inspector')} />
+        <AssistanceFicha
+          detail={detail}
+          close={() => setDetail(null)}
+          manage={() => setDetailPresentation('inspector')}
+          canClose={canClose}
+          onComplete={() => setShowComplete(true)}
+        />
+      )}
+
+      {/* Cierre con trazabilidad: observacion + evidencia obligatorias. Se dibuja DESPUES de la
+          ficha para quedar encima con el mismo z-index. */}
+      {showComplete && detail && (
+        <div className="ats-overlay" onClick={() => !busy && setShowComplete(false)}>
+          <div className="ats-modal is-complete" role="dialog" aria-modal="true" aria-labelledby="ats-complete-title" onClick={event => event.stopPropagation()}>
+            <header className="ats-modal-head">
+              <div>
+                <p className="ats-eyebrow">{detail.assistance.code}</p>
+                <h2 id="ats-complete-title">Marcar como completada</h2>
+              </div>
+              <button className="ats-x" aria-label="Cerrar" onClick={() => setShowComplete(false)}><X size={16} /></button>
+            </header>
+            <p className="ats-muted" style={{ marginTop: 8 }}>
+              Al confirmar, la asistencia se cierra al 100&nbsp;%. La observación y la evidencia
+              quedan en la bitácora como trazabilidad de lo realizado.
+            </p>
+            <div className="ats-form is-single">
+              <label className="span-2"><span>Observación de lo realizado *</span>
+                <textarea rows={4} value={completeSolution} onChange={event => setCompleteSolution(event.target.value)} placeholder="¿Qué se hizo para resolver la solicitud?" />
+              </label>
+              <label className="span-2"><span>Evidencia de lo realizado *</span>
+                <span className="ats-file">
+                  <Paperclip size={15} />
+                  <span>{completeFiles?.length ? `${completeFiles.length} archivo(s) seleccionado(s)` : 'PDF, imágenes, Word, Excel, CSV o texto'}</span>
+                  <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.csv,.txt" onChange={event => setCompleteFiles(event.target.files)} />
+                </span>
+              </label>
+              <div className="ats-modal-actions span-2">
+                <button type="button" className="ats-btn" onClick={() => setShowComplete(false)} disabled={busy}>Cancelar</button>
+                <button
+                  className="ats-btn is-success"
+                  disabled={busy || !completeSolution.trim() || !completeFiles?.length}
+                  title={!completeSolution.trim() ? 'Escribe la observación primero' : !completeFiles?.length ? 'Adjunta la evidencia primero' : undefined}
+                  onClick={() => void completeAssistance()}
+                >
+                  <CheckCircle2 size={15} /> {busy ? 'Completando…' : 'Completar al 100%'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ---- Capa 5: inspector contextual ---- */}
@@ -735,9 +808,11 @@ function RankPanel({ icon: Icon, title, caption, rows }: {
 // se consulta como una ficha, no como un panel de trabajo; la gestion (avances, cierre,
 // evidencias) sigue viviendo en el inspector, al que se salta con un boton.
 
-function AssistanceFicha({ detail, close, manage }: { detail: AssistanceDetail; close: () => void; manage: () => void }) {
+function AssistanceFicha({ detail, close, manage, canClose, onComplete }: {
+  detail: AssistanceDetail; close: () => void; manage: () => void; canClose: boolean; onComplete: () => void
+}) {
   const item = detail.assistance
-  const completed = item.effective_status === 'COMPLETADA'
+  const completed = item.effective_status === 'COMPLETADA' || item.effective_status === 'CANCELADA'
   return (
     <div className="ats-overlay" onClick={close}>
       <div className="ats-modal is-ficha" role="dialog" aria-modal="true" aria-label={`Ficha de ${item.code}`} onClick={event => event.stopPropagation()}>
@@ -832,7 +907,12 @@ function AssistanceFicha({ detail, close, manage }: { detail: AssistanceDetail; 
 
         <div className="ats-modal-actions">
           <button className="ats-btn" onClick={close}>Cerrar</button>
-          <button className="ats-btn is-primary" onClick={manage}><PencilLine size={14} /> Gestionar en el panel</button>
+          <button className="ats-btn" onClick={manage}><PencilLine size={14} /> Gestionar en el panel</button>
+          {canClose && !completed && (
+            <button className="ats-btn is-success" onClick={onComplete}>
+              <CheckCircle2 size={15} /> Marcar como completada
+            </button>
+          )}
         </div>
       </div>
     </div>
