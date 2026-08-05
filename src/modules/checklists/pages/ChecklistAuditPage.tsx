@@ -4,7 +4,7 @@ import {
   AlertTriangle, ArrowLeft, Building2, CalendarDays, ChevronDown, ChevronUp,
   ClipboardCheck, ClipboardList, Clock, CreditCard, ExternalLink, Maximize2, Paperclip, Settings2,
   User, UserCheck,
-  Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock, UserPlus,
+  Download, Info, Loader2, Lock, PenLine, Plus, Save, Trash2, Unlock,
 } from 'lucide-react'
 import {
   Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, ModuleHero, ProgressRing, SaveStatusIndicator,
@@ -57,7 +57,6 @@ function ChecklistAuditContent() {
   // el auditor vea el avance sin ir y volver al servidor en cada toque.
   const [marks, setMarks] = useState<Record<string, ChecklistValue>>({})
   const [header, setHeader] = useState<Record<string, string>>({})
-  const [showSubjectForm, setShowSubjectForm] = useState(false)
   const [signers, setSigners] = useState<SignerSuggestion[]>([])
   const [exporting, setExporting] = useState(false)
   const headerDirty = useRef(false)
@@ -68,7 +67,6 @@ function ChecklistAuditContent() {
   const [elapsed, setElapsed] = useState(0)
   const [notes, setNotes] = useState('')
   const [notesByAnswer, setNotesByAnswer] = useState<Record<string, string>>({})
-  const [staffDraft, setStaffDraft] = useState({ name: '', role: '' })
   // Hallazgo NC para el que se esta creando un plan de mejora. Null = dialogo cerrado.
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null)
   const [assignees, setAssignees] = useState<PlanAssignee[]>([])
@@ -172,23 +170,6 @@ function ChecklistAuditContent() {
     if (value === 'NC' && !wasMarked && !plansByKey.has(key)) {
       setAskPlan({ subjectRowId, criterionId })
     }
-  }
-
-  async function addStaff() {
-    if (!audit || !staffDraft.name.trim()) return
-    setBusy(true)
-    try {
-      await checklistsService.addStaff(audit.id, staffDraft.name.trim(), staffDraft.role.trim())
-      setStaffDraft({ name: '', role: '' })
-      await load()
-    } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible agregar') }
-    finally { setBusy(false) }
-  }
-
-  async function removeStaff(staffId: string) {
-    if (!audit) return
-    try { await checklistsService.removeStaff(audit.id, staffId); await load() }
-    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible quitar') }
   }
 
   async function addEvidence(file: File) {
@@ -344,7 +325,6 @@ function ChecklistAuditContent() {
     setBusy(true)
     try {
       await checklistsService.addSubject(audit.id, { displayName, attributes, subjectId })
-      setShowSubjectForm(false)
       await load()
     } catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible agregar') }
     finally { setBusy(false) }
@@ -547,7 +527,7 @@ function ChecklistAuditContent() {
           <div className="eval-context-cell">
             <span className="eval-context-icon"><User size={16} /></span>
             <div>
-              <dt>{audit.subject_label}</dt>
+              <dt>Personal de turno</dt>
               <dd>
                 {audit.subjects[0].display_name}
                 {audit.subjects.length > 1 ? <small>y {audit.subjects.length - 1} más</small> : null}
@@ -620,41 +600,14 @@ function ChecklistAuditContent() {
           </div>
         )}
 
+        {/* UNA sola lista de personas. Antes habia dos registros distintos —"Personal de turno"
+            (checklist_audit_staff, decorativo) y los sujetos de la ronda ("Colaborador"/"Paciente"
+            segun la lista)— y en la practica el auditor escribia a la misma gente dos veces sin
+            saber para que servia cada uno. Se conserva el de SUJETOS, que es el que de verdad
+            manda: cada persona registrada es una columna de la matriz, y es a lo que se enganchan
+            las respuestas y los planes de mejora. Solo cambia como se llama en pantalla. */}
         <div className="eval-subjects">
           <span className="eval-strip-label">Personal de turno</span>
-          {(audit.staff || []).map(person => (
-            <span className="eval-subject" key={person.id}>
-              <b><UserCheck size={12} /></b>
-              <span>
-                {person.full_name}
-                <small>{person.role || 'Sin cargo'}</small>
-              </span>
-              {!closed && <button title="Quitar" onClick={() => void removeStaff(person.id)}><Trash2 size={13} /></button>}
-            </span>
-          ))}
-          {!closed && (
-            <span className="eval-staff-add">
-              <input
-                placeholder="Nombre del profesional"
-                value={staffDraft.name}
-                onChange={event => setStaffDraft({ ...staffDraft, name: event.target.value })}
-                onKeyDown={event => { if (event.key === 'Enter') void addStaff() }}
-              />
-              <input
-                placeholder="Cargo (opcional)"
-                value={staffDraft.role}
-                onChange={event => setStaffDraft({ ...staffDraft, role: event.target.value })}
-                onKeyDown={event => { if (event.key === 'Enter') void addStaff() }}
-              />
-              <button onClick={() => void addStaff()} disabled={busy || !staffDraft.name.trim()}>
-                <UserPlus size={14} /> Agregar
-              </button>
-            </span>
-          )}
-        </div>
-
-        <div className="eval-subjects">
-          <span className="eval-strip-label">{audit.subject_label}s de esta ronda</span>
           {audit.subjects.map((subject, index) => (
             <span className="eval-subject" key={subject.id}>
               <b>{index + 1}</b>
@@ -671,20 +624,17 @@ function ChecklistAuditContent() {
               )}
             </span>
           ))}
-          {!closed && (
-            <button className="eval-subject-add" onClick={() => setShowSubjectForm(true)}>
-              <UserPlus size={14} /> Agregar {audit.subject_label.toLowerCase()}
-            </button>
-          )}
         </div>
 
-        {showSubjectForm && !closed && (
+        {/* El formulario va SIEMPRE desplegado, no detras de un boton "Agregar": registrar al
+            personal es el primer paso de toda ronda, y esconderlo obligaba a un clic extra que
+            hacia dudar de si faltaba algo por llenar. */}
+        {!closed && (
           <SubjectForm
-            subjectLabel={audit.subject_label}
+            subjectLabel="Personal de turno"
             fields={audit.subjectFields}
             directory={directory}
             busy={busy}
-            onCancel={() => setShowSubjectForm(false)}
             onSubmit={addSubject}
           />
         )}
@@ -932,7 +882,7 @@ function ChecklistAuditContent() {
         open={fullscreen}
         onClose={() => setFullscreen(false)}
         title={audit.template_name}
-        subtitle={`${audit.area_name || 'Sin servicio'} · ${audit.subject_label}${audit.subjects.length !== 1 ? 's' : ''} · ${audit.domains.length} dominios`}
+        subtitle={`${audit.area_name || 'Sin servicio'} · ${audit.subjects.length} en turno · ${audit.domains.length} dominios`}
         domains={audit.domains}
         subjects={audit.subjects}
         numberedItems={audit.numbered_items}
@@ -1058,12 +1008,11 @@ function SignaturesCard({ signatures, signers, closed, busy, onAdd, onRemove }: 
 
 // ---------------------------------------------------------------------------
 
-function SubjectForm({ subjectLabel, fields, directory, busy, onCancel, onSubmit }: {
+function SubjectForm({ subjectLabel, fields, directory, busy, onSubmit }: {
   subjectLabel: string
   fields: ChecklistField[]
   directory: DirectorySubject[]
   busy: boolean
-  onCancel(): void
   onSubmit(displayName: string, attributes: Record<string, string>, subjectId: string | null): void
 }) {
   const [displayName, setDisplayName] = useState('')
@@ -1077,6 +1026,14 @@ function SubjectForm({ subjectLabel, fields, directory, busy, onCancel, onSubmit
     if (found) { setDisplayName(found.display_name); setAttributes(found.attributes || {}) }
   }
 
+  // El formulario vive siempre abierto, asi que se limpia solo tras agregar: si no, el siguiente
+  // registro arrancaria con los datos del anterior ya escritos.
+  function submit() {
+    if (!displayName.trim()) return
+    onSubmit(displayName.trim(), attributes, fromDirectory || null)
+    setDisplayName(''); setAttributes({}); setFromDirectory('')
+  }
+
   return (
     <div className="checklist-subject-form mt-4">
       {directory.length > 0 && (
@@ -1085,14 +1042,19 @@ function SubjectForm({ subjectLabel, fields, directory, busy, onCancel, onSubmit
             <Select
               value={fromDirectory || 'NEW'}
               onChange={value => { if (value === 'NEW') { setFromDirectory(''); setDisplayName(''); setAttributes({}) } else pickFromDirectory(value) }}
-              options={[{ value: 'NEW', label: `Nuevo ${subjectLabel.toLowerCase()}` }, ...directory.map(subject => ({ value: subject.id, label: subject.display_name }))]}
+              options={[{ value: 'NEW', label: 'Nuevo registro' }, ...directory.map(subject => ({ value: subject.id, label: subject.display_name }))]}
             />
           </Field>
         </div>
       )}
       <div className="min-w-[220px] flex-1">
-        <Field label={`Identificación del ${subjectLabel.toLowerCase()} *`}>
-          <Input value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Ej. Nombre o número de HC" />
+        <Field label={`Nombre del ${subjectLabel.toLowerCase()} *`}>
+          <Input
+            value={displayName}
+            onChange={event => setDisplayName(event.target.value)}
+            onKeyDown={event => { if (event.key === 'Enter') submit() }}
+            placeholder="Nombre completo"
+          />
         </Field>
       </div>
       {fields.map(field => (
@@ -1109,16 +1071,16 @@ function SubjectForm({ subjectLabel, fields, directory, busy, onCancel, onSubmit
                 type={field.field_type === 'DATE' ? 'date' : field.field_type === 'NUMBER' ? 'number' : 'text'}
                 value={attributes[field.id] || ''}
                 onChange={event => setAttributes(current => ({ ...current, [field.id]: event.target.value }))}
+                onKeyDown={event => { if (event.key === 'Enter') submit() }}
               />
             )}
           </Field>
         </div>
       ))}
       <div className="flex items-center gap-2">
-        <Button identity={identity} disabled={busy || !displayName.trim()} onClick={() => onSubmit(displayName.trim(), attributes, fromDirectory || null)}>
+        <Button identity={identity} disabled={busy || !displayName.trim()} onClick={submit}>
           <Plus size={15} /> Agregar
         </Button>
-        <button className="survey-config-add" onClick={onCancel}>Cancelar</button>
       </div>
     </div>
   )

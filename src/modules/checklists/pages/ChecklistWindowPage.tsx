@@ -146,7 +146,7 @@ function ChecklistWindowContent() {
       }}
       closeLabel="Cerrar ventana"
       title={audit.template_name}
-      subtitle={`${audit.area_name || 'Sin servicio'} · ${audit.subject_label}${audit.subjects.length !== 1 ? 's' : ''} · ${audit.domains.length} dominios`}
+      subtitle={`${audit.area_name || 'Sin servicio'} · ${audit.subjects.length} en turno · ${audit.domains.length} dominios`}
       domains={audit.domains}
       subjects={audit.subjects}
       numberedItems={audit.numbered_items}
