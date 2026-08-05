@@ -107,6 +107,7 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
 
   const chips = useMemo(() => {
     const out: { key: keyof RadicadoFilters; label: string }[] = []
+    if (filters.tipoId) out.push({ key: 'tipoId', label: `Tipo: ${catalogos?.tipos.find(t => t.id === filters.tipoId)?.nombre || ''}` })
     if (filters.categoriaId) out.push({ key: 'categoriaId', label: `Categoría: ${catalogos?.categorias.find(c => c.id === filters.categoriaId)?.nombre || ''}` })
     if (filters.medioId) out.push({ key: 'medioId', label: `Medio: ${catalogos?.medios.find(m => m.id === filters.medioId)?.nombre || ''}` })
     if (filters.processId) out.push({ key: 'processId', label: `Proceso: ${catalogos?.procesos.find(p => p.id === filters.processId)?.name || ''}` })
@@ -115,6 +116,29 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
     if (filters.search) out.push({ key: 'search', label: `Buscar: ${filters.search}` })
     return out
   }, [filters, catalogos])
+
+  // Atajo de "Mes": fija Desde/Hasta a un mes completo de una sola vez, para no obligar a picar
+  // dos fechas cuando lo que se quiere exportar es "solo julio". Se DERIVA de dateFrom/dateTo en
+  // vez de guardarse aparte: si se quita el filtro "Desde" desde un chip, este campo se vacia
+  // solo, sin un segundo estado que se pueda desincronizar.
+  const monthValue = useMemo(() => {
+    if (!filters.dateFrom || !filters.dateTo) return ''
+    const [fy, fm, fd] = filters.dateFrom.split('-').map(Number)
+    if (fd !== 1) return ''
+    const lastDay = new Date(fy, fm, 0).getDate()
+    const [ty, tm, td] = filters.dateTo.split('-').map(Number)
+    if (ty !== fy || tm !== fm || td !== lastDay) return ''
+    return `${fy}-${String(fm).padStart(2, '0')}`
+  }, [filters.dateFrom, filters.dateTo])
+
+  function applyMonth(value: string) {
+    setPage(1)
+    if (!value) { set({ dateFrom: undefined, dateTo: undefined }); return }
+    const [y, m] = value.split('-').map(Number)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const lastDay = new Date(y, m, 0).getDate()
+    set({ dateFrom: `${y}-${pad(m)}-01`, dateTo: `${y}-${pad(m)}-${pad(lastDay)}` })
+  }
 
   function clearAll() {
     setSearchDraft(''); setActiveQuickFilter('TODOS'); setPage(1); setFilters({})
@@ -380,6 +404,13 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                       onBlur={() => set({ search: searchDraft.trim() || undefined })}
                     />
                   </Field>
+                  <Field label="Tipo">
+                    <Select
+                      value={filters.tipoId || 'ALL'}
+                      onChange={value => set({ tipoId: value === 'ALL' ? undefined : value })}
+                      options={[{ value: 'ALL', label: 'Todos' }, ...(catalogos?.tipos || []).map(t => ({ value: t.id, label: t.nombre }))]}
+                    />
+                  </Field>
                   <Field label="Categoría">
                     <Select
                       value={filters.categoriaId || 'ALL'}
@@ -400,6 +431,9 @@ function RadicadosDashboardContent({ canCreate, canVoid, isSuperadmin }: { canCr
                       onChange={value => set({ processId: value === 'ALL' ? undefined : value })}
                       options={[{ value: 'ALL', label: 'Todos' }, ...(catalogos?.procesos || []).map(p => ({ value: p.id, label: p.name }))]}
                     />
+                  </Field>
+                  <Field label="Mes" hint="Atajo: fija Desde y Hasta juntos">
+                    <input type="month" className="ds-input" value={monthValue} onChange={event => applyMonth(event.target.value)} />
                   </Field>
                   <Field label="Desde"><DatePicker value={filters.dateFrom || ''} onChange={value => set({ dateFrom: value || undefined })} /></Field>
                   <Field label="Hasta"><DatePicker value={filters.dateTo || ''} onChange={value => set({ dateTo: value || undefined })} /></Field>
