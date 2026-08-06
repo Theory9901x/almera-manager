@@ -1907,6 +1907,63 @@ CREATE TABLE IF NOT EXISTS carbon_indicator_snapshots (
   UNIQUE (organization_id, periodicity, period_key)
 );
 
+-- ---- Corte real 2026 (enero-agosto), entregado por la entidad desde la herramienta
+-- institucional de referencia — NO son datos de demostracion, son la medicion real que se ha
+-- podido hacer del año en curso. Un solo registro consolidado por fuente (el corte que trajo la
+-- entidad no viene desglosado por mes), fechado al corte (hoy). Se siembra UNA sola vez (guardado
+-- por el UNIQUE de invoice_number+information_source como marca) para no duplicar si se corre la
+-- migracion de nuevo. Valores de energia_mj/co2/ch4/n2o/co2e resueltos a mano contra el motor real
+-- (shared/carbonScoring.mjs) antes de escribir este INSERT — el mismo calculo que reproduce el
+-- caso de prueba de 180,917763 tCO2e verificado en la reconstruccion del modulo. ----
+DO $$
+DECLARE
+  org RECORD;
+  admin_id BIGINT;
+  gas_natural_id BIGINT;
+  diesel_id BIGINT;
+BEGIN
+  FOR org IN SELECT id FROM organizations LOOP
+    SELECT u.id INTO admin_id FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.organization_id = org.id ORDER BY u.id LIMIT 1;
+    IF admin_id IS NOT NULL THEN
+      INSERT INTO carbon_stationary_records (organization_id, record_date, period_year, period_month, period_quarter, period_semester, area, fuel_key, quantity, quantity_unit, responsible_name, information_source, notes, status, energy_mj, co2_kg, ch4_kg, n2o_kg, co2e_kg, factor_snapshot, created_by_id)
+      SELECT org.id, CURRENT_DATE, EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, ((EXTRACT(MONTH FROM CURRENT_DATE)::int - 1) / 3) + 1, CASE WHEN EXTRACT(MONTH FROM CURRENT_DATE)::int <= 6 THEN 1 ELSE 2 END,
+        'Planta física', 'gas_natural', 5561, 'm3', 'Gestión Ambiental', 'Herramienta institucional de monitoreo del impacto climático — corte real del año en curso',
+        'Corte consolidado enero-agosto (dato real reportado por la entidad, no desglosado por mes en la fuente original).',
+        'VALIDADO', 186849.6, 10482.263, 0.934, 0.019, 10511.275,
+        '{"fuelKey":"gas_natural","fuelLabel":"Gas natural","nativeUnit":"m3","densityKgPerUnit":0.7,"heatingValueMjPerKg":48,"feCo2GMj":56.1,"feCh4GMj":0.005,"feN2oGMj":0.0001,"source":"IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation"}'::jsonb,
+        admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM carbon_stationary_records WHERE organization_id = org.id AND information_source LIKE 'Herramienta institucional de monitoreo del impacto climático%' AND fuel_key = 'gas_natural');
+
+      INSERT INTO carbon_mobile_records (organization_id, record_date, period_year, period_month, period_quarter, period_semester, plate, vehicle_type, ownership, fuel_key, input_method, quantity, quantity_unit, biodiesel_blend_percent, responsible_name, information_source, notes, status, fossil_quantity_l, biogenic_quantity_l, energy_mj, co2_kg, ch4_kg, n2o_kg, co2e_kg, factor_snapshot, created_by_id)
+      SELECT org.id, CURRENT_DATE, EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, ((EXTRACT(MONTH FROM CURRENT_DATE)::int - 1) / 3) + 1, CASE WHEN EXTRACT(MONTH FROM CURRENT_DATE)::int <= 6 THEN 1 ELSE 2 END,
+        'Flota institucional', 'Flota mixta (ambulancias y administrativos)', 'PROPIO', 'diesel', 'CANTIDAD', 2807.139, 'galon', 10, 'Gestión Ambiental', 'Herramienta institucional de monitoreo del impacto climático — corte real del año en curso',
+        'Corte consolidado enero-agosto de toda la flota (dato real reportado por la entidad, no desglosado por vehículo ni por mes en la fuente original).',
+        'VALIDADO', 9562.519003500001, 1062.5021115000002, 370643.23657566, 25594.006, 1.445, 1.445, 26060.741,
+        '{"fuelKey":"diesel","fuelLabel":"Diesel","nativeUnit":"litro","densityKgPerUnit":0.84,"heatingValueMjPerKg":43,"feCo2GMj":74.1,"feCh4GMj":0.0039,"feN2oGMj":0.0039,"blendFuelKey":"biodiesel","blendPercent":10,"source":"IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation"}'::jsonb,
+        admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM carbon_mobile_records WHERE organization_id = org.id AND information_source LIKE 'Herramienta institucional de monitoreo del impacto climático%' AND fuel_key = 'diesel');
+
+      INSERT INTO carbon_mobile_records (organization_id, record_date, period_year, period_month, period_quarter, period_semester, plate, vehicle_type, ownership, fuel_key, input_method, quantity, quantity_unit, bioethanol_blend_percent, responsible_name, information_source, notes, status, fossil_quantity_l, biogenic_quantity_l, energy_mj, co2_kg, ch4_kg, n2o_kg, co2e_kg, factor_snapshot, created_by_id)
+      SELECT org.id, CURRENT_DATE, EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, ((EXTRACT(MONTH FROM CURRENT_DATE)::int - 1) / 3) + 1, CASE WHEN EXTRACT(MONTH FROM CURRENT_DATE)::int <= 6 THEN 1 ELSE 2 END,
+        'Flota institucional', 'Flota mixta (ambulancias y administrativos)', 'PROPIO', 'gasolina', 'CANTIDAD', 757.75, 'galon', 10, 'Gestión Ambiental', 'Herramienta institucional de monitoreo del impacto climático — corte real del año en curso',
+        'Corte consolidado enero-agosto de toda la flota (dato real reportado por la entidad, no desglosado por vehículo ni por mes en la fuente original).',
+        'VALIDADO', 2581.275375, 286.808375, 90752.47963425, 5864.122, 2.994, 0.291, 6025.690,
+        '{"fuelKey":"gasolina","fuelLabel":"Gasolina/Nafta","nativeUnit":"litro","densityKgPerUnit":0.74,"heatingValueMjPerKg":44.3,"feCo2GMj":69.3,"feCh4GMj":0.033,"feN2oGMj":0.0032,"blendFuelKey":"bioetanol","blendPercent":10,"source":"IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation"}'::jsonb,
+        admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM carbon_mobile_records WHERE organization_id = org.id AND information_source LIKE 'Herramienta institucional de monitoreo del impacto climático%' AND fuel_key = 'gasolina');
+
+      INSERT INTO carbon_electricity_records (organization_id, billing_start, billing_end, period_year, period_month, period_quarter, period_semester, kwh, responsible_name, notes, status, co2e_kg, factor_snapshot, created_by_id)
+      SELECT org.id, make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, 1, 1), CURRENT_DATE, EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int, ((EXTRACT(MONTH FROM CURRENT_DATE)::int - 1) / 3) + 1, CASE WHEN EXTRACT(MONTH FROM CURRENT_DATE)::int <= 6 THEN 1 ELSE 2 END,
+        1063999.71, 'Gestión Ambiental',
+        'Corte consolidado enero-agosto (dato real reportado por la entidad, no desglosado por mes en la fuente original). Herramienta institucional de monitoreo del impacto climático — corte real del año en curso.',
+        'VALIDADO', 138319.9623,
+        '{"region":"CO","label":"Colombia — Sistema Interconectado Nacional (SIN)","valueKgco2ePerKwh":0.130,"source":"UPME/XM — Documento de calculo del FE del SIN 2018 (rev. dic. 2019)"}'::jsonb,
+        admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM carbon_electricity_records WHERE organization_id = org.id AND notes LIKE '%Herramienta institucional de monitoreo del impacto climático%' AND kwh = 1063999.71);
+    END IF;
+  END LOOP;
+END $$;
+
 -- ============================================================================
 -- Indicadores Ambientales — MODULO PROPIO E INDEPENDIENTE (no es parte de
 -- Huella de Carbono: entra corregido tras el pedido explicito del usuario de
