@@ -17,6 +17,7 @@ const NAV_ITEMS: { key: string; label: string; path: string; manageOnly?: boolea
   { key: 'inventario', label: 'Inventario', path: `${BASE}/inventario` },
   { key: 'indicador', label: 'Indicador', path: `${BASE}/indicador` },
   { key: 'informes', label: 'Informes', path: `${BASE}/informes` },
+  { key: 'indicadores-ambientales', label: 'Indicadores Ambientales', path: `${BASE}/indicadores-ambientales` },
   { key: 'factores', label: 'Factores', path: `${BASE}/factores`, manageOnly: true },
   { key: 'configuracion', label: 'Configuración', path: `${BASE}/configuracion`, manageOnly: true },
   { key: 'historial', label: 'Historial', path: `${BASE}/historial` },

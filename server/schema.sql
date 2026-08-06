@@ -1906,3 +1906,237 @@ CREATE TABLE IF NOT EXISTS carbon_indicator_snapshots (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (organization_id, periodicity, period_key)
 );
+
+-- ============================================================================
+-- Indicadores Ambientales — submodulo DENTRO de Huella de Carbono (mismo modulo,
+-- mismos permisos carbon.*) pero de dominio distinto: NO mide emisiones GEI,
+-- mide EFICIENCIA/PROPORCIONALIDAD de consumo de energia y agua frente al
+-- volumen de atenciones. Dos indicadores fijos (ENERGY/WATER), nunca mas —
+-- por eso no hay tabla de "definiciones de indicador", es una constante
+-- compartida (ver shared/environmentalScoring.mjs), igual criterio que GWP en
+-- Huella de Carbono v2 (fijo, no configurable por catalogo).
+--
+-- Motor (shared/environmentalScoring.mjs): intensidad = consumo/atenciones*1000
+-- (por cada 1000 atenciones); consumo esperado = intensidad_base*atenciones/1000;
+-- indice proporcional = consumo real/consumo esperado*100; ahorro normalizado =
+-- (esperado-real)/esperado*100. Los periodos acumulados (trimestre/semestre/
+-- año) SUMAN consumo y atenciones antes de dividir — nunca promedian el % de
+-- meses individuales, error clasico que distorsiona el resultado cuando los
+-- meses tienen volumenes de atencion distintos.
+-- ============================================================================
+
+-- Sedes/centros de atencion — catalogo ligero por entidad (HCY es la primera,
+-- pero la estructura ya soporta mas de una sede sin cambios).
+CREATE TABLE IF NOT EXISTS env_facilities (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, code)
+);
+INSERT INTO env_facilities (organization_id, code, name)
+SELECT o.id, 'HCY', 'Hospital Central de Yopal' FROM organizations o
+ON CONFLICT (organization_id, code) DO NOTHING;
+
+-- Lineas base institucionales, versionadas por vigencia — solo cubren las
+-- opciones "linea base anual" y "promedio movil" (la opcion "mismo periodo
+-- año anterior" NO se guarda aqui: se deriva en caliente de un registro real
+-- ya validado de ese mismo mes el año anterior, ver resolveBaseline() en el
+-- motor). intensity_base ya viene expresada "por cada 1000 atenciones", para
+-- no repetir la conversion en cada calculo.
+CREATE TABLE IF NOT EXISTS env_baselines (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  facility_id BIGINT NOT NULL REFERENCES env_facilities(id) ON DELETE CASCADE,
+  indicator_type TEXT NOT NULL CHECK (indicator_type IN ('ENERGY', 'WATER')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('LINEA_BASE_ANUAL', 'PROMEDIO_MOVIL_12M')),
+  base_year INTEGER NOT NULL,
+  intensity_base NUMERIC NOT NULL,
+  unit TEXT NOT NULL,
+  valid_from DATE NOT NULL,
+  valid_to DATE,
+  observations TEXT NOT NULL DEFAULT '',
+  responsible_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'VALIDADA' CHECK (status IN ('BORRADOR', 'VALIDADA')),
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS env_baselines_lookup_idx ON env_baselines(organization_id, facility_id, indicator_type, valid_from);
+
+CREATE TABLE IF NOT EXISTS env_targets (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  facility_id BIGINT NOT NULL REFERENCES env_facilities(id) ON DELETE CASCADE,
+  indicator_type TEXT NOT NULL CHECK (indicator_type IN ('ENERGY', 'WATER')),
+  target_year INTEGER NOT NULL,
+  target_proportional_percent NUMERIC NOT NULL DEFAULT 100,
+  tolerance_percent NUMERIC NOT NULL DEFAULT 5,
+  valid_from DATE NOT NULL,
+  valid_to DATE,
+  observations TEXT NOT NULL DEFAULT '',
+  responsible_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'VALIDADA' CHECK (status IN ('BORRADOR', 'VALIDADA')),
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS env_targets_lookup_idx ON env_targets(organization_id, facility_id, indicator_type, valid_from);
+
+-- Registro de consumo — energia y agua en la MISMA tabla (a diferencia de
+-- Huella de Carbono v2, aqui los campos SI son practicamente identicos entre
+-- las dos fuentes: lectura de medidor, factura, atenciones — separarla en dos
+-- tablas solo duplicaria columnas). indicator_type distingue cual es.
+-- is_outlier + outlier_reason: la deteccion de atipicos NUNCA borra ni bloquea
+-- el dato, solo lo marca — el registro sigue siendo editable y validable.
+CREATE TABLE IF NOT EXISTS env_consumption_records (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  facility_id BIGINT NOT NULL REFERENCES env_facilities(id) ON DELETE CASCADE,
+  indicator_type TEXT NOT NULL CHECK (indicator_type IN ('ENERGY', 'WATER')),
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  quarter INTEGER NOT NULL,
+  semester INTEGER NOT NULL,
+  reading_start DATE,
+  reading_end DATE NOT NULL,
+  provider TEXT NOT NULL DEFAULT '',
+  invoice_number TEXT NOT NULL DEFAULT '',
+  meter_code TEXT NOT NULL DEFAULT '',
+  meter_reading_start NUMERIC,
+  meter_reading_end NUMERIC,
+  consumption_value NUMERIC NOT NULL CHECK (consumption_value >= 0),
+  consumption_unit TEXT NOT NULL,
+  invoice_value NUMERIC,
+  attention_count INTEGER NOT NULL CHECK (attention_count > 0),
+  responsible_name TEXT NOT NULL DEFAULT '',
+  information_source TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (status IN ('BORRADOR', 'PENDIENTE', 'VALIDADO', 'RECHAZADO', 'PERIODO_CERRADO')),
+  rejection_reason TEXT NOT NULL DEFAULT '',
+  is_outlier BOOLEAN NOT NULL DEFAULT FALSE,
+  outlier_reason TEXT NOT NULL DEFAULT '',
+  -- Calculados y guardados al momento del registro (trazabilidad: con que
+  -- linea base se calculo, aunque la linea base cambie despues).
+  intensity_value NUMERIC,
+  baseline_intensity NUMERIC,
+  baseline_source TEXT,
+  expected_consumption NUMERIC,
+  proportional_index NUMERIC,
+  normalized_saving NUMERIC,
+  previous_snapshot JSONB,
+  created_by_id BIGINT NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by_id BIGINT REFERENCES users(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  UNIQUE (organization_id, facility_id, indicator_type, year, month)
+);
+CREATE INDEX IF NOT EXISTS env_consumption_org_period_idx ON env_consumption_records(organization_id, facility_id, indicator_type, year, month) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS env_evidence (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  record_id BIGINT NOT NULL REFERENCES env_consumption_records(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL,
+  uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS env_evidence_record_idx ON env_evidence(record_id);
+
+-- Snapshot del indicador (igual patron que carbon_indicator_snapshots): se
+-- guarda al generar un informe, para que el PDF firmado no cambie si despues
+-- se agregan o corrigen registros de ese mismo periodo.
+CREATE TABLE IF NOT EXISTS env_indicator_snapshots (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  facility_id BIGINT NOT NULL REFERENCES env_facilities(id) ON DELETE CASCADE,
+  indicator_type TEXT NOT NULL CHECK (indicator_type IN ('ENERGY', 'WATER')),
+  periodicity TEXT NOT NULL CHECK (periodicity IN ('MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL')),
+  period_key TEXT NOT NULL,
+  consumption_total NUMERIC NOT NULL,
+  attention_total INTEGER NOT NULL,
+  intensity_value NUMERIC,
+  expected_consumption NUMERIC,
+  proportional_index NUMERIC,
+  normalized_saving NUMERIC,
+  is_provisional BOOLEAN NOT NULL DEFAULT FALSE,
+  analysis_text TEXT NOT NULL DEFAULT '',
+  generated_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, facility_id, indicator_type, periodicity, period_key)
+);
+
+-- ---- Datos de demostracion (HCY, 2025, enero-mayo) — los mismos numeros que
+-- entrego la entidad. Se siembran UNA sola vez (guardados por el UNIQUE de
+-- periodo) para que el submodulo no arranque vacio; is_outlier/outlier_reason
+-- se calculan aqui mismo con la misma regla que usa el motor (desviacion >50%
+-- frente a la mediana de los otros meses del lote), para no duplicar logica
+-- de deteccion en SQL: los valores ya vienen resueltos a mano porque el lote
+-- de siembra es fijo y conocido. ----
+DO $$
+DECLARE
+  org RECORD;
+  v_facility_id BIGINT;
+  admin_id BIGINT;
+BEGIN
+  FOR org IN SELECT id FROM organizations LOOP
+    SELECT id INTO v_facility_id FROM env_facilities WHERE organization_id = org.id AND code = 'HCY';
+    SELECT u.id INTO admin_id FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.organization_id = org.id ORDER BY u.id LIMIT 1;
+    IF v_facility_id IS NOT NULL AND admin_id IS NOT NULL THEN
+      -- Linea base institucional anual 2025 (promedio de los meses NO atipicos del propio lote de
+      -- siembra) — punto de partida editable desde Lineas base y metas.
+      INSERT INTO env_baselines (organization_id, facility_id, indicator_type, source_type, base_year, intensity_base, unit, valid_from, observations, responsible_name, created_by_id)
+      SELECT org.id, v_facility_id, 'ENERGY', 'LINEA_BASE_ANUAL', 2025, 1188.1, 'kWh/1000 atenciones', '2025-01-01',
+        'Linea base inicial estimada a partir del promedio de enero-mayo 2025 (siembra de demostracion).', 'Gestion Ambiental', admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM env_baselines WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY');
+
+      INSERT INTO env_baselines (organization_id, facility_id, indicator_type, source_type, base_year, intensity_base, unit, valid_from, observations, responsible_name, created_by_id)
+      SELECT org.id, v_facility_id, 'WATER', 'LINEA_BASE_ANUAL', 2025, 1.98, 'm3/1000 atenciones', '2025-01-01',
+        'Linea base inicial estimada a partir de los meses sin dato atipico (ene/mar/abr 2025, siembra de demostracion).', 'Gestion Ambiental', admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM env_baselines WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER');
+
+      INSERT INTO env_targets (organization_id, facility_id, indicator_type, target_year, target_proportional_percent, tolerance_percent, valid_from, responsible_name, created_by_id)
+      SELECT org.id, v_facility_id, 'ENERGY', 2025, 100, 5, '2025-01-01', 'Gestion Ambiental', admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM env_targets WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY');
+
+      INSERT INTO env_targets (organization_id, facility_id, indicator_type, target_year, target_proportional_percent, tolerance_percent, valid_from, responsible_name, created_by_id)
+      SELECT org.id, v_facility_id, 'WATER', 2025, 100, 5, '2025-01-01', 'Gestion Ambiental', admin_id
+      WHERE NOT EXISTS (SELECT 1 FROM env_targets WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER');
+
+      -- Consumos de energia (ninguno atipico en este lote). intensity/expected/proportional/saving
+      -- ya resueltos a mano con la linea base 1188,1 kWh/1000 atenciones de arriba — la misma
+      -- formula que aplica shared/environmentalScoring.mjs para cualquier registro nuevo.
+      INSERT INTO env_consumption_records (organization_id, facility_id, indicator_type, year, month, quarter, semester, reading_end, consumption_value, consumption_unit, attention_count, status, information_source, notes, intensity_value, baseline_intensity, baseline_source, expected_consumption, proportional_index, normalized_saving, created_by_id)
+      SELECT org.id, v_facility_id, 'ENERGY', 2025, m.month, ((m.month - 1) / 3) + 1, CASE WHEN m.month <= 6 THEN 1 ELSE 2 END,
+        (DATE '2025-01-01' + (m.month || ' months - 1 day')::interval)::date, m.consumption, 'kWh', m.attentions, 'VALIDADO', 'Factura de energia (siembra de demostracion)', '',
+        m.intensity, 1188.1, 'LINEA_BASE_ANUAL', m.expected, m.proportional, m.saving, admin_id
+      FROM (VALUES
+        (1, 72793.34, 76481, 951.783, 90867.076, 80.110, 19.890),
+        (2, 80533.24, 82344, 978.010, 97832.906, 82.317, 17.683),
+        (3, 99277.38, 60664, 1636.512, 72074.898, 137.742, -37.742),
+        (4, 88954.19, 72401, 1228.632, 86019.628, 103.412, -3.412),
+        (5, 86254.90, 60111, 1434.927, 71417.879, 120.775, -20.775)
+      ) AS m(month, consumption, attentions, intensity, expected, proportional, saving)
+      WHERE NOT EXISTS (SELECT 1 FROM env_consumption_records WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY' AND year = 2025 AND month = m.month);
+
+      -- Consumos de agua (febrero y mayo marcados atipicos: desviacion >50% frente a la mediana de
+      -- los otros 4 meses del lote, misma regla que aplica el motor en caliente para datos nuevos)
+      INSERT INTO env_consumption_records (organization_id, facility_id, indicator_type, year, month, quarter, semester, reading_end, consumption_value, consumption_unit, attention_count, status, is_outlier, outlier_reason, information_source, notes, intensity_value, baseline_intensity, baseline_source, expected_consumption, proportional_index, normalized_saving, created_by_id)
+      SELECT org.id, v_facility_id, 'WATER', 2025, m.month, ((m.month - 1) / 3) + 1, CASE WHEN m.month <= 6 THEN 1 ELSE 2 END,
+        (DATE '2025-01-01' + (m.month || ' months - 1 day')::interval)::date, m.consumption, 'm3', m.attentions, 'VALIDADO', m.outlier,
+        CASE WHEN m.outlier THEN 'Dato atipico pendiente de validacion: se desvia mas del 50% frente a la mediana de los demas meses del periodo' ELSE '' END,
+        'Factura de acueducto (siembra de demostracion)', '',
+        m.intensity, 1.98, 'LINEA_BASE_ANUAL', m.expected, m.proportional, m.saving, admin_id
+      FROM (VALUES
+        (1, 175, 76481, FALSE, 2.288, 151.432, 115.563, -15.563),
+        (2, 7, 82344, TRUE, 0.085, 163.041, 4.293, 95.707),
+        (3, 112, 60664, FALSE, 1.846, 120.115, 93.244, 6.756),
+        (4, 131, 72401, FALSE, 1.809, 143.354, 91.382, 8.618),
+        (5, 1014, 60111, TRUE, 16.869, 119.020, 851.959, -751.959)
+      ) AS m(month, consumption, attentions, outlier, intensity, expected, proportional, saving)
+      WHERE NOT EXISTS (SELECT 1 FROM env_consumption_records WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER' AND year = 2025 AND month = m.month);
+    END IF;
+  END LOOP;
+END $$;

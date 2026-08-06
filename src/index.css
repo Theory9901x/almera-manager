@@ -7760,3 +7760,37 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 :root[data-theme="dark"] .hc2-results-table th { border-color: rgba(255,255,255,.12); }
 :root[data-theme="dark"] .hc2-results-table td { border-color: rgba(255,255,255,.07); }
+
+/* ============================================================================
+   Indicadores Ambientales — submodulo dentro de Huella de Carbono. Hereda toda
+   la base .hc2-* (KPIs, grid, glass, tema oscuro) del modulo padre; aqui solo
+   lo que le es propio (breadcrumb, switch energia/agua, heatmap de meses).
+   ============================================================================ */
+.env-breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--hc2-muted, #657083); }
+.env-breadcrumb button { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; padding: 0; font-size: 12px; font-weight: 700; color: var(--hc2-green-dark, #08765B); cursor: pointer; }
+.env-breadcrumb button:hover { text-decoration: underline; }
+
+.env-tab-switch { display: flex; gap: 6px; }
+.env-tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 14px; border-radius: 14px;
+  border: none; background: transparent; font-size: 13px; font-weight: 700; color: var(--hc2-muted, #657083); cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.env-tab:hover { background: color-mix(in srgb, var(--env-tab-accent, #2385D9) 8%, transparent); }
+.env-tab.is-active { background: color-mix(in srgb, var(--env-tab-accent, #2385D9) 14%, transparent); color: var(--env-tab-accent, #2385D9); }
+
+.env-heat-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.env-heat-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--hc2-ink, #172033) 4%, transparent); min-width: 56px; }
+.env-heat-month { font-size: 10.5px; font-weight: 700; color: var(--hc2-muted, #657083); }
+.env-heat-dot { width: 12px; height: 12px; border-radius: 50%; }
+.env-heat-dot.is-ok.env-heat-energy { background: #2385D9; }
+.env-heat-dot.is-ok.env-heat-water { background: #1AA7B8; }
+.env-heat-dot.is-outlier { background: #F3A712; box-shadow: 0 0 0 3px color-mix(in srgb, #F3A712 25%, transparent); }
+.env-heat-dot.is-empty { background: transparent; border: 1.5px dashed rgba(11,24,48,.2); }
+
+.env-row-outlier td { background: #fdf3e6 !important; }
+.env-outlier-chip { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, #F3A712 20%, transparent); color: #B4790C; }
+
+:root[data-theme="dark"] .env-heat-dot.is-empty { border-color: rgba(255,255,255,.2); }
+:root[data-theme="dark"] .env-row-outlier td { background: color-mix(in srgb, #F3A712 14%, transparent) !important; }
+:root[data-theme="dark"] .env-outlier-chip { background: color-mix(in srgb, #F3A712 24%, transparent); color: #FCD34D; }

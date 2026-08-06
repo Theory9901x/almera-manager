@@ -11,6 +11,7 @@ import { adherenceRouter } from './routes/adherence.mjs'
 import { surveysRouter } from './routes/surveys.mjs'
 import { surveysPublicRouter } from './routes/surveysPublic.mjs'
 import { carbonRouter } from './routes/carbon.mjs'
+import { environmentalRouter } from './routes/environmental.mjs'
 import { checklistsRouter } from './routes/checklists.mjs'
 import { plansRouter } from './routes/plans.mjs'
 import { radicadosRouter } from './routes/radicados.mjs'
@@ -56,6 +57,7 @@ app.use('/api/almera', requireAuth, almeraRouter)
 app.use('/api/adherence', requireAuth, adherenceRouter)
 app.use('/api/surveys', requireAuth, surveysRouter)
 app.use('/api/carbon', requireAuth, carbonRouter)
+app.use('/api/environmental', requireAuth, environmentalRouter)
 app.use('/api/checklists', requireAuth, checklistsRouter)
 app.use('/api/radicados', requireAuth, radicadosRouter)
 // Directorio transversal de planes de mejora: LEE de cada modulo, no sustituye su circuito.

@@ -1,21 +1,21 @@
 import * as echarts from 'echarts/core'
 import type { ComposeOption } from 'echarts/core'
-import { BarChart as EChartsBarChart, GaugeChart, LineChart as EChartsLineChart, PieChart as EChartsPieChart } from 'echarts/charts'
-import type { BarSeriesOption, GaugeSeriesOption, LineSeriesOption, PieSeriesOption } from 'echarts/charts'
+import { BarChart as EChartsBarChart, GaugeChart, LineChart as EChartsLineChart, PieChart as EChartsPieChart, ScatterChart as EChartsScatterChart } from 'echarts/charts'
+import type { BarSeriesOption, GaugeSeriesOption, LineSeriesOption, PieSeriesOption, ScatterSeriesOption } from 'echarts/charts'
 import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components'
 import type { GridComponentOption, TooltipComponentOption } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import ReactEChartsCore from 'echarts-for-react/esm/core'
 import { FONT_FAMILY } from '../tokens'
 
-type ECOption = ComposeOption<BarSeriesOption | LineSeriesOption | GaugeSeriesOption | PieSeriesOption | GridComponentOption | TooltipComponentOption>
+type ECOption = ComposeOption<BarSeriesOption | LineSeriesOption | GaugeSeriesOption | PieSeriesOption | ScatterSeriesOption | GridComponentOption | TooltipComponentOption>
 
 // Motor unico de graficos para todo el sistema (reemplaza Recharts y Nivo, que convivian sin
 // necesidad). Estos wrappers cargan el tema SGIMR una sola vez — ningun modulo arma su propio
 // option de ECharts desde cero, todos consumen estos componentes con props simples.
 // Import modular (echarts/core + solo los charts/componentes usados) en vez de 'echarts' completo
 // — evita empaquetar mapas, sankey, treemap, etc. que este sistema nunca renderiza.
-echarts.use([EChartsBarChart, EChartsLineChart, EChartsPieChart, GaugeChart, GridComponent, TooltipComponent, MarkLineComponent, SVGRenderer])
+echarts.use([EChartsBarChart, EChartsLineChart, EChartsPieChart, EChartsScatterChart, GaugeChart, GridComponent, TooltipComponent, MarkLineComponent, SVGRenderer])
 
 // ECharts pinta estos colores directo en canvas/SVG via su propio parser interno de color, que
 // no entiende custom properties de CSS (var(--x)) — a diferencia del tooltip (un div real, ahi
@@ -243,4 +243,41 @@ export function DonutChart({ data, height = 220, centerLabel, unit = '' }: {
       </div>
     </div>
   )
+}
+
+export interface ScatterDatum { x: number; y: number; label: string; isOutlier?: boolean }
+
+/** Dispersion x/y con puntos atipicos resaltados en rojo — para "consumo vs volumen de actividad"
+ * (Indicadores Ambientales), donde lo que importa es ver si el punto se aleja de la nube. */
+export function ScatterChart({ data, xLabel, yLabel, color = '#4F46E5', height = 260, valueFormatter }: {
+  data: ScatterDatum[]
+  xLabel: string
+  yLabel: string
+  color?: string
+  height?: number
+  valueFormatter?: (value: number) => string
+}) {
+  const format = valueFormatter || (value => value.toLocaleString('es-CO'))
+  const option: ECOption = {
+    textStyle: { fontFamily: FONT_FAMILY },
+    grid: { left: 56, right: 16, top: 16, bottom: 44, containLabel: true },
+    tooltip: {
+      trigger: 'item', ...tooltipStyle(),
+      formatter: (params: unknown) => {
+        const item = params as { data: [number, number]; dataIndex: number }
+        const point = data[item.dataIndex]
+        return `<strong>${point.label}</strong><br/>${xLabel}: ${format(point.x)}<br/>${yLabel}: ${format(point.y)}${point.isOutlier ? '<br/><span style="color:#D64545">Dato atípico</span>' : ''}`
+      },
+    },
+    xAxis: { type: 'value', name: xLabel, nameLocation: 'middle', nameGap: 28, nameTextStyle: { ...AXIS_LABEL }, axisLabel: { ...AXIS_LABEL, formatter: (value: number) => format(value) }, axisLine: { lineStyle: { color: AXIS_LINE_COLOR } }, splitLine: SPLIT_LINE },
+    yAxis: { type: 'value', name: yLabel, nameTextStyle: { ...AXIS_LABEL }, axisLabel: { ...AXIS_LABEL, formatter: (value: number) => format(value) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: SPLIT_LINE },
+    series: [{
+      type: 'scatter',
+      symbolSize: 14,
+      data: data.map(point => ({ value: [point.x, point.y], itemStyle: { color: point.isOutlier ? '#D64545' : color, borderColor: '#fff', borderWidth: 1.5 } })),
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+    }],
+  }
+  return <ReactEChartsCore echarts={echarts} option={option} style={{ height, width: '100%' }} opts={{ renderer: 'svg' }} />
 }

@@ -27,6 +27,12 @@ import CarbonReportsPage from '@/modules/carbon/pages/CarbonReportsPage'
 import CarbonSettingsPage from '@/modules/carbon/pages/CarbonSettingsPage'
 import CarbonFactorsPage from '@/modules/carbon/pages/CarbonFactorsPage'
 import CarbonHistoryPage from '@/modules/carbon/pages/CarbonHistoryPage'
+import EnvironmentalDashboardPage from '@/modules/environmental/pages/EnvironmentalDashboardPage'
+import EnvironmentalRecordsPage from '@/modules/environmental/pages/EnvironmentalRecordsPage'
+import { EnergyIndicatorPage, WaterIndicatorPage } from '@/modules/environmental/pages/IndicatorDetailPage'
+import EnvironmentalBaselinesPage from '@/modules/environmental/pages/EnvironmentalBaselinesPage'
+import EnvironmentalReportsPage from '@/modules/environmental/pages/EnvironmentalReportsPage'
+import EnvironmentalHistoryPage from '@/modules/environmental/pages/EnvironmentalHistoryPage'
 import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
 import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
 import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
@@ -216,6 +222,13 @@ function AppRoutes() {
         <Route path="huella-carbono/factores" element={<CarbonManageRoute><CarbonFactorsPage /></CarbonManageRoute>} />
         <Route path="huella-carbono/configuracion" element={<CarbonManageRoute><CarbonSettingsPage /></CarbonManageRoute>} />
         <Route path="huella-carbono/historial" element={<CarbonRoute><CarbonHistoryPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales" element={<CarbonRoute><EnvironmentalDashboardPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales/registro" element={<CarbonRoute><EnvironmentalRecordsPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales/energia" element={<CarbonRoute><EnergyIndicatorPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales/agua" element={<CarbonRoute><WaterIndicatorPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales/lineas-base" element={<CarbonManageRoute><EnvironmentalBaselinesPage /></CarbonManageRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales/informes" element={<CarbonRoute><EnvironmentalReportsPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicadores-ambientales/historial" element={<CarbonRoute><EnvironmentalHistoryPage /></CarbonRoute>} />
         <Route path="radicados" element={<RadicadosRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>

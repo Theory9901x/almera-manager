@@ -10,7 +10,7 @@ const STATUS_LABEL: Record<KpiStatus, string> = { favorable: 'Favorable', warnin
  * Tarjeta KPI del dashboard: valor con count-up, comparacion %, flecha de tendencia y estado
  * (favorable/atencion/critico). El "sin dato" es un estado explicito, no un card vacio silencioso.
  */
-export function KpiCard({ icon: Icon, label, value, unit, trendPercent, status = 'neutral', detail, loading, tooltip }: {
+export function KpiCard({ icon: Icon, label, value, unit, trendPercent, status = 'neutral', detail, loading, tooltip, decimals }: {
   icon?: ComponentType<{ size?: number | string }>
   label: string
   value: number | null
@@ -20,9 +20,12 @@ export function KpiCard({ icon: Icon, label, value, unit, trendPercent, status =
   detail?: ReactNode
   loading?: boolean
   tooltip?: string
+  /** Fuerza el numero de decimales (ej. 0 para conteos como "numero de alertas") — sin esto, un
+   *  conteo entero como 0 o 2 se mostraba "0,00"/"2,00", que parece un dato mal calculado. */
+  decimals?: number
 }) {
   const animated = useCountUp(value)
-  const digits = value != null && Math.abs(value) < 10 ? 2 : value != null && Math.abs(value) < 1000 ? 1 : 0
+  const digits = decimals ?? (value != null && Math.abs(value) < 10 ? 2 : value != null && Math.abs(value) < 1000 ? 1 : 0)
 
   if (loading) {
     return <div className="hc2-kpi hc2-kpi-skeleton"><div className="hc2-skel-line short" /><div className="hc2-skel-line long" /></div>
