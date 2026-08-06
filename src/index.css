@@ -7306,3 +7306,167 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .ats-modal.is-complete { width: min(560px, 100%); }
 .ats-form.is-single { grid-template-columns: 1fr; }
 .ats-form.is-single .span-2 { grid-column: span 1; }
+
+/* ============================================================================
+   MATRIZ DE ADHERENCIA — % por celda y tema oscuro futurista.
+
+   Dos cosas que se corrigen aqui:
+
+   1. Los pasteles de la calificacion estaban EN LINEA en ScoreSelector.tsx,
+      mezclados con `white` literal: en tema oscuro cada celda calificada
+      quedaba como un recuadro blanco (los "campos blancos" reportados) y el
+      CSS no podia aclararla, porque un color en linea gana siempre
+      (CLAUDE.md §10). Ahora el estado viaja en `data-score` y el color lo
+      decide el tema.
+
+   2. El % de cada criterio baja a la celda: el promedio por fila mezclaba
+      historias distintas y no describia a ninguna.
+   ============================================================================ */
+
+/* --- Celda: calificacion + su % de esa HC --- */
+.hcm-cell { display: inline-grid; justify-items: center; gap: 2px; }
+.hcm-cellpct {
+  font-size: 9.5px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+}
+/* Sin calificar y NA no llevan color de semaforo: NA no es un 0, es "no incide". */
+.hcm-cellpct[data-state="empty"] { color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.hcm-cellpct[data-state="na"] { color: var(--muted); font-weight: 700; }
+.hc-matrix.is-full .hcm-cellpct[data-state="empty"] { color: color-mix(in srgb, var(--hcfs-faint) 70%, transparent); }
+.hc-matrix.is-full .hcm-cellpct[data-state="na"] { color: var(--hcfs-faint); }
+/* En la vista ampliada la celda es de 30x24: el % va aun mas pequeno o rompe la rejilla. */
+.hc-matrix.is-full .hcm-cellpct { font-size: 8.5px; }
+.hc-matrix.is-compact .hcm-cellpct { font-size: 8px; }
+
+/* --- Calificacion: color por estado, tematizable (antes en linea) ---
+   Se excluye `.is-compact` con :not(): esa variante (vista ampliada, 30x24) ya trae su propio
+   color SOLIDO con texto blanco en `.sc-*`, y aplicarle tambien el pastel le borraba el fondo
+   dejando el digito blanco sobre blanco — invisible. */
+.score-selector-trigger:not(.is-compact)[data-score="2"] {
+  background: color-mix(in oklch, oklch(0.6 0.15 150) 18%, var(--surface, #fff));
+  color: oklch(0.45 0.15 150); border-color: transparent;
+}
+.score-selector-trigger:not(.is-compact)[data-score="1"] {
+  background: color-mix(in oklch, oklch(0.7 0.16 60) 20%, var(--surface, #fff));
+  color: oklch(0.5 0.16 55); border-color: transparent;
+}
+.score-selector-trigger:not(.is-compact)[data-score="0"] {
+  background: color-mix(in srgb, var(--danger) 15%, var(--surface, #fff));
+  color: var(--danger); border-color: transparent;
+}
+.score-selector-trigger:not(.is-compact)[data-score="NA"] {
+  background: color-mix(in srgb, var(--muted) 14%, var(--surface, #fff));
+  color: var(--ink-soft); border-color: transparent;
+}
+
+/* ============================================================================
+   TEMA OSCURO FUTURISTA de la matriz. La matriz embebida vive sobre el lienzo
+   del modulo, que en oscuro ya es profundo: aqui se le da a la tabla su propia
+   superficie translucida, bordes de neon violeta/cian y calificaciones que
+   brillan en vez de quedar como pegatinas de papel.
+   ============================================================================ */
+:root[data-theme="dark"] .hc-matrix.is-embedded {
+  --hcm-glow: rgba(139, 92, 246, .35);
+  background:
+    radial-gradient(720px 420px at 0% 0%, rgba(139, 92, 246, .10), transparent 60%),
+    linear-gradient(170deg, rgba(22, 28, 54, .72), rgba(13, 18, 38, .82));
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(167, 139, 250, .12);
+}
+/* Cabecera: banda de vidrio con filo de neon, no una fila blanca. */
+:root[data-theme="dark"] .hc-matrix.is-embedded thead th {
+  background: linear-gradient(180deg, rgba(45, 33, 84, .92), rgba(26, 22, 54, .92));
+  color: #E9E6FF;
+  border-bottom: 1px solid var(--hcm-glow);
+  backdrop-filter: blur(10px) saturate(150%); -webkit-backdrop-filter: blur(10px) saturate(150%);
+}
+:root[data-theme="dark"] .hc-matrix.is-embedded thead th.hcm-criterion,
+:root[data-theme="dark"] .hc-matrix.is-embedded tbody td.hcm-criterion {
+  background: linear-gradient(180deg, rgba(30, 24, 62, .96), rgba(20, 17, 44, .96));
+  color: #EDEAFF;
+}
+/* Fila de ambito: la cresta del acordeon, con su propio brillo. */
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-scope-row td {
+  background: linear-gradient(180deg, rgba(58, 40, 106, .55), rgba(35, 27, 70, .55));
+  border-top: 1px solid var(--hcm-glow);
+}
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-scope-name { color: #F2EEFF; }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-scope-count { color: #A99BE0; }
+/* Criterios: superficie casi transparente para que el lienzo se vea detras. */
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-criterion-row td { background: rgba(17, 22, 46, .5); color: #DDE3F5; }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-criterion-row:hover td { background: rgba(129, 140, 248, .10); }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-criterion-row td.hcm-criterion { color: #EDEAFF; }
+:root[data-theme="dark"] .hc-matrix.is-embedded td.is-alt { background: rgba(139, 92, 246, .07); }
+:root[data-theme="dark"] .hc-matrix.is-embedded td.is-active { background: rgba(56, 189, 248, .12); }
+/* Peso y relleno */
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-w { color: #C4B5FD; }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-spacer { background: transparent; }
+/* Observaciones dentro de la matriz */
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-obs-row td { background: rgba(20, 26, 52, .7); }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-obs {
+  background: rgba(10, 15, 32, .8); border-color: rgba(139, 92, 246, .28); color: #E7EAF7;
+}
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-obs::placeholder { color: #6B7699; }
+/* Resumen de cierre: la conclusion, con mas presencia */
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-summary-head td { color: #A99BE0; border-top-color: var(--hcm-glow); }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-summary-head td.hcm-criterion { color: #F2EEFF; }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-summary-row td { background: rgba(58, 40, 106, .35); }
+:root[data-theme="dark"] .hc-matrix.is-embedded .hcm-general-row td {
+  background: linear-gradient(180deg, rgba(76, 51, 138, .6), rgba(45, 32, 92, .6));
+  border-top-color: rgba(167, 139, 250, .55);
+  color: #F6F3FF;
+}
+
+/* Calificaciones en oscuro: brillo tenue en vez de pastel de papel. El VERDE/AMBAR/ROJO se
+   conservan (son el vocabulario de la escala), solo se suben en luminosidad para el fondo oscuro. */
+:root[data-theme="dark"] .score-selector-trigger { border-color: rgba(139, 92, 246, .3); color: #7E8AAE; }
+:root[data-theme="dark"] .score-selector-trigger:hover { border-color: rgba(167, 139, 250, .7); }
+:root[data-theme="dark"] .score-selector-trigger:not(.is-compact)[data-score="2"] {
+  background: linear-gradient(180deg, rgba(16, 185, 129, .26), rgba(16, 185, 129, .14));
+  color: #6EE7B7; box-shadow: inset 0 0 0 1px rgba(16, 185, 129, .34), 0 0 12px rgba(16, 185, 129, .16);
+}
+:root[data-theme="dark"] .score-selector-trigger:not(.is-compact)[data-score="1"] {
+  background: linear-gradient(180deg, rgba(245, 158, 11, .26), rgba(245, 158, 11, .14));
+  color: #FCD34D; box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .34), 0 0 12px rgba(245, 158, 11, .16);
+}
+:root[data-theme="dark"] .score-selector-trigger:not(.is-compact)[data-score="0"] {
+  background: linear-gradient(180deg, rgba(239, 68, 68, .28), rgba(239, 68, 68, .15));
+  color: #FCA5A5; box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .36), 0 0 12px rgba(239, 68, 68, .18);
+}
+:root[data-theme="dark"] .score-selector-trigger:not(.is-compact)[data-score="NA"] {
+  background: rgba(148, 163, 200, .14); color: #AAB6D4; box-shadow: inset 0 0 0 1px rgba(148, 163, 200, .26);
+}
+/* El desplegable de la calificacion tambien era papel blanco. */
+:root[data-theme="dark"] .score-selector-content {
+  background: rgba(20, 26, 52, .97); border-color: rgba(139, 92, 246, .3); color: #E7EAF7;
+  box-shadow: 0 18px 45px rgba(2, 6, 18, .6);
+}
+:root[data-theme="dark"] .score-selector-item { color: #DDE3F5; }
+:root[data-theme="dark"] .score-selector-item[data-highlighted] { background: rgba(139, 92, 246, .22); color: #fff; }
+
+/* Lista completa de cumplimiento por criterio: el recorte pasa a ser del alto (con scroll), no
+   de los 5 peores — asi se puede buscar el % de cualquier criterio, no solo del peor. */
+.hcop-rh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hcop-rh-count { font-size: 10px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hcop-secbars { max-height: 260px; overflow-y: auto; margin-top: 10px; padding-right: 4px; scrollbar-width: thin; }
+.hcop-secbars::-webkit-scrollbar { width: 6px; }
+.hcop-secbars::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 30%, transparent); border-radius: 999px; }
+.hcop-secbar .nm { width: 118px; }
+
+/* Color del % de celda por BANDA del semaforo, decidido por el CSS y no en linea: los cuatro
+   colores institucionales estan calculados para papel y sobre el fondo oscuro de la matriz caen a
+   ~1.1 de contraste. En claro se usan tal cual (§5.1: no se tocan); en oscuro se sube solo la
+   luminosidad del mismo tono, que es lo que la pantalla necesita para poder leerlos. */
+.hcm-cellpct[data-band="optimo"]    { color: #059669; }
+.hcm-cellpct[data-band="aceptable"] { color: #65A30D; }
+.hcm-cellpct[data-band="deficiente"]{ color: #D97706; }
+.hcm-cellpct[data-band="malo"]      { color: #DC2626; }
+:root[data-theme="dark"] .hcm-cellpct[data-band="optimo"]    { color: #6EE7B7; }
+:root[data-theme="dark"] .hcm-cellpct[data-band="aceptable"] { color: #BEF264; }
+:root[data-theme="dark"] .hcm-cellpct[data-band="deficiente"]{ color: #FCD34D; }
+:root[data-theme="dark"] .hcm-cellpct[data-band="malo"]      { color: #FCA5A5; }
+/* La vista ampliada tiene su propia paleta de overlay y ya es oscura por defecto. */
+.hc-matrix.is-full .hcm-cellpct[data-band="optimo"]    { color: #6EE7B7; }
+.hc-matrix.is-full .hcm-cellpct[data-band="aceptable"] { color: #BEF264; }
+.hc-matrix.is-full .hcm-cellpct[data-band="deficiente"]{ color: #FCD34D; }
+.hc-matrix.is-full .hcm-cellpct[data-band="malo"]      { color: #FCA5A5; }

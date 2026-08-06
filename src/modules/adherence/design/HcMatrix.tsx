@@ -30,6 +30,33 @@ export function recordLabel(recordNumber: string) {
   return /^hc[\s-]/i.test(text) ? text : `HC ${text}`
 }
 
+/**
+ * % de UNA celda: el cumplimiento de esa HC en ese criterio, sin mezclar historias.
+ *
+ * La columna «% Cumpl.» promediaba las HC calificadas de la fila, y un promedio de historias
+ * distintas no describe a ninguna (con 2 y 0 da 50 %, que no le pasa a ninguno de los dos
+ * pacientes). Por decision del usuario el dato baja a la celda.
+ *
+ * NA y sin calificar devuelven null («—»): NA no incide de ninguna manera, no es un 0.
+ * El peso NO aparece en la formula porque se cancela al normalizar —(score/2 x peso)/peso—, asi
+ * que el % de una celda es siempre score/2: 2 = 100 %, 1 = 50 %, 0 = 0 %.
+ */
+function cellPercent(score: Score | undefined) {
+  if (score === undefined || score === null) return null
+  return (Number(score) / 2) * 100
+}
+
+/** Banda del semaforo como ATRIBUTO, no como color en linea: los cuatro colores estan calculados
+ *  para papel y sobre el fondo oscuro de la matriz caen a 1.1 de contraste (invisibles). Con la
+ *  banda en `data-band`, el CSS elige el tono que corresponde a cada tema. */
+function percentBand(percent: number | null) {
+  if (percent === null) return 'none'
+  if (percent >= 90) return 'optimo'
+  if (percent >= 80) return 'aceptable'
+  if (percent >= 70) return 'deficiente'
+  return 'malo'
+}
+
 function columnClass(index: number, isActive: boolean, isPinned?: boolean) {
   return [
     index % 2 === 1 ? 'is-alt' : '',
@@ -124,20 +151,17 @@ export function HcMatrix({
                 ))}
                 <td className="hcm-spacer" />
               </tr>
-              {scopeCriteria.map(criterion => {
-                const percent = live.byCriterion.get(criterion.id) ?? null
-                return (
-                  <tr key={criterion.id} className="hcm-criterion-row" style={{ borderLeftColor: color.from }}>
-                    <td className="hcm-criterion is-sub">{criterion.text}</td>
-                    {showWeights && <td className="hcm-weight"><span className="hcm-w">{Number(criterion.weight).toFixed(0)}</span></td>}
-                    {showPercent && (
-                      <td className="hcm-pct">
-                        {full
-                          ? <b style={{ color: colorForPercent(percent) }}>{percent === null ? '—' : `${percent.toFixed(1)}%`}</b>
-                          : <ComplianceRing percent={percent} size={28} strokeWidth={3.5} />}
-                      </td>
-                    )}
-                    {records.map((record, index) => (
+              {scopeCriteria.map(criterion => (
+                <tr key={criterion.id} className="hcm-criterion-row" style={{ borderLeftColor: color.from }}>
+                  <td className="hcm-criterion is-sub">{criterion.text}</td>
+                  {showWeights && <td className="hcm-weight"><span className="hcm-w">{Number(criterion.weight).toFixed(0)}</span></td>}
+                  {/* La columna queda reservada a los AGREGADOS (ambito, resumen y general): el
+                      dato de cada criterio vive ahora en su celda, por HC. */}
+                  {showPercent && <td className="hcm-pct" />}
+                  {records.map((record, index) => {
+                    const value = scores[record.id]?.[criterion.id]
+                    const percent = cellPercent(value)
+                    return (
                       // Ahora que el scroll es de la pagina, la cabecera de HC no queda fija: al
                       // bajar hay que poder saber de que historia es la celda sin volver arriba.
                       <td
@@ -145,19 +169,31 @@ export function HcMatrix({
                         className={columnClass(index, activeRecordId === record.id)}
                         title={`${recordLabel(record.record_number)} · ${criterion.text}`}
                       >
-                        <ScoreSelector
-                          compact={full}
-                          value={scores[record.id]?.[criterion.id]}
-                          disabled={disabled}
-                          onFocus={() => onFocusRecord?.(record.id)}
-                          onChange={value => onScore(record.id, criterion.id, value)}
-                        />
+                        <div className="hcm-cell">
+                          <ScoreSelector
+                            compact={full}
+                            value={value}
+                            disabled={disabled}
+                            onFocus={() => onFocusRecord?.(record.id)}
+                            onChange={next => onScore(record.id, criterion.id, next)}
+                          />
+                          {showPercent && (
+                            <span
+                              className="hcm-cellpct"
+                              data-state={value === null ? 'na' : percent === null ? 'empty' : 'scored'}
+                              data-band={percentBand(percent)}
+                              title={value === null ? 'No aplica: no incide en el cálculo' : undefined}
+                            >
+                              {value === null ? 'NA' : percent === null ? '—' : `${percent.toFixed(0)}%`}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                    ))}
-                    <td className="hcm-spacer" />
-                  </tr>
-                )
-              })}
+                    )
+                  })}
+                  <td className="hcm-spacer" />
+                </tr>
+              ))}
             </Fragment>
           )
         })}

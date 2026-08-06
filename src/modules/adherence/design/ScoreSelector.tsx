@@ -13,12 +13,11 @@ const OPTIONS: { value: string; score: Score; label: string }[] = [
 // Fondo pastel + texto saturado (estilo tag de Linear/Notion) en vez de boton solido con texto
 // blanco — se lee mas rapido en una grilla densa de cientos de celdas porque el color queda como
 // contexto de fondo, no como una mancha solida que compite por atencion celda a celda.
-const STYLES: Record<string, { bg: string; fg: string; border: string }> = {
-  '2': { bg: 'color-mix(in oklch, oklch(0.6 0.15 150) 18%, white)', fg: 'oklch(0.45 0.15 150)', border: 'transparent' },
-  '1': { bg: 'color-mix(in oklch, oklch(0.7 0.16 60) 20%, white)', fg: 'oklch(0.5 0.16 55)', border: 'transparent' },
-  '0': { bg: 'color-mix(in oklch, var(--danger) 15%, white)', fg: 'var(--danger)', border: 'transparent' },
-  NA: { bg: '#f1f3f5', fg: 'var(--ink-soft)', border: 'transparent' },
-}
+//
+// El color NO va en linea (CLAUDE.md §10: un color en linea gana al CSS y el tema oscuro no puede
+// aclararlo). Estos pasteles estaban mezclados con `white` literal, asi que en oscuro cada celda
+// calificada quedaba como un recuadro blanco sobre el fondo oscuro — los "campos blancos" de la
+// matriz. Ahora el estado viaja en `data-score` y el color lo decide el CSS por tema.
 
 // Puntos del menu desplegable: color solido y saturado, no el pastel de la celda — un punto de
 // 9px necesita ser reconocible de un vistazo, el pastel de fondo se ve todo igual de palido a ese tamano.
@@ -43,7 +42,6 @@ export function ScoreSelector({ value, onChange, disabled, compact, onFocus }: {
   onFocus?(): void
 }) {
   const key = keyFor(value)
-  const style = compact ? undefined : STYLES[key]
 
   return (
     <Select.Root
@@ -56,7 +54,7 @@ export function ScoreSelector({ value, onChange, disabled, compact, onFocus }: {
     >
       <Select.Trigger
         className={`score-selector-trigger${compact ? ' is-compact' : ''}${compact && key ? ` sc-${key.toLowerCase()}` : ''}`}
-        style={style ? { background: style.bg, color: style.fg, borderColor: style.border } : undefined}
+        data-score={key || 'empty'}
         aria-label="Calificación"
         onFocus={onFocus}
         onPointerEnter={onFocus}

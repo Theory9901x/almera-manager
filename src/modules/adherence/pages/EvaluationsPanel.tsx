@@ -122,14 +122,18 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     return out
   }, [detail, scores])
 
-  /** Los criterios que peor van, con dato. Ordenados de menor a mayor cumplimiento. */
-  const worstCriteria = useMemo(() => {
+  /**
+   * TODOS los criterios con dato, de menor a mayor cumplimiento. Antes se recortaba a 5 («los que
+   * peor van»), pero con eso no habia forma de ver el % de un criterio concreto que no estuviera
+   * entre los cinco peores: la lista se muestra completa y el recorte pasa a ser del alto del
+   * panel, con scroll. Los «sin dato» (todo NA o sin calificar) quedan fuera: no son un 0 %.
+   */
+  const criteriaByCompliance = useMemo(() => {
     if (!detail) return []
     return detail.criteria
       .map(criterion => ({ criterion, percent: live.byCriterion.get(criterion.id) ?? null }))
       .filter((row): row is { criterion: typeof row.criterion; percent: number } => row.percent !== null)
       .sort((a, b) => a.percent - b.percent)
-      .slice(0, 5)
   }, [detail, live])
 
   const loadEvaluations = () => adherenceService.evaluations({
@@ -727,14 +731,21 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
             {/* Ocupa la fila entera: con cinco tarjetas en rejilla automatica esta quedaba sola
                 al final dejando un hueco, y su lista de barras se lee mejor ancha que en 230 px. */}
             <Card accent={identity.color} className="p-4 hcop-rspan">
-              <div className="hcop-rh"><b>Criterios con menor cumplimiento</b></div>
-              {worstCriteria.length ? worstCriteria.map(row => (
-                <div className="hcop-secbar" key={row.criterion.id}>
-                  <span className="nm" title={row.criterion.text}>{row.criterion.text}</span>
-                  <span className="tk"><i style={{ width: `${row.percent}%`, background: colorForPercent(row.percent) }} /></span>
-                  <span className="pv" style={{ color: colorForPercent(row.percent) }}>{Math.round(row.percent)}%</span>
+              <div className="hcop-rh">
+                <b>Cumplimiento por criterio</b>
+                {criteriaByCompliance.length > 0 && <span className="hcop-rh-count">{criteriaByCompliance.length} con dato</span>}
+              </div>
+              {criteriaByCompliance.length ? (
+                <div className="hcop-secbars">
+                  {criteriaByCompliance.map(row => (
+                    <div className="hcop-secbar" key={row.criterion.id}>
+                      <span className="nm" title={row.criterion.text}>{row.criterion.text}</span>
+                      <span className="tk"><i style={{ width: `${row.percent}%`, background: colorForPercent(row.percent) }} /></span>
+                      <span className="pv" style={{ color: colorForPercent(row.percent) }}>{Math.round(row.percent)}%</span>
+                    </div>
+                  ))}
                 </div>
-              )) : <p className="hcop-muted">Aún no hay criterios calificados.</p>}
+              ) : <p className="hcop-muted">Aún no hay criterios calificados.</p>}
             </Card>
         </aside>
 
