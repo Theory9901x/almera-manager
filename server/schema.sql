@@ -1908,13 +1908,13 @@ CREATE TABLE IF NOT EXISTS carbon_indicator_snapshots (
 );
 
 -- ============================================================================
--- Indicadores Ambientales — submodulo DENTRO de Huella de Carbono (mismo modulo,
--- mismos permisos carbon.*) pero de dominio distinto: NO mide emisiones GEI,
--- mide EFICIENCIA/PROPORCIONALIDAD de consumo de energia y agua frente al
--- volumen de atenciones. Dos indicadores fijos (ENERGY/WATER), nunca mas —
--- por eso no hay tabla de "definiciones de indicador", es una constante
--- compartida (ver shared/environmentalScoring.mjs), igual criterio que GWP en
--- Huella de Carbono v2 (fijo, no configurable por catalogo).
+-- Indicadores Ambientales — MODULO PROPIO E INDEPENDIENTE (no es parte de
+-- Huella de Carbono: entra corregido tras el pedido explicito del usuario de
+-- separarlo en su propia pestaña del sidebar). No mide emisiones GEI, mide
+-- EFICIENCIA/PROPORCIONALIDAD de consumo de energia y agua frente al volumen
+-- de atenciones. Dos indicadores fijos (ENERGY/WATER), nunca mas — por eso no
+-- hay tabla de "definiciones de indicador", es una constante compartida (ver
+-- shared/environmentalScoring.mjs).
 --
 -- Motor (shared/environmentalScoring.mjs): intensidad = consumo/atenciones*1000
 -- (por cada 1000 atenciones); consumo esperado = intensidad_base*atenciones/1000;
@@ -1924,6 +1924,24 @@ CREATE TABLE IF NOT EXISTS carbon_indicator_snapshots (
 -- meses individuales, error clasico que distorsiona el resultado cuando los
 -- meses tienen volumenes de atencion distintos.
 -- ============================================================================
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('environmental-indicators', 'Indicadores Ambientales', 'Eficiencia de consumo de energia y agua ajustada por atenciones, con linea base, metas y alertas de datos atipicos', '/app/indicadores-ambientales', 'droplets', 18, TRUE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
+-- Backfill: las organizaciones ya existentes no reciben modulos nuevos automaticamente (el auto-
+-- enable solo corre al CREAR una organizacion) — se habilita aqui una sola vez.
+INSERT INTO organization_modules (organization_id, module_id, enabled)
+SELECT o.id, m.id, TRUE FROM organizations o, modules m WHERE m.key = 'environmental-indicators'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO permissions (key, name, description) VALUES
+  ('environmental.view', 'Ver indicadores ambientales', 'Consultar dashboard, indicadores, lineas base e historial'),
+  ('environmental.capture', 'Capturar consumos', 'Registrar consumos de energia y agua'),
+  ('environmental.manage', 'Gestionar indicadores ambientales', 'Configurar sedes, lineas base y metas; validar/rechazar registros'),
+  ('environmental.export', 'Exportar indicadores ambientales', 'Exportar informes PDF')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
 
 -- Sedes/centros de atencion — catalogo ligero por entidad (HCY es la primera,
 -- pero la estructura ya soporta mas de una sede sin cambios).

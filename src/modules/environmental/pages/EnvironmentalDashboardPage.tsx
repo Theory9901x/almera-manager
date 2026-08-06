@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Droplets, FileBarChart2, Gauge, Plus, RefreshCw, Settings2, Zap } from 'lucide-react'
 import { Button, Card, EmptyState, LineChart, RadialGauge, ScatterChart, Select, ToastProvider, useToast } from '@/design-system'
-import { EnvironmentalShell } from '../components/EnvironmentalShell'
+import { EnvironmentalShell, environmentalIdentity } from '../components/EnvironmentalShell'
 import { KpiCard, type KpiStatus } from '@/modules/carbon/components/KpiCard'
 import { environmentalService } from '../services/environmentalService'
 import type { DashboardData, Facility } from '../types'
@@ -58,9 +58,9 @@ function EnvironmentalDashboardContent() {
           <Select value={facilityId} onChange={setFacilityId} options={facilityOptions} placeholder="Sede" />
           <Select value={year} onChange={setYear} options={yearOptions} />
           <Button variant="secondary" onClick={() => void load()}><RefreshCw size={15} /> Actualizar</Button>
-          <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/indicadores-ambientales/lineas-base')}><Settings2 size={15} /> Línea base</Button>
-          <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/indicadores-ambientales/informes')}><FileBarChart2 size={15} /> Generar informe</Button>
-          <Button identity={{ key: 'env', color: ENERGY_COLOR, gradientFrom: ENERGY_COLOR, gradientTo: WATER_COLOR }} onClick={() => navigate('/app/huella-carbono/indicadores-ambientales/registro')}><Plus size={15} /> Registrar consumo</Button>
+          <Button variant="secondary" onClick={() => navigate('/app/indicadores-ambientales/lineas-base')}><Settings2 size={15} /> Línea base</Button>
+          <Button variant="secondary" onClick={() => navigate('/app/indicadores-ambientales/informes')}><FileBarChart2 size={15} /> Generar informe</Button>
+          <Button identity={environmentalIdentity} onClick={() => navigate('/app/indicadores-ambientales/registro')}><Plus size={15} /> Registrar consumo</Button>
         </>
       )}
     >

@@ -10,19 +10,19 @@ import { INDICATOR_LABEL, INDICATOR_UNIT, PERIODICITIES, accumulatePeriod, compu
 import { renderPdf } from '../pdf.mjs'
 import { renderEnvironmentalReportHtml } from '../templates/environmentalReport.mjs'
 
-// Indicadores Ambientales vive DENTRO de Huella de Carbono (mismo modulo, mismos permisos
-// carbon.*) por decision del propio pedido — no mide emisiones GEI, mide eficiencia de consumo,
-// pero comparte modulo/permisos porque asi quedo definido en el arbol de navegacion pedido.
+// Indicadores Ambientales es un MODULO PROPIO E INDEPENDIENTE — no mide emisiones GEI, mide
+// eficiencia de consumo de energia y agua. Modulo, permisos y navegacion propios, separados de
+// Huella de Carbono (ver server/schema.sql, seccion "Indicadores Ambientales").
 export const environmentalRouter = Router()
 
 const oid = request => request.auth.organization.id
 const uid = request => request.auth.user.id
 
-const envModule = requireAnyModuleAccess(['carbon-footprint'])
-const view = requirePermission('carbon.view')
-const capture = requirePermission('carbon.capture')
-const manage = requirePermission('carbon.manage')
-const exportPerm = requirePermission('carbon.export')
+const envModule = requireAnyModuleAccess(['environmental-indicators'])
+const view = requirePermission('environmental.view')
+const capture = requirePermission('environmental.capture')
+const manage = requirePermission('environmental.manage')
+const exportPerm = requirePermission('environmental.export')
 
 function fail(status, message) {
   const error = new Error(message)

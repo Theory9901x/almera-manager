@@ -129,7 +129,7 @@
   --m-seguridad-soft:   oklch(0.95 0.03 40);
   --m-riesgos:          oklch(0.55 0.16 70);    /* ambar-dorado — libre, sin modulo asignado aun */
   --m-riesgos-soft:     oklch(0.95 0.03 70);
-  --m-indicadores:      oklch(0.55 0.16 330);   /* magenta — libre, sin modulo asignado aun */
+  --m-indicadores:      oklch(0.55 0.16 330);   /* magenta — Indicadores Ambientales */
   --m-indicadores-soft: oklch(0.95 0.03 330);
   --m-usuarios:         oklch(0.55 0.16 350);   /* rosa-fucsia */
   --m-usuarios-soft:    oklch(0.95 0.03 350);
@@ -7762,13 +7762,23 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 :root[data-theme="dark"] .hc2-results-table td { border-color: rgba(255,255,255,.07); }
 
 /* ============================================================================
-   Indicadores Ambientales — submodulo dentro de Huella de Carbono. Hereda toda
-   la base .hc2-* (KPIs, grid, glass, tema oscuro) del modulo padre; aqui solo
-   lo que le es propio (breadcrumb, switch energia/agua, heatmap de meses).
+   Indicadores Ambientales — MODULO PROPIO (no Huella de Carbono). Reutiliza la
+   infraestructura visual .hc2-* (KPIs, grid, glass, tema oscuro) porque es
+   solo mecanica compartida — la identidad (color de fondo, hero, tabs) es la
+   suya propia (--m-indicadores, magenta), nunca el verde de Huella de Carbono.
    ============================================================================ */
-.env-breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--hc2-muted, #657083); }
-.env-breadcrumb button { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; padding: 0; font-size: 12px; font-weight: 700; color: var(--hc2-green-dark, #08765B); cursor: pointer; }
-.env-breadcrumb button:hover { text-decoration: underline; }
+.env-app::before {
+  background:
+    radial-gradient(60% 40% at 8% 0%, color-mix(in srgb, #a3489d 10%, transparent), transparent 70%),
+    radial-gradient(50% 35% at 100% 10%, color-mix(in srgb, #2385D9 8%, transparent), transparent 70%),
+    var(--hc2-bg);
+}
+:root[data-theme="dark"] .env-app::before {
+  background:
+    radial-gradient(60% 40% at 8% 0%, color-mix(in srgb, #a3489d 18%, transparent), transparent 70%),
+    radial-gradient(50% 35% at 100% 10%, color-mix(in srgb, #2385D9 14%, transparent), transparent 70%),
+    var(--hc2-bg);
+}
 
 .env-tab-switch { display: flex; gap: 6px; }
 .env-tab {

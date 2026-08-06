@@ -118,6 +118,20 @@ function CarbonManageRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+// Indicadores Ambientales es un modulo propio e independiente (no Huella de Carbono) — guardas
+// propias sobre sus propios permisos environmental.*.
+function EnvironmentalRoute({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('environmental.view')) return <Navigate to="/app" replace />
+  return <>{children}</>
+}
+
+function EnvironmentalManageRoute({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('environmental.manage')) return <Navigate to="/app/indicadores-ambientales" replace />
+  return <>{children}</>
+}
+
 function ChecklistsRoute() {
   const { session } = useAuth()
   if (session?.permissions.includes('checklists.view')) return <ChecklistsListPage />
@@ -222,13 +236,13 @@ function AppRoutes() {
         <Route path="huella-carbono/factores" element={<CarbonManageRoute><CarbonFactorsPage /></CarbonManageRoute>} />
         <Route path="huella-carbono/configuracion" element={<CarbonManageRoute><CarbonSettingsPage /></CarbonManageRoute>} />
         <Route path="huella-carbono/historial" element={<CarbonRoute><CarbonHistoryPage /></CarbonRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales" element={<CarbonRoute><EnvironmentalDashboardPage /></CarbonRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales/registro" element={<CarbonRoute><EnvironmentalRecordsPage /></CarbonRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales/energia" element={<CarbonRoute><EnergyIndicatorPage /></CarbonRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales/agua" element={<CarbonRoute><WaterIndicatorPage /></CarbonRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales/lineas-base" element={<CarbonManageRoute><EnvironmentalBaselinesPage /></CarbonManageRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales/informes" element={<CarbonRoute><EnvironmentalReportsPage /></CarbonRoute>} />
-        <Route path="huella-carbono/indicadores-ambientales/historial" element={<CarbonRoute><EnvironmentalHistoryPage /></CarbonRoute>} />
+        <Route path="indicadores-ambientales" element={<EnvironmentalRoute><EnvironmentalDashboardPage /></EnvironmentalRoute>} />
+        <Route path="indicadores-ambientales/registro" element={<EnvironmentalRoute><EnvironmentalRecordsPage /></EnvironmentalRoute>} />
+        <Route path="indicadores-ambientales/energia" element={<EnvironmentalRoute><EnergyIndicatorPage /></EnvironmentalRoute>} />
+        <Route path="indicadores-ambientales/agua" element={<EnvironmentalRoute><WaterIndicatorPage /></EnvironmentalRoute>} />
+        <Route path="indicadores-ambientales/lineas-base" element={<EnvironmentalManageRoute><EnvironmentalBaselinesPage /></EnvironmentalManageRoute>} />
+        <Route path="indicadores-ambientales/informes" element={<EnvironmentalRoute><EnvironmentalReportsPage /></EnvironmentalRoute>} />
+        <Route path="indicadores-ambientales/historial" element={<EnvironmentalRoute><EnvironmentalHistoryPage /></EnvironmentalRoute>} />
         <Route path="radicados" element={<RadicadosRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>

@@ -85,6 +85,10 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   users: { key: 'users', color: '#b2417f', gradientFrom: '#b2417f', gradientTo: '#d771a4' },
   // --m-seguridad (terracota, tono 40) — Radicados
   radicados: { key: 'radicados', color: '#bb4717', gradientFrom: '#bb4717', gradientTo: '#e07845' },
+  // --m-indicadores (magenta, tono 330) — Indicadores Ambientales. Modulo propio e independiente
+  // de Huella de Carbono (separado explicitamente a pedido del usuario), por eso lleva su propio
+  // tono libre en vez de heredar el verde de --m-huella.
+  'environmental-indicators': { key: 'environmental-indicators', color: '#a3489d', gradientFrom: '#a3489d', gradientTo: '#c96bc2' },
 }
 
 export const DEFAULT_MODULE_IDENTITY: ModuleIdentity = { key: 'default', color: '#4F46E5', gradientFrom: '#4F46E5', gradientTo: '#7C3AED' }

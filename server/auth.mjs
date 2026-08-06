@@ -20,6 +20,9 @@ const USUARIO_MODULE_PERMISSIONS = {
   // fuera de este mapa a proposito: solo admin-tier lo recibe (bypassa este mapa por completo),
   // nunca un USUARIO comun aunque se le habilite el modulo.
   'carbon-footprint': ['carbon.view', 'carbon.capture', 'carbon.export'],
+  // environmental.manage (sedes, lineas base, metas, validar/rechazar) queda fuera a proposito,
+  // mismo criterio que carbon.manage: es trabajo de Gestion Ambiental/calidad, admin-tier.
+  'environmental-indicators': ['environmental.view', 'environmental.capture', 'environmental.export'],
 }
 
 // Listas de Chequeo depende de la FUNCION elegida al habilitar el modulo, igual que
