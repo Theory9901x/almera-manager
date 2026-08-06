@@ -72,8 +72,10 @@ export const MODULE_IDENTITIES: Record<string, ModuleIdentity> = {
   'adherence-matrix': { key: 'adherence-matrix', color: '#8156c0', gradientFrom: '#8156c0', gradientTo: '#a682e1' },
   // --m-encuestas (cian-teal, tono 195)
   surveys: { key: 'surveys', color: '#008c8e', gradientFrom: '#008c8e', gradientTo: '#00b2b3' },
-  // --m-huella (verde, tono 155)
-  'carbon-footprint': { key: 'carbon-footprint', color: '#008b45', gradientFrom: '#008b45', gradientTo: '#3fb171' },
+  // --m-huella: verde/navy propios, por decision expresa del usuario sobre la reconstruccion v2
+  // del modulo (paleta institucional GEI dada completa: navy, verde, cian, ambar...) — no la
+  // paleta armonica OKLCH de §5.2, igual excepcion que --m-listas.
+  'carbon-footprint': { key: 'carbon-footprint', color: '#16A47A', gradientFrom: '#16A47A', gradientTo: '#21B6C7' },
   // --m-listas (azul, tono 230) — Listas de Chequeo
   // Violeta/indigo por decision del usuario sobre la maqueta aprobada. Se separa de
   // --m-matrices (magenta, tono 300) lo suficiente para no confundirse en el sidebar.

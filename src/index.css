@@ -112,7 +112,9 @@
   --m-auditorias-soft:  oklch(0.95 0.03 260);
   --m-encuestas:        oklch(0.55 0.16 195);   /* cian-teal */
   --m-encuestas-soft:   oklch(0.95 0.03 195);
-  --m-huella:           oklch(0.55 0.16 155);   /* verde */
+  /* Huella de Carbono v2 — hex literal (paleta institucional GEI dada por el usuario), no la
+     formula OKLCH armonica: misma excepcion documentada que Listas de Chequeo. */
+  --m-huella:           #16A47A;
   --m-huella-soft:      oklch(0.95 0.03 155);
   --m-planes:           oklch(0.55 0.16 130);   /* verde-lima — libre, sin modulo asignado aun */
   --m-planes-soft:      oklch(0.95 0.03 130);
@@ -7551,4 +7553,190 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 @media (prefers-reduced-motion: reduce) {
   .hcop-glass { transition: none; }
+}
+
+/* ============================================================================
+   Huella de Carbono v2 — reconstruccion completa. Paleta institucional propia
+   (no la armonica OKLCH de §5.2, misma excepcion documentada que Listas de
+   Chequeo): navy profundo, verde/cian de identidad, azul/ambar de alcance,
+   morado de tendencias. Claro es el modo PRIMARIO por decision expresa del
+   usuario (a diferencia del resto del sistema) — el oscuro se mantiene
+   coherente porque el conmutador global sigue existiendo, pero el diseño no
+   se penso "oscuro primero" aqui.
+   ============================================================================ */
+.hc2-app {
+  --hc2-navy: #0B1830;
+  --hc2-green: #16A47A;
+  --hc2-green-dark: #08765B;
+  --hc2-cyan: #21B6C7;
+  --hc2-scope1: #2385D9;
+  --hc2-scope2: #F3A712;
+  --hc2-purple: #7557D3;
+  --hc2-bg: #F3F7F8;
+  --hc2-ink: #172033;
+  --hc2-muted: #657083;
+  --hc2-error: #D64545;
+  --hc2-glass-bg: rgba(255, 255, 255, .74);
+  --hc2-glass-border: rgba(255, 255, 255, .5);
+  position: relative;
+}
+.hc2-app::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60% 40% at 8% 0%, color-mix(in srgb, var(--hc2-green) 10%, transparent), transparent 70%),
+    radial-gradient(50% 35% at 100% 10%, color-mix(in srgb, var(--hc2-cyan) 9%, transparent), transparent 70%),
+    var(--hc2-bg);
+}
+.hc2-nav-wrap { margin-top: 14px; }
+.hc2-content { display: flex; flex-direction: column; gap: 18px; padding: 18px 0 40px; max-width: 1320px; margin: 0 auto; }
+
+/* -- KPIs -- */
+.hc2-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.hc2-kpi {
+  position: relative; padding: 16px 18px; border-radius: 20px; overflow: hidden;
+  background: var(--hc2-glass-bg); border: 1px solid var(--hc2-glass-border);
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 10px 26px rgba(11,24,48,.06);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.hc2-kpi::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.9), transparent); }
+.hc2-kpi:hover { transform: translateY(-2px); box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 16px 34px rgba(11,24,48,.1); }
+.hc2-kpi-favorable { border-color: color-mix(in srgb, var(--hc2-green) 30%, var(--hc2-glass-border)); }
+.hc2-kpi-critical { border-color: color-mix(in srgb, var(--hc2-error) 30%, var(--hc2-glass-border)); }
+.hc2-kpi-warning { border-color: color-mix(in srgb, var(--hc2-scope2) 35%, var(--hc2-glass-border)); }
+.hc2-kpi-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.hc2-kpi-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: color-mix(in srgb, var(--hc2-green) 14%, transparent); color: var(--hc2-green-dark); flex: none; }
+.hc2-kpi-favorable .hc2-kpi-icon { background: color-mix(in srgb, var(--hc2-green) 16%, transparent); color: var(--hc2-green-dark); }
+.hc2-kpi-critical .hc2-kpi-icon { background: color-mix(in srgb, var(--hc2-error) 16%, transparent); color: var(--hc2-error); }
+.hc2-kpi-warning .hc2-kpi-icon { background: color-mix(in srgb, var(--hc2-scope2) 18%, transparent); color: #B4790C; }
+.hc2-kpi-label { font-size: 11.5px; font-weight: 700; color: var(--hc2-muted); text-transform: uppercase; letter-spacing: .03em; }
+.hc2-kpi-value { font-size: clamp(1.5rem, 2.6vw, 2rem); font-weight: 800; color: var(--hc2-ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.hc2-kpi-unit { font-size: 12px; font-weight: 700; color: var(--hc2-muted); margin-left: 4px; }
+.hc2-kpi-empty { font-size: 13px; color: var(--hc2-muted); font-style: italic; padding: 6px 0; }
+.hc2-kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.hc2-kpi-trend { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
+.hc2-kpi-trend.is-up { background: color-mix(in srgb, var(--hc2-error) 12%, transparent); color: var(--hc2-error); }
+.hc2-kpi-trend.is-down { background: color-mix(in srgb, var(--hc2-green) 14%, transparent); color: var(--hc2-green-dark); }
+.hc2-kpi-trend.is-flat { background: color-mix(in srgb, var(--hc2-muted) 12%, transparent); color: var(--hc2-muted); }
+.hc2-kpi-status { font-size: 10.5px; font-weight: 700; color: var(--hc2-muted); text-transform: uppercase; letter-spacing: .04em; }
+.hc2-kpi-detail { margin-top: 6px; font-size: 11.5px; color: var(--hc2-muted); }
+.hc2-kpi-skeleton { display: flex; flex-direction: column; gap: 10px; }
+.hc2-skel-line { height: 12px; border-radius: 6px; background: linear-gradient(90deg, rgba(11,24,48,.06), rgba(11,24,48,.12), rgba(11,24,48,.06)); background-size: 200% 100%; animation: hc2-shimmer 1.3s ease-in-out infinite; }
+.hc2-skel-line.short { width: 40%; }
+.hc2-skel-line.long { width: 70%; height: 22px; }
+.hc2-skel-block { height: 220px; border-radius: 16px; background: linear-gradient(90deg, rgba(11,24,48,.05), rgba(11,24,48,.1), rgba(11,24,48,.05)); background-size: 200% 100%; animation: hc2-shimmer 1.3s ease-in-out infinite; }
+@keyframes hc2-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* -- Layout general -- */
+.hc2-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .hc2-grid-2 { grid-template-columns: 1fr; } }
+.hc2-card-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; color: var(--hc2-ink); margin: 0 0 12px; }
+.hc2-narrative { font-size: 13.5px; color: var(--hc2-ink); line-height: 1.6; margin: 0; display: flex; align-items: flex-start; gap: 6px; }
+.hc2-alert-card { border-color: color-mix(in srgb, var(--hc2-error) 30%, var(--hc2-glass-border)) !important; }
+.hc2-hint { font-size: 12px; color: var(--hc2-muted); margin: 6px 0 0; }
+.hc2-section-title { font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--hc2-green-dark); margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--hc2-green) 25%, transparent); }
+.hc2-section-title:first-child { margin-top: 0; }
+
+/* -- Participacion por fuente -- */
+.hc2-source-list { display: flex; flex-direction: column; gap: 12px; }
+.hc2-source-row { display: grid; grid-template-columns: 32px 170px 1fr 80px 52px; align-items: center; gap: 10px; }
+@media (max-width: 640px) { .hc2-source-row { grid-template-columns: 28px 1fr; grid-template-areas: "icon label" "track track" "value pct"; } }
+.hc2-source-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; flex: none; }
+.hc2-source-label { font-size: 12.5px; font-weight: 700; color: var(--hc2-ink); }
+.hc2-source-track { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--hc2-ink) 6%, transparent); overflow: hidden; }
+.hc2-source-fill { height: 100%; border-radius: 999px; transition: width 500ms ease; }
+.hc2-source-value { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--hc2-ink); }
+.hc2-source-pct { font-size: 11.5px; font-weight: 800; color: var(--hc2-muted); text-align: right; }
+
+/* -- Indicadores de intensidad -- */
+.hc2-intensity-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.hc2-intensity-grid > div { padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--hc2-green) 6%, transparent); }
+.hc2-intensity-grid span { display: block; font-size: 10.5px; font-weight: 700; color: var(--hc2-muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.hc2-intensity-grid strong { font-size: 15px; font-weight: 800; color: var(--hc2-ink); font-variant-numeric: tabular-nums; }
+
+/* -- Filtros -- */
+.hc2-filter-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.hc2-filter-bar > label { min-width: 160px; }
+
+/* -- Inventario -- */
+.hc2-row-actions { display: flex; gap: 4px; white-space: nowrap; }
+
+/* -- Registro: stepper -- */
+.hc2-stepper-card { display: flex; flex-direction: column; gap: 22px; }
+.hc2-stepper { display: flex; list-style: none; margin: 0; padding: 0; gap: 4px; overflow-x: auto; }
+.hc2-step { display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border-radius: 999px; flex: none; opacity: .55; transition: opacity 160ms ease; }
+.hc2-step.is-active, .hc2-step.is-done { opacity: 1; }
+.hc2-step-dot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--hc2-ink) 8%, transparent); color: var(--hc2-muted); font-size: 11px; font-weight: 800; flex: none; }
+.hc2-step.is-active .hc2-step-dot { background: var(--hc2-green); color: #fff; }
+.hc2-step.is-done .hc2-step-dot { background: var(--hc2-green-dark); color: #fff; }
+.hc2-step-label { font-size: 12.5px; font-weight: 700; color: var(--hc2-ink); white-space: nowrap; }
+.hc2-step-body { min-height: 160px; }
+.hc2-step-actions { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid rgba(11,24,48,.08); }
+.hc2-step-actions-final { display: flex; gap: 10px; }
+
+.hc2-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 16px; }
+.hc2-form-full { grid-column: 1 / -1; }
+.hc2-form-narrow { max-width: 220px; margin-bottom: 16px; }
+
+.hc2-source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.hc2-source-card {
+  text-align: left; padding: 18px; border-radius: 18px; border: 1.5px solid rgba(11,24,48,.1); background: #fff; cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px; transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+.hc2-source-card:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(11,24,48,.08); }
+.hc2-source-card.is-selected { border-color: var(--hc2-green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hc2-green) 18%, transparent); }
+.hc2-source-card-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, var(--hc2-green) 14%, transparent); color: var(--hc2-green-dark); margin-bottom: 4px; }
+.hc2-source-card strong { font-size: 14px; color: var(--hc2-ink); }
+.hc2-source-card-scope { display: inline-block; width: fit-content; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--hc2-scope1) 14%, transparent); color: var(--hc2-scope1); }
+.hc2-source-card p { margin: 2px 0 0; font-size: 12px; color: var(--hc2-muted); line-height: 1.4; }
+
+.hc2-evidence-step { display: flex; flex-direction: column; gap: 8px; }
+.hc2-evidence-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 16px; border-radius: 16px;
+  border: 1.5px dashed color-mix(in srgb, var(--hc2-green) 40%, rgba(11,24,48,.15)); background: color-mix(in srgb, var(--hc2-green) 4%, transparent);
+  color: var(--hc2-green-dark); cursor: pointer; text-align: center; font-size: 12.5px; font-weight: 600;
+}
+
+.hc2-review h4 { margin: 0 0 10px; font-size: 13px; font-weight: 800; color: var(--hc2-ink); }
+.hc2-calc-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.hc2-calc-preview > div { padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--hc2-ink) 4%, transparent); }
+.hc2-calc-preview span { display: block; font-size: 10.5px; font-weight: 700; color: var(--hc2-muted); text-transform: uppercase; }
+.hc2-calc-preview strong { font-size: 14px; font-weight: 800; color: var(--hc2-ink); font-variant-numeric: tabular-nums; }
+.hc2-calc-total { background: color-mix(in srgb, var(--hc2-green) 12%, transparent) !important; grid-column: 1 / -1; }
+.hc2-calc-total strong { font-size: 20px !important; color: var(--hc2-green-dark) !important; }
+
+/* -- Indicador -- */
+.hc2-indicator-main { text-align: center; }
+.hc2-indicator-value { font-size: clamp(2.4rem, 6vw, 3.4rem); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.hc2-indicator-value span { font-size: 1.1rem; font-weight: 700; margin-left: 6px; color: var(--hc2-muted); }
+.hc2-indicator-semaphore { display: inline-block; margin-top: 10px; padding: 5px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 800; }
+.hc2-indicator-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 24px; text-align: left; }
+.hc2-indicator-grid > div { padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--hc2-ink) 4%, transparent); }
+.hc2-indicator-grid span { display: block; font-size: 10.5px; font-weight: 700; color: var(--hc2-muted); text-transform: uppercase; margin-bottom: 4px; }
+.hc2-indicator-grid strong { font-size: 14px; font-weight: 800; color: var(--hc2-ink); font-variant-numeric: tabular-nums; }
+
+/* -- Tema oscuro: el modulo es claro-primario, pero el conmutador global sigue existiendo y no
+   puede dejar texto oscuro sobre fondo oscuro (misma leccion de Huella de Carbono v1, §10). -- */
+:root[data-theme="dark"] .hc2-app {
+  --hc2-bg: #0B1830; --hc2-ink: #E8EDF7; --hc2-muted: #94A3C4;
+  --hc2-glass-bg: rgba(18, 28, 54, .78); --hc2-glass-border: rgba(255,255,255,.1);
+}
+:root[data-theme="dark"] .hc2-app::before {
+  background:
+    radial-gradient(60% 40% at 8% 0%, color-mix(in srgb, var(--hc2-green) 16%, transparent), transparent 70%),
+    radial-gradient(50% 35% at 100% 10%, color-mix(in srgb, var(--hc2-cyan) 14%, transparent), transparent 70%),
+    var(--hc2-bg);
+}
+:root[data-theme="dark"] .hc2-source-card { background: color-mix(in srgb, var(--hc2-navy) 60%, #12203a); border-color: rgba(255,255,255,.1); }
+:root[data-theme="dark"] .hc2-source-card p { color: var(--hc2-muted); }
+:root[data-theme="dark"] .hc2-calc-preview > div,
+:root[data-theme="dark"] .hc2-indicator-grid > div,
+:root[data-theme="dark"] .hc2-intensity-grid > div { background: rgba(255,255,255,.06); }
+:root[data-theme="dark"] .hc2-source-track { background: rgba(255,255,255,.1); }
+:root[data-theme="dark"] .hc2-skel-line,
+:root[data-theme="dark"] .hc2-skel-block { background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.12), rgba(255,255,255,.05)); background-size: 200% 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hc2-kpi, .hc2-source-card, .hc2-source-fill { transition: none; }
+  .hc2-skel-line, .hc2-skel-block { animation: none; }
 }

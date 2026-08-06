@@ -20,8 +20,13 @@ import SurveyResponsesPage from '@/modules/surveys/pages/SurveyResponsesPage'
 import SurveyConsolidatedPage from '@/modules/surveys/pages/SurveyConsolidatedPage'
 import PublicSurveyPage from '@/modules/surveys/pages/PublicSurveyPage'
 import CarbonDashboardPage from '@/modules/carbon/pages/CarbonDashboardPage'
-import CarbonCapturePage from '@/modules/carbon/pages/CarbonCapturePage'
-import CarbonConfigPage from '@/modules/carbon/pages/CarbonConfigPage'
+import CarbonRegistrationPage from '@/modules/carbon/pages/CarbonRegistrationPage'
+import CarbonInventoryPage from '@/modules/carbon/pages/CarbonInventoryPage'
+import CarbonIndicatorPage from '@/modules/carbon/pages/CarbonIndicatorPage'
+import CarbonReportsPage from '@/modules/carbon/pages/CarbonReportsPage'
+import CarbonSettingsPage from '@/modules/carbon/pages/CarbonSettingsPage'
+import CarbonFactorsPage from '@/modules/carbon/pages/CarbonFactorsPage'
+import CarbonHistoryPage from '@/modules/carbon/pages/CarbonHistoryPage'
 import ChecklistsListPage from '@/modules/checklists/pages/ChecklistsListPage'
 import ChecklistBuilderPage from '@/modules/checklists/pages/ChecklistBuilderPage'
 import ChecklistAuditPage from '@/modules/checklists/pages/ChecklistAuditPage'
@@ -101,10 +106,10 @@ function CarbonRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function CarbonConfigRoute() {
+function CarbonManageRoute({ children }: { children: ReactNode }) {
   const { session } = useAuth()
   if (!session?.permissions.includes('carbon.manage')) return <Navigate to="/app/huella-carbono" replace />
-  return <CarbonConfigPage />
+  return <>{children}</>
 }
 
 function ChecklistsRoute() {
@@ -204,8 +209,13 @@ function AppRoutes() {
         <Route path="listas-chequeo/:templateId/constructor" element={<ChecklistBuilderRoute />} />
         <Route path="listas-chequeo/:templateId/vista-previa" element={<ChecklistPreviewRoute />} />
         <Route path="huella-carbono" element={<CarbonRoute><CarbonDashboardPage /></CarbonRoute>} />
-        <Route path="huella-carbono/captura" element={<CarbonRoute><CarbonCapturePage /></CarbonRoute>} />
-        <Route path="huella-carbono/configuracion" element={<CarbonConfigRoute />} />
+        <Route path="huella-carbono/registro" element={<CarbonRoute><CarbonRegistrationPage /></CarbonRoute>} />
+        <Route path="huella-carbono/inventario" element={<CarbonRoute><CarbonInventoryPage /></CarbonRoute>} />
+        <Route path="huella-carbono/indicador" element={<CarbonRoute><CarbonIndicatorPage /></CarbonRoute>} />
+        <Route path="huella-carbono/informes" element={<CarbonRoute><CarbonReportsPage /></CarbonRoute>} />
+        <Route path="huella-carbono/factores" element={<CarbonManageRoute><CarbonFactorsPage /></CarbonManageRoute>} />
+        <Route path="huella-carbono/configuracion" element={<CarbonManageRoute><CarbonSettingsPage /></CarbonManageRoute>} />
+        <Route path="huella-carbono/historial" element={<CarbonRoute><CarbonHistoryPage /></CarbonRoute>} />
         <Route path="radicados" element={<RadicadosRoute />} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>

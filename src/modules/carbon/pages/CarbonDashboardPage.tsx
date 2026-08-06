@@ -1,56 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowDown, ArrowUp, FileDown, Leaf, Minus, Settings, Sparkles, Telescope } from 'lucide-react'
-import { Button, Card, DatePicker, DonutChart, EmptyState, Field, Input, LineChart, ModuleHero, Select, Table, ToastProvider, fadeSlideUp, moduleIdentity, staggerContainer, useCountUp, useToast } from '@/design-system'
-import { useAuth } from '@/platform/auth/AuthContext'
+import { Activity, AlertTriangle, Building2, Car, FileBarChart2, Flame, Plus, RefreshCw, Zap } from 'lucide-react'
+import { Button, Card, DonutChart, EmptyState, LineChart, Select, ToastProvider, useToast } from '@/design-system'
+import { CarbonShell, carbonIdentity } from '../components/CarbonShell'
+import { KpiCard, type KpiStatus } from '../components/KpiCard'
 import { carbonService } from '../services/carbonService'
-import { QuarterlyAnalysisPanel } from '../components/QuarterlyAnalysisPanel'
-import type { CarbonMeasurement, CarbonStats } from '../types'
+import type { DashboardData } from '../types'
 
-const SCOPE_COLOR = { SCOPE_1: '#2563eb', SCOPE_2: '#d97706', SCOPE_3: '#7c3aed' }
-const SCOPE_NAME = { SCOPE_1: 'Emisiones directas', SCOPE_2: 'Energía comprada', SCOPE_3: 'Cadena de valor' }
-const VARIABLE_PALETTE = ['#2563eb', '#0ca678', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#c026d3', '#65a30d']
-const identity = moduleIdentity('carbon-footprint')
-
-function ScopePill({ scope }: { scope: string | null | undefined }) {
-  const color = scope ? SCOPE_COLOR[scope as keyof typeof SCOPE_COLOR] : undefined
-  if (!scope || !color) return <span style={{ color: '#94a3b8' }}>—</span>
-  return <span className="carbon-scope-pill" style={{ background: `${color}18`, color, borderColor: `${color}40` }}>Alcance {scope.slice(-1)}</span>
-}
-
-const MONTH_OPTIONS = [
-  '01 · Enero', '02 · Febrero', '03 · Marzo', '04 · Abril', '05 · Mayo', '06 · Junio',
-  '07 · Julio', '08 · Agosto', '09 · Septiembre', '10 · Octubre', '11 · Noviembre', '12 · Diciembre',
-].map((label, index) => ({ value: String(index + 1), label }))
-const QUARTER_OPTIONS = [1, 2, 3, 4].map(n => ({ value: String(n), label: `Trimestre ${n}` }))
-const SEMESTER_OPTIONS = [1, 2].map(n => ({ value: String(n), label: `Semestre ${n}` }))
-
-type PeriodPreset = 'custom' | 'month' | 'quarter' | 'semester' | 'year'
-
-function pad(value: number) { return String(value).padStart(2, '0') }
-function lastDayOf(year: number, month: number) { return new Date(year, month, 0).getDate() }
-
-function presetRange(preset: PeriodPreset, year: number, index: number): { from: string; to: string } | null {
-  if (preset === 'month') return { from: `${year}-${pad(index)}-01`, to: `${year}-${pad(index)}-${pad(lastDayOf(year, index))}` }
-  if (preset === 'quarter') {
-    const startMonth = (index - 1) * 3 + 1
-    const endMonth = startMonth + 2
-    return { from: `${year}-${pad(startMonth)}-01`, to: `${year}-${pad(endMonth)}-${pad(lastDayOf(year, endMonth))}` }
-  }
-  if (preset === 'semester') {
-    const startMonth = (index - 1) * 6 + 1
-    const endMonth = startMonth + 5
-    return { from: `${year}-${pad(startMonth)}-01`, to: `${year}-${pad(endMonth)}-${pad(lastDayOf(year, endMonth))}` }
-  }
-  if (preset === 'year') return { from: `${year}-01-01`, to: `${year}-12-31` }
-  return null
-}
-
-function CountUpNumber({ value, decimals = 0 }: { value: number; decimals?: number }) {
-  const animated = useCountUp(value, 1400)
-  return <>{animated.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</>
-}
+const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const SOURCE_COLOR: Record<string, string> = { STATIONARY: '#2385D9', MOBILE: '#7557D3', ELECTRICITY: '#F3A712' }
+const SOURCE_ICON: Record<string, typeof Flame> = { STATIONARY: Flame, MOBILE: Car, ELECTRICITY: Zap }
 
 export default function CarbonDashboardPage() {
   return <ToastProvider><CarbonDashboardContent /></ToastProvider>
@@ -59,254 +18,116 @@ export default function CarbonDashboardPage() {
 function CarbonDashboardContent() {
   const navigate = useNavigate()
   const toast = useToast()
-  const { session } = useAuth()
-  const [stats, setStats] = useState<CarbonStats | null>(null)
-  const [preset, setPreset] = useState<PeriodPreset>('custom')
-  const [presetYear, setPresetYear] = useState(new Date().getFullYear())
-  const [presetIndex, setPresetIndex] = useState(1)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const now = new Date()
+  const [year, setYear] = useState(String(now.getUTCFullYear()))
+  const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [exportingPdf, setExportingPdf] = useState(false)
-  const [showAnalysis, setShowAnalysis] = useState(false)
-  const [recent, setRecent] = useState<CarbonMeasurement[]>([])
-
-  // El preset (mensual/trimestral/semestral/anual) calcula el rango automaticamente — la fecha de
-  // cada medicion es lo que permite agrupar por estos periodos, por eso es el primer dato que pide
-  // el formulario de captura.
-  useEffect(() => {
-    if (preset === 'custom') return
-    const range = presetRange(preset, presetYear, presetIndex)
-    if (range) { setDateFrom(range.from); setDateTo(range.to) }
-  }, [preset, presetYear, presetIndex])
 
   async function load() {
     setLoading(true)
-    try { setStats(await carbonService.stats({ dateFrom: dateFrom || undefined, dateTo: dateTo || undefined })) }
+    try { setData(await carbonService.dashboard({ year: Number(year) })) }
     catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible cargar el dashboard') }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { void load() }, [dateFrom, dateTo])
+  useEffect(() => { void load() }, [year])
 
-  // Mediciones recientes para la tabla de contexto — el mismo endpoint de captura, ya ordenado
-  // por fecha desc en el servidor, solo se limita a las ultimas 6 del periodo activo.
-  useEffect(() => {
-    carbonService.measurements({ dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, limit: '6' })
-      .then(result => setRecent(result.rows))
-      .catch(() => setRecent([]))
-  }, [dateFrom, dateTo])
+  const yearOptions = Array.from({ length: 6 }, (_unused, index) => String(now.getUTCFullYear() - 4 + index)).map(value => ({ value, label: value }))
 
-  async function handleExportPdf() {
-    setExportingPdf(true)
-    try { await carbonService.exportPdf({ dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }) }
-    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar el informe') }
-    finally { setExportingPdf(false) }
-  }
-
-  const scopeTotal = useMemo(() => stats ? stats.byScope.SCOPE_1 + stats.byScope.SCOPE_2 + stats.byScope.SCOPE_3 : 0, [stats])
-  const scopePercent = (value: number) => scopeTotal ? Math.round((value / scopeTotal) * 100) : null
-
-  if (loading && !stats) return <div className="carbon-module flex h-64 items-center justify-center"><div className="carbon-skeleton-spinner" /></div>
-  if (!stats) return null
-
-  const trendTone = stats.trendPercent == null ? 'flat' : stats.trendPercent < 0 ? 'down' : stats.trendPercent > 0 ? 'up' : 'flat'
+  const total = data?.total.ton ?? null
+  const targetStatus: KpiStatus = !data?.target ? 'neutral' : data.target.onTrack ? 'favorable' : 'critical'
+  const trendStatus: KpiStatus = data?.trendPercent == null ? 'neutral' : data.trendPercent <= 0 ? 'favorable' : data.trendPercent > 10 ? 'critical' : 'warning'
 
   return (
-    <div className="carbon-module">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <ModuleHero
-          badge="Ambiental"
-          title="Huella de Carbono"
-          subtitle="Medición de emisiones GEI según GHG Protocol — Herramienta de Monitoreo del Impacto Climático (Salud sin Daño / MinSalud, 2023)"
-          accent={identity.color}
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button identity={identity} onClick={() => navigate('/app/huella-carbono/captura')}><Sparkles size={15} /> Registrar medición</Button>
-              <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => setShowAnalysis(true)}><Telescope size={15} /> Análisis trimestral</Button>
-              <Button variant="secondary" className="btn-on-hero-secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileDown size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
-              <Button variant="secondary" className="btn-on-hero-secondary" onClick={() => navigate('/app/huella-carbono/configuracion')}><Settings size={15} /> Configuración</Button>
-            </div>
-          }
-        />
+    <CarbonShell
+      title="Huella de Carbono"
+      subtitle={`Combustión estacionaria, combustión móvil y energía eléctrica — Alcance 1 y 2, año ${year}`}
+      actions={(
+        <>
+          <Select value={year} onChange={setYear} options={yearOptions} />
+          <Button variant="secondary" onClick={() => void load()}><RefreshCw size={15} /> Actualizar</Button>
+          <Button variant="secondary" onClick={() => navigate('/app/huella-carbono/informes')}><FileBarChart2 size={15} /> Generar informe</Button>
+          <Button identity={carbonIdentity} onClick={() => navigate('/app/huella-carbono/registro')}><Plus size={15} /> Registrar actividad</Button>
+        </>
+      )}
+    >
+      <div className="hc2-kpi-grid">
+        <KpiCard icon={Building2} label="Huella total" value={total} unit=" tCO2e" trendPercent={data?.trendPercent} status={trendStatus} loading={loading}
+          tooltip="Suma de combustión estacionaria + móvil + energía eléctrica" />
+        <KpiCard icon={Flame} label="Alcance 1" value={data ? data.byScope.scope1Ton : null} unit=" tCO2e" status="neutral" loading={loading}
+          detail={data ? `${data.byScope.scope1SharePercent.toFixed(1)}% del total` : undefined} />
+        <KpiCard icon={Zap} label="Alcance 2" value={data ? data.byScope.scope2Ton : null} unit=" tCO2e" status="neutral" loading={loading}
+          detail={data ? `${data.byScope.scope2SharePercent.toFixed(1)}% del total` : undefined} />
+        <KpiCard icon={Activity} label="Cumplimiento de meta" value={data?.target ? data.target.progressPercent : null} unit="%" status={targetStatus} loading={loading}
+          detail={data?.target ? `Meta ${data.target.targetYear}: ${data.target.expectedValueTon.toFixed(2)} t` : 'Sin meta configurada'} />
+      </div>
 
-        <Card accent={identity.color} className="carbon-period-bar flex flex-wrap items-end gap-3 p-4">
-          <Field label="Período">
-            <Select
-              value={preset}
-              onChange={value => { setPreset(value as PeriodPreset); setPresetIndex(1) }}
-              options={[
-                { value: 'custom', label: 'Personalizado' }, { value: 'month', label: 'Mensual' },
-                { value: 'quarter', label: 'Trimestral' }, { value: 'semester', label: 'Semestral' }, { value: 'year', label: 'Anual' },
+      <div className="hc2-grid-2">
+        <Card accent={carbonIdentity.color} className="p-5">
+          <h3 className="hc2-card-title">Alcance 1 vs Alcance 2</h3>
+          {loading ? <div className="hc2-skel-block" /> : !total ? (
+            <EmptyState icon={Building2} title="Sin registros validados" description="Registra y valida actividad para ver la distribución por alcance." />
+          ) : (
+            <DonutChart unit="tCO2e" centerLabel="Total tCO2e"
+              data={[
+                { label: 'Alcance 1 (estacionaria + móvil)', value: Number((data!.byScope.scope1Ton).toFixed(3)), color: '#2385D9' },
+                { label: 'Alcance 2 (electricidad)', value: Number((data!.byScope.scope2Ton).toFixed(3)), color: '#F3A712' },
               ]}
             />
-          </Field>
-          {preset !== 'custom' && (
-            <>
-              <Field label="Año"><Input type="number" value={presetYear} onChange={event => setPresetYear(Number(event.target.value))} /></Field>
-              {preset !== 'year' && (
-                <Field label={preset === 'month' ? 'Mes' : preset === 'quarter' ? 'Trimestre' : 'Semestre'}>
-                  <Select
-                    value={String(presetIndex)} onChange={value => setPresetIndex(Number(value))}
-                    options={preset === 'month' ? MONTH_OPTIONS : preset === 'quarter' ? QUARTER_OPTIONS : SEMESTER_OPTIONS}
-                  />
-                </Field>
-              )}
-            </>
-          )}
-          {preset === 'custom' && (
-            <>
-              <Field label="Desde"><DatePicker value={dateFrom} onChange={setDateFrom} /></Field>
-              <Field label="Hasta"><DatePicker value={dateTo} onChange={setDateTo} /></Field>
-            </>
-          )}
-          {stats.lastUpdated && (
-            <span className="carbon-period-badge">
-              <Leaf size={13} /> Última actualización: {new Date(stats.lastUpdated).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </span>
           )}
         </Card>
 
-        {!stats.total ? (
-          <Card accent={identity.color}>
-            <EmptyState icon={Leaf} title="Aún no hay mediciones registradas" description="Registra la primera medición de combustión, energía o residuos para ver el dashboard." />
-          </Card>
-        ) : (
-          <>
-            <motion.div variants={staggerContainer(80)} initial="hidden" animate="visible" className="kpi-strip">
-              <motion.div variants={fadeSlideUp} className="kpi-tile kpi-tile--hero" style={{ ['--kpi-accent' as string]: identity.color }}>
-                <p className="kpi-tile-label">Huella total del período</p>
-                <p className="kpi-tile-value"><CountUpNumber value={stats.total} decimals={1} /><span className="kpi-tile-unit">kg CO2e</span></p>
-                <span className={`kpi-tile-delta kpi-tile-delta--${trendTone}`}>
-                  {trendTone === 'down' && <ArrowDown size={13} />}
-                  {trendTone === 'up' && <ArrowUp size={13} />}
-                  {trendTone === 'flat' && <Minus size={13} />}
-                  {stats.trendPercent == null ? 'Sin período anterior' : `${Math.abs(stats.trendPercent)}% vs. anterior`}
-                </span>
-              </motion.div>
-              {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map(scope => (
-                <motion.div key={scope} variants={fadeSlideUp} className="kpi-tile" style={{ ['--kpi-accent' as string]: SCOPE_COLOR[scope] }}>
-                  <p className="kpi-tile-label">{SCOPE_NAME[scope]}</p>
-                  <p className="kpi-tile-value"><CountUpNumber value={stats.byScope[scope]} decimals={1} /><span className="kpi-tile-unit">kg CO2e</span></p>
-                  <span className="kpi-tile-delta kpi-tile-delta--flat"><Minus size={13} />{scopePercent(stats.byScope[scope]) ?? 0}% del total</span>
-                </motion.div>
-              ))}
-            </motion.div>
-
-            <motion.div variants={staggerContainer(80)} initial="hidden" animate="visible" className="scope-wave-grid">
-              {(['SCOPE_1', 'SCOPE_2', 'SCOPE_3'] as const).map((scope, index) => (
-                <motion.div key={scope} variants={fadeSlideUp} className="scope-wave-card" style={{ ['--scope-accent' as string]: SCOPE_COLOR[scope] }}>
-                  <div className="scope-wave-top">
-                    <span className="scope-wave-ghost">0{index + 1}</span>
-                    <div className="scope-wave-eyebrow">Alcance {index + 1}</div>
-                    <div className="scope-wave-title">{SCOPE_NAME[scope]}</div>
-                    <svg className="scope-wave-svg" viewBox="0 0 500 40" preserveAspectRatio="none">
-                      <path d="M0,20 C150,40 350,0 500,20 L500,40 L0,40 Z" style={{ fill: 'var(--surface-1)' }} />
-                    </svg>
-                  </div>
-                  <div className="scope-wave-body">
-                    <p className="scope-wave-pct">{scopePercent(stats.byScope[scope]) ?? 0}%</p>
-                    <p className="scope-wave-kg"><CountUpNumber value={stats.byScope[scope]} decimals={1} /> kg CO2e</p>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </>
-        )}
-
-        {stats.timeline.length > 1 && (
-          <Card accent={identity.color} className="p-5">
-            <h3 className="mb-3 text-base font-bold">Evolución en el tiempo</h3>
-            <LineChart
-              height={260}
-              color={identity.color}
-              valueSuffix=" kg CO2e"
-              data={stats.timeline.map(point => ({ label: point.period, value: point.kgco2e }))}
+        <Card accent={carbonIdentity.color} className="p-5">
+          <h3 className="hc2-card-title">Evolución mensual</h3>
+          {loading ? <div className="hc2-skel-block" /> : (
+            <LineChart color={carbonIdentity.color} valueSuffix=" t"
+              data={(data?.timeline || []).map(point => ({ label: MONTH_LABELS[point.month - 1], value: point.totalTon || null }))}
             />
-          </Card>
-        )}
-
-        {stats.byBlock.length > 0 && (
-          <Card accent={identity.color} className="p-5">
-            <h3 className="mb-3 text-base font-bold">Desglose por variable</h3>
-            <div className="carbon-donut-row">
-              <div className="carbon-donut-chart">
-                <DonutChart
-                  height={220}
-                  unit="kg CO2e"
-                  centerLabel="kg CO2e total"
-                  data={stats.byBlock.map((item, i) => ({ label: item.name, value: item.kgco2e, color: VARIABLE_PALETTE[i % VARIABLE_PALETTE.length] }))}
-                />
-              </div>
-              <div className="carbon-donut-legend">
-                {stats.byBlock.map((item, i) => {
-                  const blockTotal = stats.byBlock.reduce((sum, block) => sum + block.kgco2e, 0)
-                  const pct = blockTotal ? Math.round((item.kgco2e / blockTotal) * 100) : 0
-                  return (
-                    <div key={item.blockKey} className="carbon-donut-legend-item">
-                      <i style={{ background: VARIABLE_PALETTE[i % VARIABLE_PALETTE.length] }} />
-                      <span className="carbon-donut-legend-name">{item.name}</span>
-                      <span className="carbon-donut-legend-value">{item.kgco2e.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span>
-                      <span className="carbon-donut-legend-pct">{pct}%</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {recent.length > 0 && (
-          <Card accent={identity.color} className="p-5">
-            <h3 className="mb-3 text-base font-bold">Mediciones recientes</h3>
-            <div className="carbon-recent-table">
-              <Table>
-                <thead>
-                  <tr><th>Fecha</th><th>Variable</th><th>Alcance</th><th>Cantidad</th><th>Emisión</th></tr>
-                </thead>
-                <tbody>
-                  {recent.map(row => {
-                    const scope = row.scope_override || row.block_scope || null
-                    return (
-                      <tr key={row.id}>
-                        <td>{new Date(row.record_date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                        <td>{row.block_name}</td>
-                        <td><ScopePill scope={scope} /></td>
-                        <td>{row.quantity.toLocaleString('es-CO')} {row.quantity_unit}</td>
-                        <td>{(row.computed_kgco2e ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </Table>
-            </div>
-          </Card>
-        )}
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card accent={identity.color} className="p-5">
-            <h3 className="mb-2 text-sm font-bold">Indicadores normalizados</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between"><span>kg CO2e por paciente atendido</span><strong>{stats.normalized.perPatient ?? 'Dato no disponible'}</strong></div>
-              <div className="flex items-center justify-between"><span>kg CO2e por cama ocupada</span><strong>{stats.normalized.perBed ?? 'Dato no disponible'}</strong></div>
-              <p className="text-xs text-[var(--muted)]">{stats.normalized.note}</p>
-            </div>
-          </Card>
-
-          {stats.target && (
-            <Card accent={identity.color} className="p-5">
-              <h3 className="mb-2 text-sm font-bold">Meta de reducción {stats.target.targetYear}</h3>
-              <div className="space-y-1 text-sm">
-                <div className="flex items-center justify-between"><span>Línea base ({stats.target.baseYear})</span><strong>{stats.target.baseValue.toLocaleString('es-CO')} kg CO2e</strong></div>
-                <div className="flex items-center justify-between"><span>Meta ({stats.target.targetReductionPercent}% de reducción)</span><strong>{Math.round(stats.target.expectedValue).toLocaleString('es-CO')} kg CO2e</strong></div>
-                <div className="flex items-center justify-between"><span>Actual</span><strong style={{ color: stats.target.onTrack ? '#0ca678' : '#dc2626' }}>{Math.round(stats.target.currentValue).toLocaleString('es-CO')} kg CO2e</strong></div>
-              </div>
-            </Card>
           )}
-        </div>
+        </Card>
       </div>
 
-      {showAnalysis && <QuarterlyAnalysisPanel canManage={Boolean(session?.permissions.includes('carbon.manage'))} onClose={() => setShowAnalysis(false)} />}
-    </div>
+      <Card accent={carbonIdentity.color} className="p-5">
+        <h3 className="hc2-card-title">Lectura automática del periodo</h3>
+        <p className="hc2-narrative">{loading ? 'Calculando…' : data?.narrative}</p>
+      </Card>
+
+      <Card accent={carbonIdentity.color} className="p-5">
+        <h3 className="hc2-card-title">Participación por fuente</h3>
+        <div className="hc2-source-list">
+          {(data?.bySource || []).map(source => {
+            const Icon = SOURCE_ICON[source.source]
+            return (
+              <div key={source.source} className="hc2-source-row">
+                <span className="hc2-source-icon" style={{ background: `${SOURCE_COLOR[source.source]}18`, color: SOURCE_COLOR[source.source] }}><Icon size={16} /></span>
+                <span className="hc2-source-label">{source.label}</span>
+                <div className="hc2-source-track"><div className="hc2-source-fill" style={{ width: `${Math.max(2, source.sharePercent)}%`, background: SOURCE_COLOR[source.source] }} /></div>
+                <span className="hc2-source-value">{source.ton.toFixed(3)} t</span>
+                <span className="hc2-source-pct">{source.sharePercent.toFixed(1)}%</span>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+
+      {!!data?.missingMonths.length && (
+        <Card accent="#D64545" className="p-5 hc2-alert-card">
+          <h3 className="hc2-card-title"><AlertTriangle size={15} /> Meses sin registros</h3>
+          <p className="hc2-narrative">No hay registros validados para: {data.missingMonths.map(month => MONTH_LABELS[month - 1]).join(', ')}. El total del año puede estar subestimado.</p>
+        </Card>
+      )}
+
+      {data?.normalized && (
+        <Card accent={carbonIdentity.color} className="p-5">
+          <h3 className="hc2-card-title">Indicadores de intensidad</h3>
+          <div className="hc2-intensity-grid">
+            <div><span>kgCO2e / paciente</span><strong>{data.normalized.perPatientKg != null ? data.normalized.perPatientKg.toFixed(3) : '—'}</strong></div>
+            <div><span>tCO2e / empleado</span><strong>{data.normalized.perEmployeeTon != null ? data.normalized.perEmployeeTon.toFixed(4) : '—'}</strong></div>
+            <div><span>tCO2e / cama ocupada</span><strong>{data.normalized.perBedTon != null ? data.normalized.perBedTon.toFixed(4) : '—'}</strong></div>
+            <div><span>kgCO2e / m²</span><strong>{data.normalized.perM2Kg != null ? data.normalized.perM2Kg.toFixed(2) : '—'}</strong></div>
+          </div>
+        </Card>
+      )}
+    </CarbonShell>
   )
 }

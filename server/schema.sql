@@ -1575,3 +1575,334 @@ CROSS JOIN (VALUES
   ('Socialización', 23), ('Denuncia', 24), ('Solicitud de permiso', 25), ('Factura', 26)
 ) AS v(nombre, order_index)
 ON CONFLICT (organization_id, nombre) DO NOTHING;
+
+-- ============================================================================
+-- Huella de Carbono v2 — reconstruccion completa a partir de la herramienta de
+-- referencia "Herramienta de monitoreo del impacto climatico para establecimientos
+-- de salud" (Salud sin Dano/GGHH, V3.3). Alcance ESTRICTO: solo 3 fuentes se miden
+-- y sumian al total — Combustion estacionaria, Combustion movil (Alcance 1) y
+-- Energia electrica comprada (Alcance 2). El resto de categorias del Excel de
+-- referencia (fugitivas/refrigerantes, gases anestesicos, vapor comprado, residuos,
+-- Alcance 3 completo) estan marcadas alli como "No estimada" o "No ocurre" y NUNCA
+-- deben aparecer ni calcularse aqui. El modulo viejo (carbon_blocks/
+-- carbon_measurements/carbon_emission_factors mas arriba) se deja intacto sin
+-- migrar: su modelo de una sola cantidad+factor no puede reconstruir el desglose
+-- CO2/CH4/N2O que exige el metodo IPCC Tier 1 usado abajo, migrarlo con perdida de
+-- precision seria peor que dejarlo como dato historico inerte.
+--
+-- Motor de calculo (ver shared/carbonScoring.mjs, que este schema solo alimenta de
+-- datos): Energia[MJ] = cantidad x densidad[kg/unidad] x poder_calorifico[MJ/kg];
+-- gas[kg] = Energia[MJ] x factor[g/MJ] / 1000; CO2e = CO2 + CH4xGWP_CH4 + N2OxGWP_N2O.
+-- Verificado a mano contra el caso de la hoja "Paso 3" del Excel de referencia:
+-- gas natural 5561 m3 -> 10511,275 kgCO2e (exacto a 3 decimales).
+-- ============================================================================
+
+-- Potencial de calentamiento global (IPCC AR4, horizonte 100 anios) — el MISMO
+-- horizonte que usa el Excel de referencia (su hoja "Referencias" #5/#28 lo cita
+-- explicitamente). No se toca por el usuario: cambiar de version de IPCC alteraria
+-- retroactivamente calculos ya firmados en un informe.
+CREATE TABLE IF NOT EXISTS carbon_gwp (
+  gas_key TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  gwp_value NUMERIC NOT NULL,
+  ar_version TEXT NOT NULL,
+  source TEXT NOT NULL
+);
+INSERT INTO carbon_gwp (gas_key, label, gwp_value, ar_version, source) VALUES
+  ('CO2', 'Dioxido de carbono', 1, 'AR4', 'IPCC Cuarto Informe de Evaluacion, Tabla 2.14 (horizonte 100 anios)'),
+  ('CH4', 'Metano', 25, 'AR4', 'IPCC Cuarto Informe de Evaluacion, Tabla 2.14 (horizonte 100 anios)'),
+  ('N2O', 'Oxido nitroso', 298, 'AR4', 'IPCC Cuarto Informe de Evaluacion, Tabla 2.14 (horizonte 100 anios)')
+ON CONFLICT (gas_key) DO NOTHING;
+
+-- Catalogo de combustibles: densidad, poder calorifico y factores de emision
+-- CO2/CH4/N2O separados por tipo de combustion (estacionaria vs movil, distintos
+-- porque el motor de un vehiculo quema distinto que una caldera). Valores
+-- extraidos literalmente de la hoja "Listas" del Excel de referencia. NULL en un
+-- factor movil significa que ese combustible no aplica a combustion movil (ej.
+-- fuel oil, kerosene, carbon, lena no se usan en vehiculos en esta metodologia).
+-- applicable_stationary/applicable_mobile controlan que aparece en cada
+-- desplegable del formulario — replican EXACTAMENTE las listas de las secciones
+-- 1.1 y 1.2 del Excel, no una union de "todo lo que tenga factor".
+CREATE TABLE IF NOT EXISTS carbon_fuel_types (
+  id BIGSERIAL PRIMARY KEY,
+  fuel_key TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  native_unit TEXT NOT NULL,
+  applicable_stationary BOOLEAN NOT NULL DEFAULT FALSE,
+  applicable_mobile BOOLEAN NOT NULL DEFAULT FALSE,
+  is_biofuel BOOLEAN NOT NULL DEFAULT FALSE,
+  density_kg_per_unit NUMERIC,
+  heating_value_mj_per_kg NUMERIC NOT NULL,
+  fe_stationary_co2_g_mj NUMERIC,
+  fe_stationary_ch4_g_mj NUMERIC,
+  fe_stationary_n2o_g_mj NUMERIC,
+  fe_mobile_co2_g_mj NUMERIC,
+  fe_mobile_ch4_g_mj NUMERIC,
+  fe_mobile_n2o_g_mj NUMERIC,
+  factor_source TEXT NOT NULL DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  position INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO carbon_fuel_types (fuel_key, label, native_unit, applicable_stationary, applicable_mobile, is_biofuel, density_kg_per_unit, heating_value_mj_per_kg, fe_stationary_co2_g_mj, fe_stationary_ch4_g_mj, fe_stationary_n2o_g_mj, fe_mobile_co2_g_mj, fe_mobile_ch4_g_mj, fe_mobile_n2o_g_mj, factor_source, position) VALUES
+  ('gas_natural', 'Gas natural', 'm3', TRUE, TRUE, FALSE, 0.7, 48, 56.1, 0.005, 0.0001, 56.1, 0.092, 0.003, 'IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation', 1),
+  ('glp', 'GLP', 'kg', TRUE, FALSE, FALSE, 0.54, 47.3, 63.1, 0.005, 0.0001, 63.1, 0.062, 0.0002, 'IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation', 2),
+  ('gasolina', 'Gasolina/Nafta', 'litro', TRUE, TRUE, FALSE, 0.74, 44.3, 69.3, 0.01, 0.0006, 69.3, 0.033, 0.0032, 'IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation', 3),
+  ('diesel', 'Diesel', 'litro', TRUE, TRUE, FALSE, 0.84, 43, 74.1, 0.01, 0.0006, 74.1, 0.0039, 0.0039, 'IPCC 2006 Guidelines Vol.2 — GHG Protocol Emission Factors Compilation', 4),
+  ('fuel_oil', 'Fuel oil/Bunker', 'litro', TRUE, FALSE, FALSE, 0.94, 40.4, 77.4, 0.01, 0.0006, NULL, NULL, NULL, 'IPCC 2006 Guidelines Vol.2', 5),
+  ('kerosene', 'Kerosene', 'litro', TRUE, FALSE, FALSE, 0.8, 43.8, 71.9, 0.01, 0.0006, NULL, NULL, NULL, 'IPCC 2006 Guidelines Vol.2', 6),
+  ('carbon', 'Carbon', 'kg', TRUE, FALSE, FALSE, NULL, 25.8, 94.6, 0.001, 0.0015, NULL, NULL, NULL, 'IPCC 2006 Guidelines Vol.2', 7),
+  ('lena', 'Lena', 'kg', TRUE, FALSE, TRUE, NULL, 15.6, 0, 0.3, 0.004, NULL, NULL, NULL, 'IPCC 2006 Guidelines Vol.2 — CO2 biogenico se contabiliza como neutral (cero)', 8),
+  ('biodiesel', 'Biodiesel', 'litro', TRUE, TRUE, TRUE, 0.88, 27, 0, 0.01, 0.0006, 0, 0.0039, 0.0039, 'IPCC 2006 Guidelines Vol.2 — CO2 biogenico se contabiliza como neutral (cero)', 9),
+  ('bioetanol', 'Biogasolina/Bioetanol', 'litro', FALSE, TRUE, TRUE, 0.792, 27, 0, 0.01, 0.0006, 0, 0.033, 0.0032, 'IPCC 2006 Guidelines Vol.2 — CO2 biogenico se contabiliza como neutral (cero)', 10)
+ON CONFLICT (fuel_key) DO NOTHING;
+
+-- Factor de emision de la red electrica, versionado por region — el factor del SIN
+-- colombiano cambia cada tanto (UPME lo recalcula), por eso vigencia con
+-- valid_from/valid_to en vez de un valor fijo. 0.130 kgCO2e/kWh reproduce el caso
+-- de prueba del Excel de referencia (1.063.999,71 kWh -> 138.319,962 kgCO2e).
+CREATE TABLE IF NOT EXISTS carbon_electricity_factors (
+  id BIGSERIAL PRIMARY KEY,
+  region TEXT NOT NULL DEFAULT 'CO',
+  label TEXT NOT NULL,
+  value_kgco2e_per_kwh NUMERIC NOT NULL,
+  valid_from DATE NOT NULL,
+  valid_to DATE,
+  source TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS carbon_electricity_factors_region_idx ON carbon_electricity_factors(region, valid_from);
+INSERT INTO carbon_electricity_factors (region, label, value_kgco2e_per_kwh, valid_from, source)
+SELECT 'CO', 'Colombia — Sistema Interconectado Nacional (SIN)', 0.130, '2018-01-01',
+  'UPME/XM — Documento de calculo del FE del SIN 2018 (rev. dic. 2019)'
+WHERE NOT EXISTS (SELECT 1 FROM carbon_electricity_factors WHERE region = 'CO');
+
+-- Corte obligatorio de biocombustibles, versionado por region — la herramienta
+-- divide automaticamente la cantidad de combustible fosil ingresada segun este
+-- porcentaje (no se pide al usuario que calcule la mezcla a mano).
+CREATE TABLE IF NOT EXISTS carbon_biofuel_blends (
+  id BIGSERIAL PRIMARY KEY,
+  region TEXT NOT NULL DEFAULT 'CO',
+  biodiesel_percent NUMERIC NOT NULL,
+  bioethanol_percent NUMERIC NOT NULL,
+  valid_from DATE NOT NULL,
+  valid_to DATE,
+  source TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS carbon_biofuel_blends_region_idx ON carbon_biofuel_blends(region, valid_from);
+INSERT INTO carbon_biofuel_blends (region, biodiesel_percent, bioethanol_percent, valid_from, source)
+SELECT 'CO', 10, 10, '2018-01-01', 'IICA — Los biocombustibles liquidos en las Americas (2020)'
+WHERE NOT EXISTS (SELECT 1 FROM carbon_biofuel_blends WHERE region = 'CO');
+
+-- Perfil institucional / configuracion del inventario, versionado por vigencia
+-- (un mismo establecimiento puede reportar años distintos con datos distintos:
+-- empleados, camas, superficie cambian). Los datos climaticos/financieros viven
+-- aqui y NUNCA se mezclan visualmente en los formularios de registro — solo se
+-- usan donde la formula realmente los necesita (indicadores de intensidad).
+CREATE TABLE IF NOT EXISTS carbon_profiles (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  vigencia_year INTEGER NOT NULL,
+  establishment_name TEXT NOT NULL DEFAULT '',
+  department TEXT NOT NULL DEFAULT '',
+  city TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  start_year INTEGER,
+  establishment_type TEXT NOT NULL DEFAULT '',
+  organizational_boundary TEXT NOT NULL DEFAULT '',
+  temp_min_c NUMERIC,
+  temp_max_c NUMERIC,
+  humidity_winter_percent NUMERIC,
+  humidity_summer_percent NUMERIC,
+  fulltime_employees INTEGER,
+  patients_per_year INTEGER,
+  avg_occupied_beds INTEGER,
+  built_area_m2 NUMERIC,
+  hours_per_day NUMERIC,
+  currency TEXT NOT NULL DEFAULT 'COP',
+  usd_exchange_rate NUMERIC,
+  updated_by_id BIGINT REFERENCES users(id),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, vigencia_year)
+);
+-- Perfil por defecto 2025, con los valores institucionales reales entregados por
+-- la entidad (editables desde Configuracion despues) — asi el modulo no arranca
+-- con el indicador de intensidad vacio.
+INSERT INTO carbon_profiles (organization_id, vigencia_year, establishment_name, department, city, address, start_year, establishment_type, organizational_boundary, temp_min_c, temp_max_c, humidity_winter_percent, humidity_summer_percent, fulltime_employees, patients_per_year, avg_occupied_beds, built_area_m2, hours_per_day, currency, usd_exchange_rate)
+SELECT o.id, 2025, 'Hospital Central de Yopal', 'Casanare', 'Yopal', 'Carrera 14a 33-76', 2006, 'Hospital de baja complejidad', 'La estimacion se realiza para la Sede de HCY', 22, 32, 85, 60, 250, 600000, 600, 200, 24, 'COP', 3200
+FROM organizations o
+WHERE NOT EXISTS (SELECT 1 FROM carbon_profiles cp WHERE cp.organization_id = o.id AND cp.vigencia_year = 2025);
+
+-- Catalogos ligeros por entidad, para reutilizar equipo/vehiculo/medidor entre
+-- registros (el registro tambien puede escribir un nombre libre si no esta aun
+-- en el catalogo — el catalogo es una ayuda de captura, no una restriccion dura).
+CREATE TABLE IF NOT EXISTS carbon_equipment (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  area TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL,
+  internal_code TEXT NOT NULL DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS carbon_vehicles (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  plate TEXT NOT NULL,
+  vehicle_type TEXT NOT NULL DEFAULT '',
+  ownership TEXT NOT NULL DEFAULT 'PROPIO' CHECK (ownership IN ('PROPIO', 'CONTROL_OPERACIONAL')),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, plate)
+);
+CREATE TABLE IF NOT EXISTS carbon_electricity_meters (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, code)
+);
+
+-- Registros de actividad por fuente. Tres tablas (no una polimorfica) porque los
+-- campos difieren demasiado (mezcla de biocombustibles solo en movil, medidor y
+-- facturacion solo en electricidad) — forzarlos a una sola tabla generica
+-- terminaria en columnas NULL por todas partes, el mismo problema que tenia el
+-- modelo viejo de carbon_measurements y que esta reconstruccion buscaba resolver.
+-- previous_snapshot: al editar un registro VALIDADO, ahi queda la fila completa
+-- de ANTES del cambio y el estado vuelve a PENDIENTE — nunca se pisa en silencio
+-- un dato que ya habia sido revisado.
+CREATE TABLE IF NOT EXISTS carbon_stationary_records (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  record_date DATE NOT NULL,
+  period_year INTEGER NOT NULL, period_month INTEGER NOT NULL, period_quarter INTEGER NOT NULL, period_semester INTEGER NOT NULL,
+  area TEXT NOT NULL DEFAULT '',
+  equipment_id BIGINT REFERENCES carbon_equipment(id) ON DELETE SET NULL,
+  equipment_label TEXT NOT NULL DEFAULT '',
+  internal_code TEXT NOT NULL DEFAULT '',
+  fuel_key TEXT NOT NULL REFERENCES carbon_fuel_types(fuel_key),
+  quantity NUMERIC NOT NULL CHECK (quantity >= 0),
+  quantity_unit TEXT NOT NULL,
+  invoice_number TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '',
+  invoice_value NUMERIC,
+  responsible_name TEXT NOT NULL DEFAULT '',
+  information_source TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (status IN ('BORRADOR', 'PENDIENTE', 'VALIDADO', 'RECHAZADO', 'PERIODO_CERRADO')),
+  rejection_reason TEXT NOT NULL DEFAULT '',
+  energy_mj NUMERIC NOT NULL DEFAULT 0,
+  co2_kg NUMERIC NOT NULL DEFAULT 0, ch4_kg NUMERIC NOT NULL DEFAULT 0, n2o_kg NUMERIC NOT NULL DEFAULT 0, co2e_kg NUMERIC NOT NULL DEFAULT 0,
+  factor_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  previous_snapshot JSONB,
+  created_by_id BIGINT NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by_id BIGINT REFERENCES users(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS carbon_stationary_org_period_idx ON carbon_stationary_records(organization_id, period_year, period_month) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS carbon_mobile_records (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  record_date DATE NOT NULL,
+  period_year INTEGER NOT NULL, period_month INTEGER NOT NULL, period_quarter INTEGER NOT NULL, period_semester INTEGER NOT NULL,
+  vehicle_id BIGINT REFERENCES carbon_vehicles(id) ON DELETE SET NULL,
+  plate TEXT NOT NULL DEFAULT '',
+  vehicle_type TEXT NOT NULL DEFAULT '',
+  ownership TEXT NOT NULL DEFAULT 'PROPIO' CHECK (ownership IN ('PROPIO', 'CONTROL_OPERACIONAL')),
+  fuel_key TEXT NOT NULL REFERENCES carbon_fuel_types(fuel_key),
+  input_method TEXT NOT NULL CHECK (input_method IN ('CANTIDAD', 'RENDIMIENTO')),
+  quantity NUMERIC CHECK (quantity IS NULL OR quantity >= 0),
+  quantity_unit TEXT,
+  km_traveled NUMERIC,
+  specific_consumption NUMERIC,
+  biodiesel_blend_percent NUMERIC,
+  bioethanol_blend_percent NUMERIC,
+  invoice_number TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '',
+  responsible_name TEXT NOT NULL DEFAULT '',
+  information_source TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (status IN ('BORRADOR', 'PENDIENTE', 'VALIDADO', 'RECHAZADO', 'PERIODO_CERRADO')),
+  rejection_reason TEXT NOT NULL DEFAULT '',
+  fossil_quantity_l NUMERIC NOT NULL DEFAULT 0,
+  biogenic_quantity_l NUMERIC NOT NULL DEFAULT 0,
+  energy_mj NUMERIC NOT NULL DEFAULT 0,
+  co2_kg NUMERIC NOT NULL DEFAULT 0, ch4_kg NUMERIC NOT NULL DEFAULT 0, n2o_kg NUMERIC NOT NULL DEFAULT 0, co2e_kg NUMERIC NOT NULL DEFAULT 0,
+  factor_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  previous_snapshot JSONB,
+  created_by_id BIGINT NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by_id BIGINT REFERENCES users(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS carbon_mobile_org_period_idx ON carbon_mobile_records(organization_id, period_year, period_month) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS carbon_electricity_records (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  meter_id BIGINT REFERENCES carbon_electricity_meters(id) ON DELETE SET NULL,
+  meter_code TEXT NOT NULL DEFAULT '',
+  billing_start DATE NOT NULL,
+  billing_end DATE NOT NULL,
+  period_year INTEGER NOT NULL, period_month INTEGER NOT NULL, period_quarter INTEGER NOT NULL, period_semester INTEGER NOT NULL,
+  invoice_number TEXT NOT NULL DEFAULT '',
+  provider TEXT NOT NULL DEFAULT '',
+  account_number TEXT NOT NULL DEFAULT '',
+  kwh NUMERIC NOT NULL CHECK (kwh >= 0),
+  invoice_value NUMERIC,
+  responsible_name TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (status IN ('BORRADOR', 'PENDIENTE', 'VALIDADO', 'RECHAZADO', 'PERIODO_CERRADO')),
+  rejection_reason TEXT NOT NULL DEFAULT '',
+  co2e_kg NUMERIC NOT NULL DEFAULT 0,
+  factor_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  previous_snapshot JSONB,
+  created_by_id BIGINT NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by_id BIGINT REFERENCES users(id), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS carbon_electricity_org_period_idx ON carbon_electricity_records(organization_id, period_year, period_month) WHERE deleted_at IS NULL;
+
+-- Evidencia de los 3 tipos de registro en una sola tabla (record_type + record_id):
+-- a diferencia de los registros mismos, la evidencia SI es identica en estructura
+-- para las 3 fuentes (archivo + metadatos), no hay campos que dividir.
+CREATE TABLE IF NOT EXISTS carbon_activity_evidence (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  record_type TEXT NOT NULL CHECK (record_type IN ('STATIONARY', 'MOBILE', 'ELECTRICITY')),
+  record_id BIGINT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL,
+  uploaded_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS carbon_activity_evidence_idx ON carbon_activity_evidence(record_type, record_id);
+
+-- Snapshot del indicador institucional, guardado cuando se genera un informe (asi
+-- el informe siempre puede mostrar el mismo numero que se firmo, aunque despues
+-- se agreguen o corrijan registros de ese periodo). El indicador EN VIVO (para el
+-- dashboard/vista Indicador) se calcula al vuelo desde los registros validados —
+-- nunca se captura a mano, por eso no hay columna alguna para escribirlo.
+CREATE TABLE IF NOT EXISTS carbon_indicator_snapshots (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  periodicity TEXT NOT NULL CHECK (periodicity IN ('MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL')),
+  period_key TEXT NOT NULL,
+  numerator_kgco2e NUMERIC NOT NULL,
+  result_value NUMERIC NOT NULL,
+  unit TEXT NOT NULL DEFAULT 'tCO2e',
+  target_value NUMERIC,
+  baseline_value NUMERIC,
+  variation_percent NUMERIC,
+  compliance_status TEXT,
+  is_provisional BOOLEAN NOT NULL DEFAULT FALSE,
+  analysis_text TEXT NOT NULL DEFAULT '',
+  generated_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, periodicity, period_key)
+);
