@@ -20,8 +20,26 @@ import { SaveStatusIndicator, type SaveState } from '@/design-system'
 import { buildScoreMap, scoresToPayload } from '../design/scoreMap'
 import { useLiveCompliance, type ScoreMap } from '../design/useLiveCompliance'
 import { colorForPercent, conceptFromPercent, CONCEPT_LABELS, type Concept } from '../design/scopeColors'
+import { useCountUp } from '../design/useCountUp'
 
 const identity = moduleIdentity('adherence-matrix')
+
+/**
+ * Casilla de la Semaforización. Antes era una `<div>` con el numero y la etiqueta apiladas en
+ * 65 px de ancho: "No cumple" y "No aplica" (las mas largas) no cabian en una linea y el bloque
+ * quedaba mas alto de lo que el contenedor le daba, asomando por el borde inferior. Se resuelve
+ * con `min-height` propio (el texto puede envolver sin que nada se corte) y un numero que cuenta
+ * hacia arriba, para que el panel se sienta vivo al recalificar en vez de saltar de golpe.
+ */
+function SemTile({ tone, value, label }: { tone: 'ok' | 'pa' | 'no' | 'na'; value: number; label: string }) {
+  const animated = useCountUp(value, 380)
+  return (
+    <div className={`hcop-sem is-${tone}`}>
+      <div className="n">{Math.round(animated)}</div>
+      <div className="l">{label}</div>
+    </div>
+  )
+}
 
 const professionalStatusOptions = [
   ['ACTIVE_INDEFINITE', 'Activo - indefinido'],
@@ -676,10 +694,15 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         </Card>
 
         <aside className="hcop-rpanel">
-            <Card accent={identity.color} className="p-4">
+            {/* Vidrio DINAMICO: el tinte de cada tarjeta sale de su propio dato (el color del
+                anillo, el semaforo, la identidad del modulo, si hay hallazgos o no), no de un
+                degradado decorativo fijo — es lo que hace que el panel lea "en vivo". El color
+                necesita algo detras para notarse (CLAUDE.md §13): por eso va horneado en el
+                fondo de la propia tarjeta via --hcop-tint, no en una capa aparte. */}
+            <Card accent={identity.color} className="p-4 hcop-glass" style={{ ['--hcop-tint' as string]: colorForPercent(live.overall) }}>
               <div className="hcop-rh"><b>Cumplimiento general</b></div>
               <div className="hcop-cmp">
-                <ComplianceRing percent={live.overall} size={86} strokeWidth={7} />
+                <ComplianceRing percent={live.overall} size={92} strokeWidth={8} />
                 <div className="hcop-cmpstat">
                   <div><span>Objetivo</span><b>90%</b></div>
                   <div><span>Celdas</span><b>{live.graded}/{live.totalCells}</b></div>
@@ -691,17 +714,17 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
               </div>
             </Card>
 
-            <Card accent={identity.color} className="p-4">
+            <Card accent={identity.color} className="p-4 hcop-glass" style={{ ['--hcop-tint' as string]: identity.color }}>
               <div className="hcop-rh"><b>Semaforización</b></div>
               <div className="hcop-semrow">
-                <div className="hcop-sem is-ok"><div className="n">{live.counts.two}</div><div className="l">Cumple</div></div>
-                <div className="hcop-sem is-pa"><div className="n">{live.counts.one}</div><div className="l">Parcial</div></div>
-                <div className="hcop-sem is-no"><div className="n">{live.counts.zero}</div><div className="l">No cumple</div></div>
-                <div className="hcop-sem is-na"><div className="n">{live.counts.na}</div><div className="l">No aplica</div></div>
+                <SemTile tone="ok" value={live.counts.two} label="Cumple" />
+                <SemTile tone="pa" value={live.counts.one} label="Parcial" />
+                <SemTile tone="no" value={live.counts.zero} label="No cumple" />
+                <SemTile tone="na" value={live.counts.na} label="No aplica" />
               </div>
             </Card>
 
-            <Card accent={identity.color} className="p-4">
+            <Card accent={identity.color} className="p-4 hcop-glass" style={{ ['--hcop-tint' as string]: identity.color }}>
               <div className="hcop-rh"><b>Adherencia por sección</b></div>
               {detail.scopes.map(scope => {
                 const percent = live.byScope.get(scope.id) ?? null
@@ -715,10 +738,14 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
               })}
             </Card>
 
-            <Card accent={identity.color} className="p-4">
+            <Card
+              accent={identity.color}
+              className="p-4 hcop-glass"
+              style={{ ['--hcop-tint' as string]: criticalFindings.length ? '#DC2626' : '#059669' }}
+            >
               <div className="hcop-rh">
                 <b>Hallazgos críticos</b>
-                <span className="hcop-tag">{criticalFindings.length}</span>
+                <span className="hcop-tag" data-empty={criticalFindings.length === 0}>{criticalFindings.length}</span>
               </div>
               {criticalFindings.length ? criticalFindings.slice(0, 6).map((finding, index) => (
                 <div className="hcop-hall" key={`${finding.recordNumber}-${index}`}>
@@ -730,7 +757,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
 
             {/* Ocupa la fila entera: con cinco tarjetas en rejilla automatica esta quedaba sola
                 al final dejando un hueco, y su lista de barras se lee mejor ancha que en 230 px. */}
-            <Card accent={identity.color} className="p-4 hcop-rspan">
+            <Card accent={identity.color} className="p-4 hcop-rspan hcop-glass" style={{ ['--hcop-tint' as string]: identity.color }}>
               <div className="hcop-rh">
                 <b>Cumplimiento por criterio</b>
                 {criteriaByCompliance.length > 0 && <span className="hcop-rh-count">{criteriaByCompliance.length} con dato</span>}

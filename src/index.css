@@ -7470,3 +7470,77 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hc-matrix.is-full .hcm-cellpct[data-band="aceptable"] { color: #BEF264; }
 .hc-matrix.is-full .hcm-cellpct[data-band="deficiente"]{ color: #FCD34D; }
 .hc-matrix.is-full .hcm-cellpct[data-band="malo"]      { color: #FCA5A5; }
+
+/* ============================================================================
+   PANEL LATERAL DE ANALISIS — vidrio dinamico + KPIs mas visibles.
+
+   --hcop-tint llega distinto por tarjeta (el color del anillo, la identidad del
+   modulo, rojo/verde segun haya hallazgos): el vidrio necesita color detras para
+   notarse (CLAUDE.md §13), y aqui va horneado en el propio fondo de la tarjeta
+   en vez de depender de una malla de pagina que este panel no tiene.
+   ============================================================================ */
+.hcop-glass {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 14%, transparent), transparent 60%),
+    var(--color-surface-card);
+  border-color: color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 22%, var(--border-hairline));
+  backdrop-filter: blur(6px);
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms cubic-bezier(.2,.8,.2,1), border-color 180ms;
+}
+.hcop-glass:hover { transform: translateY(-2px); box-shadow: 0 14px 32px color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 16%, rgba(16,24,40,.08)); }
+.hcop-glass::before { background: linear-gradient(90deg, var(--hcop-tint, var(--ds-accent)), color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 40%, transparent)); }
+
+/* --- Anillo general: mas aire, cifras alineadas --- */
+.hcop-cmp { display: flex; align-items: center; gap: 16px; }
+.hcop-cmpstat { flex: 1; display: grid; gap: 8px; font-size: 11.5px; min-width: 0; }
+.hcop-cmpstat > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hcop-cmpstat span { color: var(--muted); }
+.hcop-cmpstat b { font-weight: 800; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+
+/* --- Semaforizacion: el arreglo real del desbordamiento.
+   Antes: 65px de ancho, sin min-height, con "No cumple"/"No aplica" partiendose en dos lineas
+   que asomaban por debajo del recuadro de color. Ahora cada casilla fija su propio alto minimo
+   (crece con el texto en vez de recortarlo) y el numero sube de 17 a 26px: es EL dato que hay
+   que leer de lejos, y antes competia en tamano con la etiqueta. */
+.hcop-semrow { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+.hcop-sem {
+  display: grid; align-content: center; justify-items: center; gap: 3px;
+  min-height: 64px; border-radius: 12px; padding: 10px 8px;
+  border: 1px solid transparent;
+}
+.hcop-sem .n { font-size: 26px; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; }
+.hcop-sem .l {
+  font-size: 9.5px; font-weight: 700; color: var(--muted); text-align: center;
+  line-height: 1.25; max-width: 100%;
+}
+.hcop-sem.is-ok { background: color-mix(in srgb, #059669 13%, transparent); border-color: color-mix(in srgb, #059669 20%, transparent); } .hcop-sem.is-ok .n { color: #059669; }
+.hcop-sem.is-pa { background: color-mix(in srgb, #D97706 15%, transparent); border-color: color-mix(in srgb, #D97706 22%, transparent); } .hcop-sem.is-pa .n { color: #D97706; }
+.hcop-sem.is-no { background: color-mix(in srgb, #DC2626 13%, transparent); border-color: color-mix(in srgb, #DC2626 20%, transparent); } .hcop-sem.is-no .n { color: #DC2626; }
+.hcop-sem.is-na { background: color-mix(in srgb, #94A3B8 18%, transparent); border-color: color-mix(in srgb, #94A3B8 26%, transparent); } .hcop-sem.is-na .n { color: #64748B; }
+
+/* Hallazgos criticos: el badge tambien celebra el "0" en vez de quedarse en rojo tenue. */
+.hcop-tag[data-empty="true"] { background: color-mix(in srgb, #059669 14%, transparent); color: #059669; }
+
+/* --- Tema oscuro: superficies propias del panel, ver CLAUDE.md §10 (un modulo con superficie
+   propia necesita su propio override o queda papel claro sobre fondo oscuro). --- */
+:root[data-theme="dark"] { --compliance-ring-track: rgba(148, 163, 200, .22); }
+:root[data-theme="dark"] .hcop-glass {
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 22%, transparent), transparent 62%),
+    rgba(16, 22, 44, .82);
+  border-color: color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 34%, rgba(139,92,246,.18));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+:root[data-theme="dark"] .hcop-glass:hover { box-shadow: 0 16px 36px color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 30%, rgba(2,6,18,.5)); }
+:root[data-theme="dark"] .hcop-cmpstat span { color: #94A3C4; }
+:root[data-theme="dark"] .hcop-sem.is-ok { background: color-mix(in srgb, #10B981 22%, transparent); border-color: color-mix(in srgb, #10B981 34%, transparent); } :root[data-theme="dark"] .hcop-sem.is-ok .n { color: #6EE7B7; }
+:root[data-theme="dark"] .hcop-sem.is-pa { background: color-mix(in srgb, #F59E0B 22%, transparent); border-color: color-mix(in srgb, #F59E0B 34%, transparent); } :root[data-theme="dark"] .hcop-sem.is-pa .n { color: #FCD34D; }
+:root[data-theme="dark"] .hcop-sem.is-no { background: color-mix(in srgb, #EF4444 24%, transparent); border-color: color-mix(in srgb, #EF4444 36%, transparent); } :root[data-theme="dark"] .hcop-sem.is-no .n { color: #FCA5A5; }
+:root[data-theme="dark"] .hcop-sem.is-na { background: color-mix(in srgb, #94A3B8 20%, transparent); border-color: color-mix(in srgb, #94A3B8 30%, transparent); } :root[data-theme="dark"] .hcop-sem.is-na .n { color: #CBD5E1; }
+:root[data-theme="dark"] .hcop-sem .l { color: #A9B6D4; }
+:root[data-theme="dark"] .hcop-tag[data-empty="true"] { background: color-mix(in srgb, #10B981 24%, transparent); color: #6EE7B7; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hcop-glass { transition: none; }
+}
