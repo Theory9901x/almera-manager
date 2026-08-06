@@ -2093,6 +2093,25 @@ CREATE TABLE IF NOT EXISTS env_indicator_snapshots (
 -- frente a la mediana de los otros meses del lote), para no duplicar logica
 -- de deteccion en SQL: los valores ya vienen resueltos a mano porque el lote
 -- de siembra es fijo y conocido. ----
+-- Correccion: el primer despliegue sembro esto como año 2025 (lo que decia literalmente el
+-- pedido original) pero el usuario aclaro despues que la serie es del año en curso, 2026. Estos
+-- UPDATE llevan cualquier fila ya sembrada como 2025 a 2026 (identificadas por su marca de
+-- "siembra de demostracion", nunca tocan un registro real) ANTES del INSERT de mas abajo — asi
+-- una base ya desplegada queda corregida en vez de terminar con 2025 y 2026 duplicados, y una
+-- base nueva simplemente no encuentra nada que actualizar y sigue directo al INSERT.
+UPDATE env_baselines SET base_year = 2026, valid_from = '2026-01-01', observations = replace(observations, '2025', '2026')
+WHERE observations LIKE '%siembra de demostracion%' AND base_year = 2025;
+
+UPDATE env_targets SET target_year = 2026, valid_from = '2026-01-01'
+WHERE responsible_name = 'Gestion Ambiental' AND target_year = 2025;
+
+UPDATE env_consumption_records SET
+  year = 2026,
+  quarter = ((month - 1) / 3) + 1,
+  semester = CASE WHEN month <= 6 THEN 1 ELSE 2 END,
+  reading_end = (DATE '2026-01-01' + (month || ' months - 1 day')::interval)::date
+WHERE (information_source LIKE '%siembra de demostracion%') AND year = 2025;
+
 DO $$
 DECLARE
   org RECORD;
@@ -2103,32 +2122,32 @@ BEGIN
     SELECT id INTO v_facility_id FROM env_facilities WHERE organization_id = org.id AND code = 'HCY';
     SELECT u.id INTO admin_id FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.organization_id = org.id ORDER BY u.id LIMIT 1;
     IF v_facility_id IS NOT NULL AND admin_id IS NOT NULL THEN
-      -- Linea base institucional anual 2025 (promedio de los meses NO atipicos del propio lote de
+      -- Linea base institucional anual 2026 (promedio de los meses NO atipicos del propio lote de
       -- siembra) — punto de partida editable desde Lineas base y metas.
       INSERT INTO env_baselines (organization_id, facility_id, indicator_type, source_type, base_year, intensity_base, unit, valid_from, observations, responsible_name, created_by_id)
-      SELECT org.id, v_facility_id, 'ENERGY', 'LINEA_BASE_ANUAL', 2025, 1188.1, 'kWh/1000 atenciones', '2025-01-01',
-        'Linea base inicial estimada a partir del promedio de enero-mayo 2025 (siembra de demostracion).', 'Gestion Ambiental', admin_id
+      SELECT org.id, v_facility_id, 'ENERGY', 'LINEA_BASE_ANUAL', 2026, 1188.1, 'kWh/1000 atenciones', '2026-01-01',
+        'Linea base inicial estimada a partir del promedio de enero-mayo 2026 (siembra de demostracion).', 'Gestion Ambiental', admin_id
       WHERE NOT EXISTS (SELECT 1 FROM env_baselines WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY');
 
       INSERT INTO env_baselines (organization_id, facility_id, indicator_type, source_type, base_year, intensity_base, unit, valid_from, observations, responsible_name, created_by_id)
-      SELECT org.id, v_facility_id, 'WATER', 'LINEA_BASE_ANUAL', 2025, 1.98, 'm3/1000 atenciones', '2025-01-01',
-        'Linea base inicial estimada a partir de los meses sin dato atipico (ene/mar/abr 2025, siembra de demostracion).', 'Gestion Ambiental', admin_id
+      SELECT org.id, v_facility_id, 'WATER', 'LINEA_BASE_ANUAL', 2026, 1.98, 'm3/1000 atenciones', '2026-01-01',
+        'Linea base inicial estimada a partir de los meses sin dato atipico (ene/mar/abr 2026, siembra de demostracion).', 'Gestion Ambiental', admin_id
       WHERE NOT EXISTS (SELECT 1 FROM env_baselines WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER');
 
       INSERT INTO env_targets (organization_id, facility_id, indicator_type, target_year, target_proportional_percent, tolerance_percent, valid_from, responsible_name, created_by_id)
-      SELECT org.id, v_facility_id, 'ENERGY', 2025, 100, 5, '2025-01-01', 'Gestion Ambiental', admin_id
+      SELECT org.id, v_facility_id, 'ENERGY', 2026, 100, 5, '2026-01-01', 'Gestion Ambiental', admin_id
       WHERE NOT EXISTS (SELECT 1 FROM env_targets WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY');
 
       INSERT INTO env_targets (organization_id, facility_id, indicator_type, target_year, target_proportional_percent, tolerance_percent, valid_from, responsible_name, created_by_id)
-      SELECT org.id, v_facility_id, 'WATER', 2025, 100, 5, '2025-01-01', 'Gestion Ambiental', admin_id
+      SELECT org.id, v_facility_id, 'WATER', 2026, 100, 5, '2026-01-01', 'Gestion Ambiental', admin_id
       WHERE NOT EXISTS (SELECT 1 FROM env_targets WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER');
 
       -- Consumos de energia (ninguno atipico en este lote). intensity/expected/proportional/saving
       -- ya resueltos a mano con la linea base 1188,1 kWh/1000 atenciones de arriba — la misma
       -- formula que aplica shared/environmentalScoring.mjs para cualquier registro nuevo.
       INSERT INTO env_consumption_records (organization_id, facility_id, indicator_type, year, month, quarter, semester, reading_end, consumption_value, consumption_unit, attention_count, status, information_source, notes, intensity_value, baseline_intensity, baseline_source, expected_consumption, proportional_index, normalized_saving, created_by_id)
-      SELECT org.id, v_facility_id, 'ENERGY', 2025, m.month, ((m.month - 1) / 3) + 1, CASE WHEN m.month <= 6 THEN 1 ELSE 2 END,
-        (DATE '2025-01-01' + (m.month || ' months - 1 day')::interval)::date, m.consumption, 'kWh', m.attentions, 'VALIDADO', 'Factura de energia (siembra de demostracion)', '',
+      SELECT org.id, v_facility_id, 'ENERGY', 2026, m.month, ((m.month - 1) / 3) + 1, CASE WHEN m.month <= 6 THEN 1 ELSE 2 END,
+        (DATE '2026-01-01' + (m.month || ' months - 1 day')::interval)::date, m.consumption, 'kWh', m.attentions, 'VALIDADO', 'Factura de energia (siembra de demostracion)', '',
         m.intensity, 1188.1, 'LINEA_BASE_ANUAL', m.expected, m.proportional, m.saving, admin_id
       FROM (VALUES
         (1, 72793.34, 76481, 951.783, 90867.076, 80.110, 19.890),
@@ -2137,13 +2156,13 @@ BEGIN
         (4, 88954.19, 72401, 1228.632, 86019.628, 103.412, -3.412),
         (5, 86254.90, 60111, 1434.927, 71417.879, 120.775, -20.775)
       ) AS m(month, consumption, attentions, intensity, expected, proportional, saving)
-      WHERE NOT EXISTS (SELECT 1 FROM env_consumption_records WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY' AND year = 2025 AND month = m.month);
+      WHERE NOT EXISTS (SELECT 1 FROM env_consumption_records WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'ENERGY' AND year = 2026 AND month = m.month);
 
       -- Consumos de agua (febrero y mayo marcados atipicos: desviacion >50% frente a la mediana de
       -- los otros 4 meses del lote, misma regla que aplica el motor en caliente para datos nuevos)
       INSERT INTO env_consumption_records (organization_id, facility_id, indicator_type, year, month, quarter, semester, reading_end, consumption_value, consumption_unit, attention_count, status, is_outlier, outlier_reason, information_source, notes, intensity_value, baseline_intensity, baseline_source, expected_consumption, proportional_index, normalized_saving, created_by_id)
-      SELECT org.id, v_facility_id, 'WATER', 2025, m.month, ((m.month - 1) / 3) + 1, CASE WHEN m.month <= 6 THEN 1 ELSE 2 END,
-        (DATE '2025-01-01' + (m.month || ' months - 1 day')::interval)::date, m.consumption, 'm3', m.attentions, 'VALIDADO', m.outlier,
+      SELECT org.id, v_facility_id, 'WATER', 2026, m.month, ((m.month - 1) / 3) + 1, CASE WHEN m.month <= 6 THEN 1 ELSE 2 END,
+        (DATE '2026-01-01' + (m.month || ' months - 1 day')::interval)::date, m.consumption, 'm3', m.attentions, 'VALIDADO', m.outlier,
         CASE WHEN m.outlier THEN 'Dato atipico pendiente de validacion: se desvia mas del 50% frente a la mediana de los demas meses del periodo' ELSE '' END,
         'Factura de acueducto (siembra de demostracion)', '',
         m.intensity, 1.98, 'LINEA_BASE_ANUAL', m.expected, m.proportional, m.saving, admin_id
@@ -2154,7 +2173,7 @@ BEGIN
         (4, 131, 72401, FALSE, 1.809, 143.354, 91.382, 8.618),
         (5, 1014, 60111, TRUE, 16.869, 119.020, 851.959, -751.959)
       ) AS m(month, consumption, attentions, outlier, intensity, expected, proportional, saving)
-      WHERE NOT EXISTS (SELECT 1 FROM env_consumption_records WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER' AND year = 2025 AND month = m.month);
+      WHERE NOT EXISTS (SELECT 1 FROM env_consumption_records WHERE organization_id = org.id AND facility_id = v_facility_id AND indicator_type = 'WATER' AND year = 2026 AND month = m.month);
     END IF;
   END LOOP;
 END $$;
