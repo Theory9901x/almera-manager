@@ -7480,7 +7480,11 @@ h1, h2, h3, strong, th { text-wrap: balance; }
    en vez de depender de una malla de pagina que este panel no tiene.
    ============================================================================ */
 .hcop-glass {
-  position: relative; overflow: hidden;
+  /* SIN overflow:hidden: el degradado ya respeta el border-radius por si solo (es un
+     `background`, no un elemento que se salga de la caja), y con overflow:hidden puesto
+     cualquier contenido que no cupiera en una tarjeta angosta se recortaba en SILENCIO en vez
+     de apretarse o envolver — eso fue justo lo que se comio "Aceptable" y parte de "Celdas". */
+  position: relative;
   background:
     radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 14%, transparent), transparent 60%),
     var(--color-surface-card);
@@ -7491,12 +7495,16 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .hcop-glass:hover { transform: translateY(-2px); box-shadow: 0 14px 32px color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 16%, rgba(16,24,40,.08)); }
 .hcop-glass::before { background: linear-gradient(90deg, var(--hcop-tint, var(--ds-accent)), color-mix(in srgb, var(--hcop-tint, var(--ds-accent)) 40%, transparent)); }
 
-/* --- Anillo general: mas aire, cifras alineadas --- */
-.hcop-cmp { display: flex; align-items: center; gap: 16px; }
-.hcop-cmpstat { flex: 1; display: grid; gap: 8px; font-size: 11.5px; min-width: 0; }
-.hcop-cmpstat > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.hcop-cmpstat span { color: var(--muted); }
-.hcop-cmpstat b { font-weight: 800; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+/* --- Anillo general. Iba en fila (anillo + columna "Objetivo/Celdas/Estado" al lado): con
+   230px de tarjeta y un anillo de 92px, a la columna le quedaban ~90px para "Estado" + la
+   pastilla "Aceptable" en la MISMA linea, y eso desborda si o si. Pasa a apilado — el anillo
+   centrado arriba, las tres cifras abajo en su propia columna cada una — que no depende de
+   cuanto ancho sobre al lado del anillo. */
+.hcop-cmp { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.hcop-cmpstat { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 11.5px; }
+.hcop-cmpstat > div { display: grid; justify-items: center; gap: 4px; min-width: 0; }
+.hcop-cmpstat span { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.hcop-cmpstat b { font-weight: 800; font-variant-numeric: tabular-nums; font-size: 13px; }
 
 /* --- Semaforizacion: el arreglo real del desbordamiento.
    Antes: 65px de ancho, sin min-height, con "No cumple"/"No aplica" partiendose en dos lineas
