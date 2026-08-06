@@ -3,9 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Download, ExternalLink, Layers,
   ListChecks, Lock, Maximize2, Minimize2, Paperclip, PenLine, Plus, Save, Search, Send,
-  Settings2, Sparkles, Unlock, X,
+  Settings2, Sparkles, Trash2, Unlock, X,
 } from 'lucide-react'
-import { Badge, Button, Card, DatePicker, Field, Select, SignaturePad, Table, moduleIdentity } from '@/design-system'
+import { Badge, Button, Card, ConfirmDialog, DatePicker, Field, Select, SignaturePad, Table, moduleIdentity } from '@/design-system'
+import { useAuth } from '@/platform/auth/AuthContext'
 import { adherenceService } from '../services/adherenceService'
 import type { Area, Commitment, CommitmentStatus, EvaluationDetail, EvaluationSummary, ImprovementPlan, Professional, Score } from '../types'
 import { ConceptBadge } from '../design/ConceptBadge'
@@ -56,12 +57,18 @@ function newClosureForm() {
 }
 
 export default function EvaluationsPanel({ areas, professionals }: { areas: Area[]; professionals: Professional[] }) {
+  const { session } = useAuth()
+  const isSuperadmin = session?.role.key === 'SUPERADMIN'
   const [evaluations, setEvaluations] = useState<EvaluationSummary[]>([])
   const [filterAreaId, setFilterAreaId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState(newEvaluationForm)
+  // Borrado directo (superadmin): id de la evaluacion pendiente de confirmar, o null si el
+  // dialogo esta cerrado. Separado de `busy` general para que solo ESE dialogo muestre "Eliminando…".
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<EvaluationDetail | null>(null)
@@ -160,6 +167,22 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
     ...(filterMonth ? { monthReported: filterMonth } : {}),
   }).then(setEvaluations).catch(caught => fail(caught, 'No fue posible cargar las evaluaciones'))
   useEffect(() => { void loadEvaluations() }, [filterAreaId, filterProfessionalId, filterMonth])
+
+  const confirmDeleteEvaluation = async () => {
+    if (!deletingId) return
+    setDeleteBusy(true)
+    try {
+      await adherenceService.deleteEvaluation(deletingId)
+      setDeletingId(null)
+      // Si la que se borro era la que estaba abierta en el detalle, hay que salir de ahi: seguir
+      // mostrando una evaluacion que ya no existe en la base dejaria «Guardar»/«Cerrar» rotos.
+      if (selectedId === deletingId) { setSelectedId(null); setDetail(null) }
+      await loadEvaluations()
+      setNotice('Evaluación eliminada de la base de datos')
+      window.setTimeout(() => setNotice(''), 3500)
+    } catch (caught) { fail(caught, 'No fue posible eliminar la evaluación') }
+    finally { setDeleteBusy(false) }
+  }
 
   // Enlace directo desde el directorio de Planes de mejora: /app/adherencia/operacion?evaluacion=12
   // abre esa evaluacion. El parametro se limpia despues, para que recargar no reabra siempre lo
@@ -987,7 +1010,7 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
         </div>
         <div className="evaluations-table">
           <Table>
-            <thead><tr><th>Profesional</th><th>Área</th><th>Mes</th><th>HC</th><th>Cumplimiento</th><th>Concepto</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Profesional</th><th>Área</th><th>Mes</th><th>HC</th><th>Cumplimiento</th><th>Concepto</th><th>Estado</th><th></th>{isSuperadmin && <th></th>}</tr></thead>
             <tbody>
               {evaluations.map(evaluation => (
                 <tr key={evaluation.id}>
@@ -999,13 +1022,34 @@ export default function EvaluationsPanel({ areas, professionals }: { areas: Area
                   <td><ConceptBadge concept={evaluation.concept as Concept | null} size="sm" /></td>
                   <td><Badge tone={evaluation.status === 'CLOSED' ? 'info' : 'neutral'}>{evaluation.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}</Badge></td>
                   <td><button className="row-action" style={{ ['--row-accent' as string]: identity.color }} onClick={() => void openEvaluation(evaluation.id)}>Abrir</button></td>
+                  {/* Borrado directo de la base, exclusivo de superadmin — el servidor lo vuelve a
+                      exigir, esto solo evita mostrarle el boton a quien no puede usarlo. */}
+                  {isSuperadmin && (
+                    <td>
+                      <button className="row-action is-danger" onClick={() => setDeletingId(evaluation.id)} title="Eliminar de la base de datos">
+                        <Trash2 size={13} /> Eliminar
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {!evaluations.length && <tr><td colSpan={8}><div className="almera-empty"><ClipboardList size={30} /><p>Aún no hay evaluaciones registradas.</p></div></td></tr>}
+              {!evaluations.length && <tr><td colSpan={isSuperadmin ? 9 : 8}><div className="almera-empty"><ClipboardList size={30} /><p>Aún no hay evaluaciones registradas.</p></div></td></tr>}
             </tbody>
           </Table>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={deletingId !== null}
+        tone="danger"
+        title="¿Eliminar esta evaluación?"
+        confirmLabel={deleteBusy ? 'Eliminando…' : 'Eliminar de la base de datos'}
+        cancelLabel="Cancelar"
+        busy={deleteBusy}
+        onCancel={() => setDeletingId(null)}
+        onConfirm={() => void confirmDeleteEvaluation()}
+        description={<p>Se borra la fila y todo lo que dependa de ella (historias clínicas, calificaciones, plan de mejora, firmas, evidencias) <strong>directamente de la base de datos</strong>. No es una anulación con motivo: no queda registro del contenido, solo de que se eliminó. Esta acción no se puede deshacer.</p>}
+      />
     </div>
   )
 }

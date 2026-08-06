@@ -448,6 +448,52 @@ adherenceRouter.get('/evaluations', view, async (request, response, next) => {
   } catch (error) { next(error) }
 })
 
+// Borrado exclusivo de superadmin: mismo criterio ya aplicado a mediciones de huella de carbono
+// y respuestas de encuestas (ver carbon.mjs). Es un DELETE real, no la anulacion con motivo que
+// usan Radicados o Listas de Chequeo — para una evaluacion duplicada o de prueba no hay nada que
+// trazar "anulado, con su motivo": simplemente no debio existir. Por eso pide confirmacion en el
+// cliente y deja registro de que ALGUIEN la borro (activity_logs), aunque el registro ya no este.
+function requireSuperadmin(request, response, next) {
+  if (request.auth?.role?.key !== 'SUPERADMIN') return response.status(403).json({ error: 'Solo un superadministrador puede eliminar evaluaciones' })
+  next()
+}
+
+adherenceRouter.delete('/evaluations/:id', view, requireSuperadmin, async (request, response, next) => {
+  const client = await pool.connect()
+  try {
+    if (!/^\d+$/.test(String(request.params.id))) fail(404, 'Evaluación no encontrada')
+    await client.query('BEGIN')
+    const evaluation = await client.query(
+      'SELECT id FROM adherence_evaluations WHERE id = $1 AND organization_id = $2 FOR UPDATE',
+      [request.params.id, oid(request)],
+    )
+    if (!evaluation.rows[0]) fail(404, 'Evaluación no encontrada')
+    // Los archivos de evidencia viven en disco, no en la fila: hay que borrarlos aparte o el
+    // DELETE en cascada de la base deja huerfanos en uploads/adherence para siempre.
+    const evidence = await client.query(
+      `SELECT storage_key FROM adherence_plan_evidence WHERE evaluation_id = $1
+       UNION ALL
+       SELECT fe.storage_key FROM adherence_plan_followup_evidence fe
+       JOIN adherence_plan_followups f ON f.id = fe.followup_id
+       JOIN adherence_improvement_plans ip ON ip.id = f.plan_id
+       WHERE ip.evaluation_id = $1`,
+      [request.params.id],
+    )
+    await client.query('DELETE FROM adherence_evaluations WHERE id = $1', [request.params.id])
+    await client.query(
+      `INSERT INTO activity_logs (organization_id, entity_type, entity_id, action, changes, actor_user_id)
+       VALUES ($1, 'ADHERENCE_EVALUATION', $2, 'DELETED', '{}'::jsonb, $3)`,
+      [oid(request), request.params.id, uid(request)],
+    )
+    await client.query('COMMIT')
+    await Promise.all(evidence.rows.map(row => unlink(resolve(uploadRoot, row.storage_key)).catch(() => {})))
+    response.json({ ok: true })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    next(error)
+  } finally { client.release() }
+})
+
 adherenceRouter.post('/evaluations', evaluate, async (request, response, next) => {
   try {
     const body = request.body || {}

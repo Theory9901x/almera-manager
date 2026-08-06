@@ -31,6 +31,9 @@ export const adherenceService = {
   evaluations: (filters: { professionalId?: string; areaId?: string; monthReported?: string } = {}) => call<EvaluationSummary[]>(`/evaluations${toQueryString(filters)}`),
   createEvaluation: (data: Record<string, unknown>) => call<Evaluation>('/evaluations', { method: 'POST', body: JSON.stringify(data) }),
   evaluationDetail: (id: string) => call<EvaluationDetail>(`/evaluations/${id}`),
+  // Exclusivo de superadmin (el servidor lo vuelve a exigir): borrado real de la fila, no una
+  // anulacion con motivo — para una evaluacion duplicada o de prueba no hay nada que trazar.
+  deleteEvaluation: (id: string) => call(`/evaluations/${id}`, { method: 'DELETE' }),
   addRecord: (evaluationId: string, data: Record<string, unknown>) => call<EvaluationRecord>(`/evaluations/${evaluationId}/records`, { method: 'POST', body: JSON.stringify(data) }),
   updateRecord: (evaluationId: string, recordId: string, data: Record<string, unknown>) => call<EvaluationRecord>(`/evaluations/${evaluationId}/records/${recordId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   removeRecord: (evaluationId: string, recordId: string) => call(`/evaluations/${evaluationId}/records/${recordId}`, { method: 'DELETE' }),
