@@ -7740,3 +7740,23 @@ h1, h2, h3, strong, th { text-wrap: balance; }
   .hc2-kpi, .hc2-source-card, .hc2-source-fill { transition: none; }
   .hc2-skel-line, .hc2-skel-block { animation: none; }
 }
+
+/* -- Resultados globales por categoria (replica jerarquica del Excel de referencia) -- */
+.hc2-results-wrap { overflow-x: auto; }
+.hc2-results-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.hc2-results-table th { text-align: left; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--hc2-muted); padding: 6px 12px; border-bottom: 1.5px solid rgba(11,24,48,.1); }
+.hc2-results-table td { padding: 6px 12px; border-bottom: 1px solid rgba(11,24,48,.06); color: var(--hc2-ink); }
+.hc2-results-code { display: inline-block; min-width: 30px; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--hc2-muted); margin-right: 6px; }
+.hc2-results-row-total td { font-weight: 800; font-size: 13.5px; background: color-mix(in srgb, var(--hc2-green) 10%, transparent); }
+.hc2-results-row-scope td { font-weight: 800; background: color-mix(in srgb, var(--hc2-ink) 4%, transparent); }
+.hc2-results-row-measured td:first-child { font-weight: 600; }
+.hc2-results-row-measured td:nth-child(2) { font-weight: 700; color: var(--hc2-green-dark); }
+.hc2-results-row-bucket td { color: var(--hc2-muted); font-style: italic; }
+.hc2-results-row-excluded td { color: var(--hc2-muted); }
+.hc2-results-note { font-size: 11px; font-style: italic; color: var(--hc2-muted); }
+.hc2-results-toggle-row td { padding: 8px 12px; border-bottom: none; }
+.hc2-results-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 4px 0; font-size: 12px; font-weight: 700; color: var(--hc2-green-dark); cursor: pointer; }
+.hc2-results-toggle:hover { text-decoration: underline; }
+
+:root[data-theme="dark"] .hc2-results-table th { border-color: rgba(255,255,255,.12); }
+:root[data-theme="dark"] .hc2-results-table td { border-color: rgba(255,255,255,.07); }

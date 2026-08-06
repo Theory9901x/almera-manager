@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, Building2, Car, FileBarChart2, Flame, Plus, Re
 import { Button, Card, DonutChart, EmptyState, LineChart, Select, ToastProvider, useToast } from '@/design-system'
 import { CarbonShell, carbonIdentity } from '../components/CarbonShell'
 import { KpiCard, type KpiStatus } from '../components/KpiCard'
+import { ResultsBreakdownTable } from '../components/ResultsBreakdownTable'
 import { carbonService } from '../services/carbonService'
 import type { DashboardData } from '../types'
 
@@ -108,6 +109,20 @@ function CarbonDashboardContent() {
             )
           })}
         </div>
+      </Card>
+
+      <Card accent={carbonIdentity.color} className="p-5">
+        <h3 className="hc2-card-title">Resultados globales por categoría</h3>
+        {loading || !data ? <div className="hc2-skel-block" /> : (
+          <ResultsBreakdownTable
+            totalTon={data.total.ton}
+            values={{
+              stationaryTon: data.bySource.find(source => source.source === 'STATIONARY')?.ton || 0,
+              mobileTon: data.bySource.find(source => source.source === 'MOBILE')?.ton || 0,
+              electricityTon: data.bySource.find(source => source.source === 'ELECTRICITY')?.ton || 0,
+            }}
+          />
+        )}
       </Card>
 
       {!!data?.missingMonths.length && (
