@@ -26,9 +26,10 @@ function sanitizeConfigForPublic(config = {}) {
 
 async function loadPublicSurvey(slug) {
   const surveyResult = await query(
-    `SELECT id, code, title, description, cover_image, audience, status, theme_color, thank_you_message,
-            allow_multiple_responses, require_login, show_score_to_respondent, opens_at, closes_at
-     FROM surveys WHERE slug = $1`,
+    `SELECT s.id, s.code, s.title, s.description, s.cover_image, s.audience, s.status, s.theme_color, s.thank_you_message,
+            s.allow_multiple_responses, s.require_login, s.show_score_to_respondent, s.opens_at, s.closes_at,
+            o.name AS organization_name
+     FROM surveys s JOIN organizations o ON o.id = s.organization_id WHERE s.slug = $1`,
     [slug],
   )
   const survey = surveyResult.rows[0]

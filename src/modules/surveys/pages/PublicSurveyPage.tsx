@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Lock, Send } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Lock, Send, ShieldCheck } from 'lucide-react'
 import { ToastProvider, fadeSlideUp, semaphoreColor, useToast } from '@/design-system'
 import { publicSurveyService, PublicSurveyError } from '../services/publicSurveyService'
 import { PresentationEmbed } from '../components/PresentationEmbed'
@@ -90,6 +90,11 @@ function PublicSurveyContent() {
   const [submitting, setSubmitting] = useState(false)
   const [thankYou, setThankYou] = useState('')
   const [score, setScore] = useState<SurveyScoring | null>(null)
+  // Autorizacion de tratamiento de datos (Ley 1581 de 2012) — SIEMPRE se pide, en TODA encuesta,
+  // antes de la primera pregunta: no es una opcion de configuracion que un constructor pueda
+  // desactivar. Se guarda en el propio estado del formulario (no hay "recordar" entre visitas: la
+  // autorizacion es por cada diligenciamiento, no por dispositivo).
+  const [consentGiven, setConsentGiven] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -283,7 +288,13 @@ function PublicSurveyContent() {
         </header>
 
         <AnimatePresence mode="wait">
-          {phase === 'form' && currentPage && (
+          {phase === 'form' && !consentGiven && (
+            <motion.div key="consent" variants={fadeSlideUp} initial="hidden" animate="visible" exit={{ opacity: 0, y: -8 }}>
+              <ConsentGate organizationName={survey.organization_name} color={themeColor} onAccept={() => setConsentGiven(true)} />
+            </motion.div>
+          )}
+
+          {phase === 'form' && consentGiven && currentPage && (
             <motion.div key={currentPage.id} variants={fadeSlideUp} initial="hidden" animate="visible" exit={{ opacity: 0, y: -8 }}>
               <StepCard page={currentPage} answers={answers} fieldErrors={fieldErrors} color={themeColor} onAnswer={setAnswer} />
               <nav className="survey-public-nav">
@@ -334,6 +345,40 @@ function PublicSurveyContent() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  )
+}
+
+// Autorizacion de tratamiento de datos personales — corta, pero con lo que exige una autorizacion
+// valida bajo la Ley 1581 de 2012 (Ley Estatutaria de Proteccion de Datos Personales) y su decreto
+// reglamentario 1377 de 2013: finalidad concreta, caracter voluntario, confidencialidad y como
+// ejercer los derechos de conocer/actualizar/rectificar/revocar (art. 8). Aparece SIEMPRE, en toda
+// encuesta, antes de la primera pregunta — no es un texto de relleno al pie que nadie lee.
+function ConsentGate({ organizationName, color, onAccept }: { organizationName: string; color: string; onAccept(): void }) {
+  const [checked, setChecked] = useState(false)
+  return (
+    <div className="survey-consent-card">
+      <span className="survey-consent-icon" style={{ background: `${color}18`, color }}><ShieldCheck size={22} /></span>
+      <h2>Política de tratamiento de datos personales</h2>
+      <p>
+        De acuerdo con la Ley 1581 de 2012 y el Decreto 1377 de 2013, <strong>{organizationName}</strong> tratará
+        los datos que registres en esta encuesta únicamente para los fines aquí indicados (medición y mejora de
+        la calidad del servicio). Tu participación es voluntaria y tus respuestas se manejarán de forma
+        confidencial. Puedes conocer, actualizar, rectificar o solicitar la eliminación de tus datos, o revocar
+        esta autorización en cualquier momento, contactando a la entidad. Al continuar, autorizas el tratamiento
+        de tus datos personales conforme a esta política.
+      </p>
+      <label className="survey-consent-check">
+        <input type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} />
+        <span>He leído y acepto la Política de Tratamiento de Datos Personales</span>
+      </label>
+      <button
+        type="button" className="survey-nav-button is-primary" disabled={!checked}
+        style={{ backgroundImage: `linear-gradient(135deg, ${color}, ${color}cc)` }}
+        onClick={onAccept}
+      >
+        Continuar <ArrowRight size={16} />
+      </button>
     </div>
   )
 }

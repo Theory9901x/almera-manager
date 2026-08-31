@@ -223,6 +223,7 @@ export interface PublicSurvey {
   code: string
   title: string
   description: string
+  organization_name: string
   cover_image: string | null
   audience: SurveyAudience
   status: SurveyStatus
