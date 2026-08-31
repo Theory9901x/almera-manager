@@ -4,6 +4,10 @@ import type {
 
 export interface StatsFilters {
   month?: string
+  // Trimestre calendario (1-4) + año — alternativa a `month`, ver buildResponseFilters en el
+  // servidor: seleccionar trimestre limpia el mes elegido, son dos modos del mismo filtro.
+  quarter?: string
+  year?: string
   dateFrom?: string
   dateTo?: string
   respondentMembershipId?: string
@@ -13,6 +17,8 @@ export interface StatsFilters {
 }
 
 export interface ResponseFilters {
+  quarter?: string
+  year?: string
   dateFrom?: string
   dateTo?: string
   search?: string
@@ -90,7 +96,7 @@ export const surveysService = {
   stats: (surveyId: string, filters: StatsFilters = {}) => call<SurveyStats>(`/${surveyId}/stats${toQueryString(filters)}`),
   respondents: (surveyId: string) => call<Respondent[]>(`/${surveyId}/respondents`),
   liveCount: (surveyId: string) => call<{ totalResponses: number; completedResponses: number }>(`/${surveyId}/live-count`),
-  exportCsv: async (surveyId: string, code: string, filters: { month?: string } = {}) => {
+  exportCsv: async (surveyId: string, code: string, filters: { month?: string; quarter?: string; year?: string } = {}) => {
     const response = await fetch(`/api/surveys/${surveyId}/export.csv${toQueryString(filters)}`, { credentials: 'same-origin' })
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
     const blob = await response.blob()
@@ -101,7 +107,7 @@ export const surveysService = {
     anchor.click()
     URL.revokeObjectURL(url)
   },
-  exportPdf: async (surveyId: string, code: string, filters: { dateFrom?: string; dateTo?: string } = {}) => {
+  exportPdf: async (surveyId: string, code: string, filters: { dateFrom?: string; dateTo?: string; quarter?: string; year?: string } = {}) => {
     const response = await fetch(`/api/surveys/${surveyId}/report.pdf${toQueryString(filters)}`, { credentials: 'same-origin' })
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
     const blob = await response.blob()

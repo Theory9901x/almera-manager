@@ -726,8 +726,26 @@ surveysRouter.put('/:id/pages/:pageId/questions/reorder', surveysModule, edit, a
 
 // ---- Respuestas y analítica ----
 
+// Trimestre calendario fijo (T1 ene-mar ... T4 oct-dic), igual particion que el resto de modulos
+// del sistema (Huella de Carbono, Indicadores Ambientales) — nunca un "trimestre movil".
+function monthsInQuarter(year, quarter) {
+  const startMonth = (quarter - 1) * 3 + 1
+  return [startMonth, startMonth + 1, startMonth + 2].map(month => `${year}-${String(month).padStart(2, '0')}`)
+}
+
+function previousQuarter(year, quarter) {
+  return quarter === 1 ? { year: year - 1, quarter: 4 } : { year, quarter: quarter - 1 }
+}
+
 function buildResponseFilters(request, params, where) {
-  if (request.query.month) { params.push(request.query.month); where.push(`r.month_reported = $${params.length}`) }
+  // El trimestre gana sobre "mes": son modos alternativos del mismo filtro de periodo, elegir
+  // trimestre en el frontend limpia el mes seleccionado (ver SurveyResultsPage/SurveyResponsesPage).
+  if (request.query.quarter && request.query.year) {
+    params.push(monthsInQuarter(Number(request.query.year), Number(request.query.quarter)))
+    where.push(`r.month_reported = ANY($${params.length}::text[])`)
+  } else if (request.query.month) {
+    params.push(request.query.month); where.push(`r.month_reported = $${params.length}`)
+  }
   if (request.query.dateFrom) { params.push(request.query.dateFrom); where.push(`COALESCE(r.submitted_at, r.started_at) >= $${params.length}::date`) }
   if (request.query.dateTo) { params.push(request.query.dateTo); where.push(`COALESCE(r.submitted_at, r.started_at) < ($${params.length}::date + interval '1 day')`) }
   if (request.query.respondentMembershipId) { params.push(Number(request.query.respondentMembershipId)); where.push(`r.respondent_membership_id = $${params.length}`) }
@@ -915,10 +933,13 @@ surveysRouter.get('/:id/live-count', surveysModule, view, async (request, respon
   } catch (error) { next(error) }
 })
 
-async function countCompleted(surveyId, month) {
+// Acepta un solo mes ('2026-03') o una lista de meses (un trimestre ya expandido) — un trimestre
+// es solo "varios meses a la vez" para efectos de este conteo, no una unidad de tiempo distinta.
+async function countCompleted(surveyId, monthOrMonths) {
+  const months = Array.isArray(monthOrMonths) ? monthOrMonths : [monthOrMonths]
   const result = await query(
-    `SELECT COUNT(*)::int AS completed FROM survey_responses WHERE survey_id = $1 AND month_reported = $2 AND completed = TRUE`,
-    [surveyId, month],
+    `SELECT COUNT(*)::int AS completed FROM survey_responses WHERE survey_id = $1 AND month_reported = ANY($2::text[]) AND completed = TRUE`,
+    [surveyId, months],
   )
   return result.rows[0].completed
 }
@@ -1046,9 +1067,21 @@ async function buildStatsPayload(survey, request) {
 
   const completionRate = totalsResult.rows[0].total ? Math.round((totalsResult.rows[0].completed / totalsResult.rows[0].total) * 100) : 0
 
-  // Comparacion entre periodos: solo tiene sentido cuando se esta mirando un mes puntual.
+  // Comparacion entre periodos: solo tiene sentido cuando se esta mirando un periodo puntual —
+  // trimestre contra trimestre anterior, o si no hay trimestre elegido, mes contra mes anterior.
   let comparison = null
-  if (request.query.month) {
+  if (request.query.quarter && request.query.year) {
+    const year = Number(request.query.year)
+    const quarter = Number(request.query.quarter)
+    const previous = previousQuarter(year, quarter)
+    const previousCompleted = await countCompleted(survey.id, monthsInQuarter(previous.year, previous.quarter))
+    const currentCompleted = totalsResult.rows[0].completed
+    comparison = {
+      previousMonth: `T${previous.quarter} ${previous.year}`,
+      previousCompletedResponses: previousCompleted,
+      deltaPercent: previousCompleted ? Math.round(((currentCompleted - previousCompleted) / previousCompleted) * 100) : null,
+    }
+  } else if (request.query.month) {
     const previous = previousMonth(String(request.query.month))
     const previousCompleted = await countCompleted(survey.id, previous)
     const currentCompleted = totalsResult.rows[0].completed
@@ -1058,6 +1091,17 @@ async function buildStatsPayload(survey, request) {
       deltaPercent: previousCompleted ? Math.round(((currentCompleted - previousCompleted) / previousCompleted) * 100) : null,
     }
   }
+
+  // Trimestres con al menos una respuesta, derivados de los meses reales — para que el selector de
+  // "Trimestre" del frontend solo ofrezca combinaciones año+trimestre que de verdad tienen datos.
+  const quarterSet = new Map()
+  for (const row of monthsResult.rows) {
+    const [yearText, monthText] = row.month_reported.split('-')
+    const year = Number(yearText)
+    const quarter = Math.floor((Number(monthText) - 1) / 3) + 1
+    quarterSet.set(`${year}-Q${quarter}`, { year, quarter })
+  }
+  const quarters = [...quarterSet.values()].sort((a, b) => b.year - a.year || b.quarter - a.quarter)
 
   return {
     survey: { id: survey.id, title: survey.title, status: survey.status },
@@ -1072,6 +1116,7 @@ async function buildStatsPayload(survey, request) {
     avgCompletionSeconds: durationResult.rows[0].avg_seconds,
     demographics: buildDemographics(questions, itemsByResponse),
     months: monthsResult.rows.map(row => row.month_reported),
+    quarters,
     comparison,
     questions: questionStats,
     scoring: hasScoredQuestions(pages) ? buildScoringAggregate(pages, itemsByResponse) : null,

@@ -13,6 +13,10 @@ const PAGE_SIZE = 25
 // excluyen los de texto largo o los de estructura compleja (matching, ranking, escalas), que no
 // sirven como criterio de segmentacion.
 const SEGMENT_CANDIDATE_TYPES = new Set(['SHORT_TEXT', 'SINGLE_CHOICE', 'DROPDOWN', 'YES_NO'])
+// Trimestre calendario fijo (T1 ene-mar ... T4 oct-dic) — mismo criterio que SurveyResultsPage.
+const QUARTER_OPTIONS = [{ value: '1', label: 'T1 · Ene-Mar' }, { value: '2', label: 'T2 · Abr-Jun' }, { value: '3', label: 'T3 · Jul-Sep' }, { value: '4', label: 'T4 · Oct-Dic' }]
+const CURRENT_YEAR = new Date().getUTCFullYear()
+const YEAR_OPTIONS = Array.from({ length: 5 }, (_unused, index) => String(CURRENT_YEAR - 3 + index)).map(value => ({ value, label: value }))
 
 export default function SurveyResponsesPage() {
   return <ToastProvider><SurveyResponsesContent /></ToastProvider>
@@ -32,6 +36,10 @@ function SurveyResponsesContent() {
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  // Trimestre: elegir año o trimestre limpia dateFrom/dateTo, son modos alternativos del mismo
+  // filtro de periodo — combinarlos daria una interseccion confusa (¿trimestre Y ademas ese rango?).
+  const [quarterYear, setQuarterYear] = useState('')
+  const [quarter, setQuarter] = useState('')
   const [segmentQuestionId, setSegmentQuestionId] = useState('')
   const [segmentValue, setSegmentValue] = useState('')
   const [loading, setLoading] = useState(true)
@@ -47,7 +55,8 @@ function SurveyResponsesContent() {
       const [detail, result] = await Promise.all([
         surveyRef ? Promise.resolve(surveyRef) : surveysService.detail(surveyId),
         surveysService.responses(surveyId, {
-          dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, search: search || undefined,
+          dateFrom: quarter ? undefined : (dateFrom || undefined), dateTo: quarter ? undefined : (dateTo || undefined), search: search || undefined,
+          quarter: quarter || undefined, year: quarter ? (quarterYear || undefined) : undefined,
           segmentQuestionId: segmentQuestionId || undefined, segmentValue: segmentValue || undefined,
           limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE),
         }),
@@ -60,13 +69,21 @@ function SurveyResponsesContent() {
     finally { setLoading(false) }
   }
 
+  function selectQuarter(value: string) {
+    setQuarter(value)
+    if (value) { setDateFrom(''); setDateTo(''); setQuarterYear(current => current || String(CURRENT_YEAR)) }
+    setPage(0)
+  }
+  function selectQuarterYear(value: string) { setQuarterYear(value); setPage(0) }
+  function selectDate(setter: (value: string) => void) { return (value: string) => { setter(value); if (value) { setQuarter(''); setQuarterYear('') } setPage(0) } }
+
   // Un solo efecto debounced para todos los filtros: evita disparar una consulta por cada tecla
   // escrita en el buscador, sin necesidad de logica separada para el resto de los filtros.
   useEffect(() => {
     const timeout = window.setTimeout(() => { void load(survey) }, 300)
     return () => window.clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surveyId, page, dateFrom, dateTo, search, segmentQuestionId, segmentValue])
+  }, [surveyId, page, dateFrom, dateTo, quarter, quarterYear, search, segmentQuestionId, segmentValue])
 
   const questions = useMemo(() => survey?.pages.flatMap(page => page.questions) || [], [survey])
   const segmentCandidates = useMemo(() => questions.filter(question => SEGMENT_CANDIDATE_TYPES.has(question.type)), [questions])
@@ -119,8 +136,10 @@ function SurveyResponsesContent() {
 
       <Card accent={identity.color} className="flex flex-wrap items-end gap-3 p-4">
         <Field label="Buscar por nombre"><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre del encuestado" /></Field>
-        <Field label="Desde"><DatePicker value={dateFrom} onChange={value => { setDateFrom(value); setPage(0) }} /></Field>
-        <Field label="Hasta"><DatePicker value={dateTo} onChange={value => { setDateTo(value); setPage(0) }} /></Field>
+        <Field label="Trimestre"><Select value={quarter} onChange={selectQuarter} placeholder="Todos" options={[{ value: '', label: 'Todos' }, ...QUARTER_OPTIONS]} /></Field>
+        {quarter && <Field label="Año"><Select value={quarterYear} onChange={selectQuarterYear} options={YEAR_OPTIONS} /></Field>}
+        <Field label="Desde"><DatePicker value={dateFrom} onChange={selectDate(setDateFrom)} /></Field>
+        <Field label="Hasta"><DatePicker value={dateTo} onChange={selectDate(setDateTo)} /></Field>
         {segmentCandidates.length > 0 && (
           <>
             <Field label="Filtrar por campo">
@@ -149,8 +168,8 @@ function SurveyResponsesContent() {
             )}
           </>
         )}
-        {(dateFrom || dateTo || search || segmentQuestionId) && (
-          <Button variant="ghost" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setSegmentQuestionId(''); setSegmentValue(''); setPage(0) }}><X size={14} /> Limpiar</Button>
+        {(dateFrom || dateTo || quarter || search || segmentQuestionId) && (
+          <Button variant="ghost" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setQuarter(''); setQuarterYear(''); setSegmentQuestionId(''); setSegmentValue(''); setPage(0) }}><X size={14} /> Limpiar</Button>
         )}
       </Card>
 

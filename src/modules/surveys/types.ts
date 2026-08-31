@@ -179,6 +179,10 @@ export interface SurveyStats {
   avgCompletionSeconds: number | null
   demographics: DemographicCross[]
   months: string[]
+  // Trimestres con al menos una respuesta (calendario fijo T1 ene-mar ... T4 oct-dic), derivados
+  // de `months` en el servidor — para poblar el selector de "Trimestre" sin ofrecer combinaciones
+  // año+trimestre vacías.
+  quarters: { year: number; quarter: number }[]
   comparison: StatsComparison | null
   questions: QuestionStat[]
   // null cuando la encuesta no tiene ninguna pregunta con clave de calificacion configurada (ej.

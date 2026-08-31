@@ -11,6 +11,11 @@ import type { QuestionStat, Respondent, SurveyDetail, SurveyOption, SurveyQuesti
 
 const identity = moduleIdentity('surveys')
 const SEGMENT_TYPES = new Set(['SINGLE_CHOICE', 'DROPDOWN', 'YES_NO', 'IMAGE_CHOICE'])
+// Trimestre calendario fijo, igual particion que Huella de Carbono/Indicadores Ambientales — nunca
+// un "trimestre movil" contado desde una fecha arbitraria.
+const QUARTER_MONTH_LABELS = ['Ene-Mar', 'Abr-Jun', 'Jul-Sep', 'Oct-Dic']
+function quarterKeyOf(year: number, quarter: number) { return `${year}-Q${quarter}` }
+function quarterLabel(year: number, quarter: number) { return `T${quarter} ${year} (${QUARTER_MONTH_LABELS[quarter - 1]})` }
 
 function CountUpValue({ value, suffix = '' }: { value: number; suffix?: string }) {
   const animated = useCountUp(value)
@@ -38,6 +43,9 @@ function SurveyResultsContent() {
   const [respondents, setRespondents] = useState<Respondent[]>([])
   const [liveTotals, setLiveTotals] = useState<{ totalResponses: number; completedResponses: number } | null>(null)
   const [month, setMonth] = useState('')
+  // "AAAA-Qn" (ej. "2026-Q1") — modo alternativo al mes puntual, nunca combinado con `month` (ver
+  // selectMonth/selectQuarter mas abajo, que se limpian mutuamente al elegir uno).
+  const [quarterKey, setQuarterKey] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [respondentId, setRespondentId] = useState('')
@@ -50,6 +58,10 @@ function SurveyResultsContent() {
   const segmentCandidates = useMemo(() => questions.filter(question => SEGMENT_TYPES.has(question.type) && segmentOptions(question).length > 0), [questions])
   const segmentQuestion = questions.find(question => question.id === segmentQuestionId)
 
+  const [quarterYear, quarterNumber] = quarterKey ? quarterKey.split('-Q') : [undefined, undefined]
+  function selectMonth(value: string) { setMonth(value); setQuarterKey('') }
+  function selectQuarter(value: string) { setQuarterKey(value); setMonth('') }
+
   async function load() {
     if (!surveyId) return
     setLoading(true)
@@ -57,7 +69,8 @@ function SurveyResultsContent() {
       const [detail, statsResult, respondentsResult] = await Promise.all([
         survey ? Promise.resolve(survey) : surveysService.detail(surveyId),
         surveysService.stats(surveyId, {
-          month: month || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, respondentMembershipId: respondentId || undefined,
+          month: quarterKey ? undefined : (month || undefined), quarter: quarterNumber, year: quarterYear,
+          dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, respondentMembershipId: respondentId || undefined,
           segmentQuestionId: segmentQuestionId || undefined, segmentValue: segmentValue || undefined,
         }),
         respondents.length ? Promise.resolve(respondents) : surveysService.respondents(surveyId),
@@ -69,12 +82,12 @@ function SurveyResultsContent() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { void load() }, [surveyId, month, dateFrom, dateTo, respondentId, segmentQuestionId, segmentValue])
+  useEffect(() => { void load() }, [surveyId, month, quarterKey, dateFrom, dateTo, respondentId, segmentQuestionId, segmentValue])
 
   async function handleExportPdf() {
     if (!survey) return
     setExportingPdf(true)
-    try { await surveysService.exportPdf(survey.id, survey.code, { dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }) }
+    try { await surveysService.exportPdf(survey.id, survey.code, { dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, quarter: quarterNumber, year: quarterYear }) }
     catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar el informe') }
     finally { setExportingPdf(false) }
   }
@@ -111,7 +124,7 @@ function SurveyResultsContent() {
             <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/constructor`)}><Pencil size={15} /> Constructor</Button>
             <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/respuestas`)}><ListChecks size={15} /> Respuestas</Button>
             <Button variant="secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileText size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
-            <Button identity={identity} onClick={() => surveysService.exportCsv(survey.id, survey.code, { month: month || undefined })}><Download size={15} /> Exportar CSV</Button>
+            <Button identity={identity} onClick={() => surveysService.exportCsv(survey.id, survey.code, { month: quarterKey ? undefined : (month || undefined), quarter: quarterNumber, year: quarterYear })}><Download size={15} /> Exportar CSV</Button>
           </div>
         }
       />
@@ -124,7 +137,17 @@ function SurveyResultsContent() {
 
       <Card accent={identity.color} className="flex flex-wrap items-end gap-3 p-4">
         {stats.months.length > 0 && (
-          <Field label="Mes"><Select value={month} onChange={setMonth} placeholder="Todos los meses" options={[{ value: '', label: 'Todos los meses' }, ...stats.months.map(item => ({ value: item, label: item }))]} /></Field>
+          <Field label="Mes"><Select value={month} onChange={selectMonth} placeholder="Todos los meses" options={[{ value: '', label: 'Todos los meses' }, ...stats.months.map(item => ({ value: item, label: item }))]} /></Field>
+        )}
+        {stats.quarters.length > 0 && (
+          <Field label="Trimestre" hint="Ene-Mar, Abr-Jun, Jul-Sep, Oct-Dic">
+            <Select
+              value={quarterKey}
+              onChange={selectQuarter}
+              placeholder="Todos los trimestres"
+              options={[{ value: '', label: 'Todos los trimestres' }, ...stats.quarters.map(item => ({ value: quarterKeyOf(item.year, item.quarter), label: quarterLabel(item.year, item.quarter) }))]}
+            />
+          </Field>
         )}
         <Field label="Corte desde"><DatePicker value={dateFrom} onChange={setDateFrom} /></Field>
         <Field label="Corte hasta"><DatePicker value={dateTo} onChange={setDateTo} /></Field>
