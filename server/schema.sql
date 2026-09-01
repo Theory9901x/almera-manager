@@ -1576,6 +1576,14 @@ CROSS JOIN (VALUES
 ) AS v(nombre, order_index)
 ON CONFLICT (organization_id, nombre) DO NOTHING;
 
+-- Coordinacion Enfermeria como opcion del campo Proceso al radicar: es un area que recibe y
+-- emite comunicaciones con frecuencia y no estaba en el mapa de procesos sembrado en el
+-- bootstrap. Se agrega al catalogo compartido (no hay catalogo propio de radicados para esto)
+-- con una serie de codigo propia (ENF) para no ocupar un numero del mapa institucional oficial.
+INSERT INTO institutional_processes (organization_id, code, name, classification)
+SELECT o.id, 'ENF-01', 'Coordinación Enfermería', 'MISIONAL' FROM organizations o
+ON CONFLICT (organization_id, code) DO NOTHING;
+
 -- ============================================================================
 -- Huella de Carbono v2 — reconstruccion completa a partir de la herramienta de
 -- referencia "Herramienta de monitoreo del impacto climatico para establecimientos
