@@ -91,7 +91,32 @@ function questionSection(stat, color) {
   return `<div class="question-block">${header}<p class="muted">Sin datos suficientes.</p></div>`
 }
 
-export function renderSurveyReportHtml({ survey, totals, compliance, timeline, avgCompletionSeconds, demographics, questions, dateFrom, dateTo, generatedAt }) {
+// Listado nominal: quien diligencio y que adherencia individual genero. La fila usa el mismo
+// semaforo fijo de la plataforma; N/A significa que esa respuesta no toco ninguna pregunta
+// calificable (solo perfil), no que haya incumplido.
+function participantsSection(participants) {
+  if (!participants || !participants.length) return ''
+  const rows = participants.map((participant, index) => {
+    const level = complianceLevel(participant.adherencePercent)
+    const badge = level
+      ? `<span class="concept-badge" style="background:${complianceColors[level]}18;color:${complianceColors[level]}">${complianceLabels[level]}</span>`
+      : '<span class="muted">Sin dato</span>'
+    return `<tr>
+      <td class="num">${index + 1}</td>
+      <td>${escapeHtml(participant.name)}</td>
+      <td>${formatDate(participant.submittedAt)}</td>
+      <td class="num">${formatPercent(participant.adherencePercent)}</td>
+      <td>${badge}</td>
+    </tr>`
+  }).join('')
+  const scored = participants.map(p => p.adherencePercent).filter(value => value != null)
+  const average = scored.length ? Math.round(scored.reduce((sum, value) => sum + value, 0) / scored.length) : null
+  return `<h2>Participantes y adherencia individual</h2>
+  <p class="muted">${participants.length} participante${participants.length === 1 ? '' : 's'} con respuesta completa${average != null ? ` · Adherencia promedio: <strong>${average}%</strong>` : ''}</p>
+  <table><thead><tr><th class="num">#</th><th>Participante</th><th>Fecha</th><th class="num">Adherencia</th><th>Concepto</th></tr></thead><tbody>${rows}</tbody></table>`
+}
+
+export function renderSurveyReportHtml({ survey, totals, compliance, timeline, avgCompletionSeconds, demographics, questions, participants, dateFrom, dateTo, generatedAt }) {
   const level = complianceLevel(compliance.percent)
   const rangeLabel = dateFrom || dateTo
     ? `${dateFrom ? formatDate(dateFrom) : 'inicio'} — ${dateTo ? formatDate(dateTo) : 'hoy'}`
@@ -176,6 +201,8 @@ export function renderSurveyReportHtml({ survey, totals, compliance, timeline, a
 
   <h2>Participación por período</h2>
   <table><thead><tr><th>Fecha</th><th class="num">Respuestas</th></tr></thead><tbody>${timelineRows || '<tr><td colspan="2">Sin respuestas en el rango seleccionado</td></tr>'}</tbody></table>
+
+  ${participantsSection(participants)}
 
   ${demographicsBlocks ? `<h2>Cruces demográficos</h2>${demographicsBlocks}` : ''}
 

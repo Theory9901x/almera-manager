@@ -955,6 +955,64 @@ function computeCompliance(questionStats, completionRate) {
   return { percent: completionRate, basis: 'completion' }
 }
 
+// Adherencia INDIVIDUAL de una respuesta, para el listado de participantes del informe.
+// Dos caminos, en este orden:
+// 1. Si la encuesta tiene clave de calificacion (correctOptionId), manda el motor de puntaje
+//    compartido — misma cifra que ve el panel de resultados por respuesta.
+// 2. Sin clave, se normalizan las preguntas de escala a 0-100: (valor - min) / (max - min).
+//    Es el caso de las encuestas de adherencia a politicas, que preguntan grado de acuerdo o
+//    frecuencia en escala y no tienen "respuesta correcta".
+// Si la respuesta no toco ninguna pregunta calificable, la adherencia es null (N/A), nunca 0:
+// un participante que solo diligencio datos de perfil no "incumplio".
+const ADHERENCE_SCALE_TYPES = new Set(['SCALE', 'NPS', 'RATING', 'EMOJI_SCALE'])
+
+function scaleBounds(question) {
+  const config = question.config || {}
+  if (question.type === 'NPS') return { min: 0, max: 10 }
+  if (question.type === 'EMOJI_SCALE') return { min: 1, max: (config.steps || []).length || 5 }
+  return { min: 1, max: Number(config.max) || 5 }
+}
+
+function responseAdherence(pages, questions, answers) {
+  const values = new Map()
+  for (const [questionId, row] of answers) values.set(questionId, row.value)
+  const { total } = computeResponseScore(pages, values)
+  if (total.possible) return total.percent
+  let sum = 0
+  let count = 0
+  for (const question of questions) {
+    if (!ADHERENCE_SCALE_TYPES.has(question.type)) continue
+    const raw = Number((answers.get(question.id)?.value || {}).value)
+    if (!Number.isFinite(raw)) continue
+    const { min, max } = scaleBounds(question)
+    if (max > min) { sum += Math.max(0, Math.min(1, (raw - min) / (max - min))); count += 1 }
+  }
+  return count ? Math.round((sum / count) * 100) : null
+}
+
+// Nombre del participante: el usuario autenticado si lo hay; si la respuesta llego por el enlace
+// publico, se cae a la pregunta de texto que pide el nombre (ej. "Nombres y apellidos"), que es
+// como estas encuestas identifican a quien diligencia.
+function findNameQuestion(questions) {
+  return questions.find(question =>
+    (question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') && /nombre/i.test(question.prompt || ''),
+  ) || null
+}
+
+function buildParticipants(pages, questions, responseRows, itemsByResponse) {
+  const nameQuestion = findNameQuestion(questions)
+  return responseRows.map(row => {
+    const answers = itemsByResponse.get(row.id) || new Map()
+    const typedName = nameQuestion ? String(answers.get(nameQuestion.id)?.text_value || '').trim() : ''
+    return {
+      responseId: row.id,
+      name: row.respondent_name || typedName || 'Anónimo',
+      submittedAt: row.submitted_at || row.started_at,
+      adherencePercent: responseAdherence(pages, questions, answers),
+    }
+  })
+}
+
 function ageBucketLabel(age) {
   if (age < 20) return '<20'
   if (age < 30) return '20-29'
@@ -1027,7 +1085,7 @@ async function buildStatsPayload(survey, request) {
   const where = ['r.survey_id = $1']
   buildResponseFilters(request, params, where)
 
-  const [totalsResult, monthsResult, itemsResult, timelineResult, durationResult] = await Promise.all([
+  const [totalsResult, monthsResult, itemsResult, timelineResult, durationResult, respondentsResult] = await Promise.all([
     query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE r.completed)::int AS completed FROM survey_responses r WHERE ${where.join(' AND ')}`, params),
     query(`SELECT DISTINCT month_reported FROM survey_responses WHERE survey_id = $1 ORDER BY month_reported DESC`, [survey.id]),
     query(
@@ -1044,6 +1102,15 @@ async function buildStatsPayload(survey, request) {
     query(
       `SELECT AVG(EXTRACT(EPOCH FROM (r.submitted_at - r.started_at)))::int AS avg_seconds
        FROM survey_responses r WHERE ${where.join(' AND ')} AND r.completed = TRUE AND r.submitted_at IS NOT NULL`,
+      params,
+    ),
+    query(
+      `SELECT r.id, r.started_at, r.submitted_at, u.full_name AS respondent_name
+       FROM survey_responses r
+       LEFT JOIN memberships m ON m.id = r.respondent_membership_id
+       LEFT JOIN users u ON u.id = m.user_id
+       WHERE ${where.join(' AND ')} AND r.completed = TRUE
+       ORDER BY COALESCE(r.submitted_at, r.started_at)`,
       params,
     ),
   ])
@@ -1120,6 +1187,7 @@ async function buildStatsPayload(survey, request) {
     comparison,
     questions: questionStats,
     scoring: hasScoredQuestions(pages) ? buildScoringAggregate(pages, itemsByResponse) : null,
+    participants: buildParticipants(pages, questions, respondentsResult.rows, itemsByResponse),
   }
 }
 
