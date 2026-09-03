@@ -143,6 +143,33 @@ export default function AlmeraPage() {
   const [editingGestionId, setEditingGestionId] = useState<string | null>(null)
   const [gestionForm, setGestionForm] = useState({ title: '', detail: '', performedAt: new Date().toISOString().slice(0, 10) })
 
+  // Textos narrativos del informe PDF: se cargan al abrir el dialogo (no en cada render del
+  // modulo) y se guardan completos con un solo PUT.
+  const [showReportTexts, setShowReportTexts] = useState(false)
+  const [reportTexts, setReportTexts] = useState({ intro: '', objective: '', conclusions: '', preparedBy: '', preparedByRole: '' })
+
+  const openReportTexts = async () => {
+    try {
+      const current = await almeraService.reportSettings()
+      setReportTexts({
+        intro: current.intro, objective: current.objective, conclusions: current.conclusions,
+        preparedBy: current.prepared_by, preparedByRole: current.prepared_by_role,
+      })
+      setShowReportTexts(true)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible cargar los textos del informe') }
+  }
+
+  const submitReportTexts = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    try {
+      await almeraService.saveReportSettings(reportTexts)
+      setShowReportTexts(false)
+      setNotice('Textos del informe guardados')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible guardar los textos') }
+    finally { setBusy(false) }
+  }
+
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState(newForm)
   const [action, setAction] = useState({ description: '', result: '', completionPercent: 0 })
@@ -568,11 +595,18 @@ export default function AlmeraPage() {
                 {filters.dateFrom || filters.dateTo ? ' (con el rango de fechas aplicado)' : ''}
                 {' · aparecen en su propia sección del informe PDF'}
               </span>
-              {canCreate && (
-                <button className="ats-btn is-primary" onClick={() => openGestionDialog()}>
-                  <Plus size={14} /> Nueva gestión
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {canEdit && (
+                  <button className="ats-btn" onClick={() => void openReportTexts()} title="Introducción, objetivo, conclusiones y quién elabora el informe PDF">
+                    <FileText size={14} /> Textos del informe
+                  </button>
+                )}
+                {canCreate && (
+                  <button className="ats-btn is-primary" onClick={() => openGestionDialog()}>
+                    <Plus size={14} /> Nueva gestión
+                  </button>
+                )}
+              </div>
             </div>
             <table className="ats-table is-db">
               <thead>
@@ -757,6 +791,28 @@ export default function AlmeraPage() {
               <div className="ats-modal-actions span-2">
                 <button type="button" className="ats-btn" onClick={() => setShowGestion(false)}>Cancelar</button>
                 <button className="ats-btn is-primary" disabled={busy}>{busy ? 'Guardando…' : editingGestionId ? 'Guardar cambios' : 'Registrar gestión'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showReportTexts && (
+        <div className="ats-overlay" onClick={() => !busy && setShowReportTexts(false)}>
+          <div className="ats-modal" role="dialog" aria-modal="true" aria-labelledby="ats-rt-title" onClick={event => event.stopPropagation()}>
+            <header className="ats-modal-head">
+              <div><p className="ats-eyebrow">Informe PDF</p><h2 id="ats-rt-title">Textos del informe</h2></div>
+              <button aria-label="Cerrar" onClick={() => setShowReportTexts(false)}><X size={16} /></button>
+            </header>
+            <form onSubmit={submitReportTexts} className="ats-form is-single">
+              <label><span>Introducción</span><textarea rows={4} value={reportTexts.intro} onChange={event => setReportTexts({ ...reportTexts, intro: event.target.value })} placeholder="Vacío = el informe usa el texto institucional por defecto" /></label>
+              <label><span>Objetivo</span><textarea rows={3} value={reportTexts.objective} onChange={event => setReportTexts({ ...reportTexts, objective: event.target.value })} placeholder="Vacío = texto por defecto" /></label>
+              <label><span>Conclusiones y recomendaciones</span><textarea rows={4} value={reportTexts.conclusions} onChange={event => setReportTexts({ ...reportTexts, conclusions: event.target.value })} placeholder="Vacío = texto por defecto. El análisis de cifras del periodo se genera solo." /></label>
+              <label><span>Elaborado por</span><input value={reportTexts.preparedBy} onChange={event => setReportTexts({ ...reportTexts, preparedBy: event.target.value })} placeholder="Nombre de quien elabora el informe" /></label>
+              <label><span>Cargo</span><input value={reportTexts.preparedByRole} onChange={event => setReportTexts({ ...reportTexts, preparedByRole: event.target.value })} placeholder="Ej. Administrador Plataforma ALMERA" /></label>
+              <div className="ats-modal-actions span-2">
+                <button type="button" className="ats-btn" onClick={() => setShowReportTexts(false)}>Cancelar</button>
+                <button className="ats-btn is-primary" disabled={busy}>{busy ? 'Guardando…' : 'Guardar textos'}</button>
               </div>
             </form>
           </div>

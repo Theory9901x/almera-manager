@@ -1592,6 +1592,21 @@ CREATE TABLE IF NOT EXISTS assistance_gestiones (
 );
 CREATE INDEX IF NOT EXISTS assistance_gestiones_scope_idx ON assistance_gestiones(organization_id, performed_at DESC);
 
+-- Textos narrativos del informe de Asistencias Tecnicas (GIN-GDO-FO-17 trae introduccion,
+-- objetivo, conclusiones y quien elabora, no solo datos). Una fila por entidad, editable desde
+-- el modulo; si esta vacia, el informe usa textos institucionales por defecto para no salir
+-- nunca a medias.
+CREATE TABLE IF NOT EXISTS assistance_report_settings (
+  organization_id BIGINT PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+  intro TEXT NOT NULL DEFAULT '',
+  objective TEXT NOT NULL DEFAULT '',
+  conclusions TEXT NOT NULL DEFAULT '',
+  prepared_by TEXT NOT NULL DEFAULT '',
+  prepared_by_role TEXT NOT NULL DEFAULT '',
+  updated_by_id BIGINT REFERENCES users(id),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Coordinacion Enfermeria como opcion del campo Proceso al radicar: es un area que recibe y
 -- emite comunicaciones con frecuencia y no estaba en el mapa de procesos sembrado en el
 -- bootstrap. Se agrega al catalogo compartido (no hay catalogo propio de radicados para esto)

@@ -267,6 +267,32 @@ almeraRouter.delete('/gestiones/:id', assistanceModule, edit, async (request, re
   } catch (error) { next(error) }
 })
 
+// Textos narrativos del informe (introduccion, objetivo, conclusiones, quien elabora): una fila
+// por entidad; el PUT hace upsert de los campos enviados. Vacio = el informe usa sus defaults.
+almeraRouter.get('/report-settings', assistanceModule, view, async (request, response, next) => {
+  try {
+    const result = await query('SELECT intro,objective,conclusions,prepared_by,prepared_by_role FROM assistance_report_settings WHERE organization_id=$1', [oid(request)])
+    response.json(result.rows[0] || { intro: '', objective: '', conclusions: '', prepared_by: '', prepared_by_role: '' })
+  } catch (error) { next(error) }
+})
+
+almeraRouter.put('/report-settings', assistanceModule, edit, async (request, response, next) => {
+  try {
+    const body = request.body || {}
+    const result = await query(
+      `INSERT INTO assistance_report_settings(organization_id,intro,objective,conclusions,prepared_by,prepared_by_role,updated_by_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT(organization_id) DO UPDATE SET
+         intro=EXCLUDED.intro, objective=EXCLUDED.objective, conclusions=EXCLUDED.conclusions,
+         prepared_by=EXCLUDED.prepared_by, prepared_by_role=EXCLUDED.prepared_by_role,
+         updated_by_id=EXCLUDED.updated_by_id, updated_at=NOW()
+       RETURNING intro,objective,conclusions,prepared_by,prepared_by_role`,
+      [oid(request), String(body.intro || '').trim(), String(body.objective || '').trim(), String(body.conclusions || '').trim(),
+       String(body.preparedBy || '').trim(), String(body.preparedByRole || '').trim(), uid(request)])
+    response.json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
 almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async (request, response, next) => {
   try {
     const params = [oid(request)]
@@ -277,7 +303,7 @@ almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async 
        FROM technical_assistances a
        JOIN institutional_processes p ON p.id=a.process_id AND p.organization_id=a.organization_id
        JOIN almera_catalog_modules am ON am.id=a.almera_module_id AND am.organization_id=a.organization_id`
-    const [rows, orgResult, summary, byModule, byProcess, timeline, byPriority, dataKpis, gestiones] = await Promise.all([
+    const [rows, orgResult, summary, byModule, byProcess, timeline, byPriority, dataKpis, gestiones, reportSettings] = await Promise.all([
       query(
         `SELECT a.code,a.subject,a.description,a.priority,a.received_at,a.commitment_at,a.closed_at,
                 a.completion_percent,a.requester_name,a.final_solution,a.general_observations,
@@ -326,6 +352,7 @@ almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async 
            AND ($2::date IS NULL OR g.performed_at >= $2::date)
            AND ($3::date IS NULL OR g.performed_at <= $3::date)
          ORDER BY g.performed_at, g.id`, [oid(request), request.query.dateFrom || null, request.query.dateTo || null]),
+      query('SELECT intro,objective,conclusions,prepared_by,prepared_by_role FROM assistance_report_settings WHERE organization_id=$1', [oid(request)]),
     ])
     const filtered = ['q', 'status', 'processId', 'moduleId', 'dateFrom', 'dateTo'].some(key => Boolean(request.query[key]))
     const html = renderAlmeraReportHtml({
@@ -341,6 +368,7 @@ almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async 
       byPriority: byPriority.rows,
       dataKpis: dataKpis.rows[0],
       gestiones: gestiones.rows,
+      settings: reportSettings.rows[0] || {},
       dateFrom: request.query.dateFrom || null,
       dateTo: request.query.dateTo || null,
     })

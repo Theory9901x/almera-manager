@@ -1,4 +1,4 @@
-import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AlmeraRecord, Gestion } from '../types'
+import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AlmeraRecord, Gestion, ReportSettings } from '../types'
 
 async function call<T>(path:string,init?:RequestInit):Promise<T>{
   const response=await fetch(`/api/almera${path}`,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(init?.headers||{})},...init})
@@ -55,6 +55,8 @@ export const almeraService={
     anchor.click()
     URL.revokeObjectURL(url)
   },
+  reportSettings:()=>call<ReportSettings>('/report-settings'),
+  saveReportSettings:(data:Record<string,unknown>)=>call<ReportSettings>('/report-settings',{method:'PUT',body:JSON.stringify(data)}),
   gestiones:(filters:{dateFrom?:string;dateTo?:string}={})=>call<Gestion[]>(`/gestiones${params(filters as AssistanceFilters)}`),
   createGestion:(data:Record<string,unknown>)=>call<Gestion>('/gestiones',{method:'POST',body:JSON.stringify(data)}),
   updateGestion:(id:string,data:Record<string,unknown>)=>call<Gestion>(`/gestiones/${id}`,{method:'PATCH',body:JSON.stringify(data)}),

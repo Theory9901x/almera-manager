@@ -77,3 +77,13 @@ export interface Gestion {
   created_by_name?:string
   created_at:string
 }
+
+// Textos narrativos del informe PDF (introduccion, objetivo, conclusiones, quien elabora).
+// Vacio = el informe usa sus textos institucionales por defecto.
+export interface ReportSettings {
+  intro:string
+  objective:string
+  conclusions:string
+  prepared_by:string
+  prepared_by_role:string
+}

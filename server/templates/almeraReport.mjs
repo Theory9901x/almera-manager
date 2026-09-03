@@ -60,10 +60,59 @@ function clip(value, size) {
   return text.length > size ? `${text.slice(0, size)}…` : text
 }
 
+// Textos por defecto cuando la entidad no ha configurado los suyos: el informe institucional
+// nunca sale sin introduccion, objetivo ni conclusiones.
+const DEFAULT_INTRO = 'El presente informe da cuenta de la gestión de asistencias técnicas de la plataforma ALMERA, '
+  + 'Sistema Integrado de Gestión de la entidad. Comprende la atención de las solicitudes radicadas por los '
+  + 'líderes y gestores de los procesos, el acompañamiento en el uso de los módulos de la herramienta y las '
+  + 'actividades de administración de la plataforma desarrolladas durante el periodo, como soporte transversal '
+  + 'a la calidad, oportunidad y confiabilidad de la información institucional.'
+const DEFAULT_OBJECTIVE = 'Reportar las asistencias técnicas atendidas y las gestiones desarrolladas durante el periodo en la '
+  + 'administración de la plataforma ALMERA, evidenciando el estado de cada solicitud, los tiempos de atención '
+  + 'y el comportamiento de la demanda por proceso, como insumo para el seguimiento del Sistema Integrado de Gestión.'
+const DEFAULT_CONCLUSIONS = 'Se recomienda dar continuidad al seguimiento de las solicitudes que permanecen abiertas, mantener el '
+  + 'acompañamiento a los procesos en el uso adecuado de la plataforma y conservar el registro oportuno de las '
+  + 'gestiones del periodo, de manera que este informe siga reflejando de forma completa la labor de administración del sistema.'
+
+/** Parrafo de analisis generado de los DATOS del corte: la parte del informe que nadie tiene
+ *  que redactar a mano porque sale sola de la base. */
+function buildAnalysis({ summary, byProcess, dataKpis, timeline, gestiones }) {
+  const total = Number(summary.total) || 0
+  if (!total) return 'En el corte seleccionado no se registraron asistencias técnicas.'
+  const parts = []
+  const completedPct = Math.round((Number(summary.completed) / total) * 100)
+  parts.push(`Durante el corte se gestionaron ${total} asistencias técnicas radicadas por ${dataKpis.distinct_processes} proceso${dataKpis.distinct_processes === 1 ? '' : 's'} de la entidad, de las cuales ${summary.completed} (${completedPct}%) culminaron su trámite`)
+  parts.push(Number(summary.overdue) > 0
+    ? `${summary.overdue} se encuentran vencidas y requieren acción inmediata`
+    : 'sin asistencias vencidas al cierre del corte')
+  if (Number(dataKpis.avg_close_days) > 0) parts.push(`con un tiempo promedio de cierre de ${dataKpis.avg_close_days} días`)
+  const sentences = [`${parts.join(', ')}.`]
+  if (byProcess.length) {
+    const top = byProcess[0]
+    sentences.push(`El proceso con mayor volumen fue ${top.name} con ${top.total} solicitud${top.total === 1 ? '' : 'es'} (${Math.round((top.total / total) * 100)}% del total).`)
+  }
+  if (timeline.length > 1) {
+    const last = timeline[timeline.length - 1]
+    const previous = timeline[timeline.length - 2]
+    const delta = last.received - previous.received
+    sentences.push(`En ${formatMonth(last.month)} se radicaron ${last.received} solicitudes, ${delta === 0 ? 'igual que' : delta > 0 ? `${delta} más que` : `${Math.abs(delta)} menos que`} en ${formatMonth(previous.month)}.`)
+  }
+  if (gestiones.length) sentences.push(`De manera complementaria se desarrollaron ${gestiones.length} gestiones de administración de la plataforma, detalladas en la sección correspondiente.`)
+  return sentences.join(' ')
+}
+
 export function renderAlmeraReportHtml({
   organizationName, generatedAt, generatedBy, filtered, rows, summary, byModule, byProcess,
-  timeline = [], byPriority = [], dataKpis = {}, gestiones = [], dateFrom = null, dateTo = null,
+  timeline = [], byPriority = [], dataKpis = {}, gestiones = [], settings = {}, dateFrom = null, dateTo = null,
 }) {
+  const intro = settings.intro || DEFAULT_INTRO
+  const objective = settings.objective || DEFAULT_OBJECTIVE
+  const conclusions = settings.conclusions || DEFAULT_CONCLUSIONS
+  const analysis = buildAnalysis({ summary, byProcess, dataKpis, timeline, gestiones })
+  // La numeracion de secciones es dinamica: si no hay gestiones registradas, la seccion no sale
+  // y las siguientes no pueden quedar con un numero saltado.
+  let sectionNumber = 0
+  const section = title => `<h2>${++sectionNumber}. ${title}</h2>`
   const byState = Object.keys(STATE_LABELS)
     .map(key => ({ key, label: STATE_LABELS[key], color: STATE_COLORS[key], value: rows.filter(row => row.effective_status === key).length }))
     .filter(item => item.value > 0)
@@ -169,6 +218,12 @@ export function renderAlmeraReportHtml({
   .gestion-date { flex: none; font-size: 8.5px; color: #5b6b86; font-weight: 700; text-transform: uppercase; }
   .gestion-body p { margin: 4px 0 0; color: #33445f; font-size: 9.5px; line-height: 1.45; }
   .detail-section { page-break-before: always; }
+  .prose { margin: 0; text-align: justify; line-height: 1.55; font-size: 10px; color: #26344d; }
+  h3 { font-size: 11px; margin: 0 0 8px; color: #1c4fae; text-transform: uppercase; letter-spacing: .04em; }
+  .signature { margin: 22px 0 8px; padding-top: 10px; border-top: 1px solid #d2d9e3; width: 280px; font-size: 10px; }
+  .signature span { display: block; color: #667085; margin-bottom: 14px; }
+  .signature strong { display: block; font-size: 11px; }
+  .signature em { display: block; font-style: normal; color: #5b6b86; font-size: 9px; }
 </style>
 </head>
 <body>
@@ -182,6 +237,17 @@ export function renderAlmeraReportHtml({
     </div>
   </div>
 
+  <div class="section">
+    ${section('Introducción')}
+    <p class="prose">${escapeHtml(intro)}</p>
+  </div>
+
+  <div class="section">
+    ${section('Objetivo')}
+    <p class="prose">${escapeHtml(objective)}</p>
+  </div>
+
+  ${section('Indicadores clave del periodo')}
   <div class="kpi-band">
     <div class="kpi"><span>Asistencias en este informe</span><strong>${summary.total}</strong><small>solicitudes gestionadas</small></div>
     <div class="kpi" style="--kpi:${STATE_COLORS.COMPLETADA}"><span>Completadas</span><strong>${summary.completed}</strong><small>${summary.total ? Math.round((summary.completed / summary.total) * 100) : 0}% del total</small></div>
@@ -195,33 +261,50 @@ export function renderAlmeraReportHtml({
     <div class="kpi"><span>Trámite cerrado</span><strong>${closedShare}%</strong><small>completadas + canceladas</small></div>
   </div>
 
+  <div class="section">
+    ${section('Desarrollo y análisis del periodo')}
+    <p class="prose">${escapeHtml(analysis)}</p>
+  </div>
+
   <div class="charts-grid">
-    <div class="chart-card"><h2>Estado de las asistencias</h2><div id="chart-states" class="chart-box" style="height:190px"></div></div>
-    <div class="chart-card"><h2>Por proceso solicitante</h2><div id="chart-processes" class="chart-box" style="height:190px"></div></div>
-    <div class="chart-card"><h2>Prioridad</h2><div id="chart-priorities" class="chart-box" style="height:190px"></div></div>
+    <div class="chart-card"><h3>Estado de las asistencias</h3><div id="chart-states" class="chart-box" style="height:190px"></div></div>
+    <div class="chart-card"><h3>Por proceso solicitante</h3><div id="chart-processes" class="chart-box" style="height:190px"></div></div>
+    <div class="chart-card"><h3>Prioridad</h3><div id="chart-priorities" class="chart-box" style="height:190px"></div></div>
   </div>
   <div class="charts-grid-2">
-    <div class="chart-card"><h2>Tendencia mensual · radicadas vs cerradas</h2><div id="chart-timeline" class="chart-box" style="height:170px"></div></div>
-    <div class="chart-card"><h2>Por módulo ALMERA</h2><div id="chart-modules" class="chart-box" style="height:170px"></div></div>
+    <div class="chart-card"><h3>Tendencia mensual · radicadas vs cerradas</h3><div id="chart-timeline" class="chart-box" style="height:170px"></div></div>
+    <div class="chart-card"><h3>Por módulo ALMERA</h3><div id="chart-modules" class="chart-box" style="height:170px"></div></div>
   </div>
 
   ${gestiones.length ? `
   <div class="section">
-    <h2>Gestiones del periodo</h2>
+    ${section('Gestiones del periodo')}
     <p class="muted" style="margin:0 0 8px;">Actividades de administración de la plataforma desarrolladas en el periodo, adicionales a la atención de solicitudes.</p>
     ${gestionBlocks}
   </div>` : ''}
 
   <div class="section">
-    <h2>Resumen general de gestión</h2>
+    ${section('Resumen general de gestión')}
     <table>
       <thead><tr><th>Estado</th><th class="num">Cantidad</th><th class="num">%</th><th>Descripción</th></tr></thead>
       <tbody>${stateSummaryRows || '<tr><td colspan="4">Sin datos</td></tr>'}</tbody>
     </table>
   </div>
 
+  <div class="section">
+    ${section('Conclusiones y recomendaciones')}
+    <p class="prose">${escapeHtml(conclusions)}</p>
+  </div>
+
+  ${settings.prepared_by ? `
+  <div class="signature">
+    <span>Elaboró:</span>
+    <strong>${escapeHtml(settings.prepared_by)}</strong>
+    ${settings.prepared_by_role ? `<em>${escapeHtml(settings.prepared_by_role)}</em>` : ''}
+  </div>` : ''}
+
   <div class="detail-section">
-    <h2>Detalle de asistencias</h2>
+    ${section('Anexo · Detalle de asistencias')}
     <table>
       <thead><tr>
         <th>Código</th><th>Asunto / solicitud</th><th>Proceso</th><th>Módulo</th><th>Solicitante</th>
