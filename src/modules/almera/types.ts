@@ -66,3 +66,14 @@ export interface AssistanceDetail {
   evidences:{id:string;original_name:string;mime_type:string;size_bytes:number;description:string;uploaded_by:string;created_at:string}[]
   history:{id:string;action:string;changes:Record<string,unknown>;actor_name:string;created_at:string}[]
 }
+
+// Gestion del periodo: actividad de administracion de la plataforma que no es una solicitud
+// puntual; el informe PDF las reporta en su propia seccion (formato GIN-GDO-FO-17).
+export interface Gestion {
+  id:string
+  title:string
+  detail:string
+  performed_at:string
+  created_by_name?:string
+  created_at:string
+}

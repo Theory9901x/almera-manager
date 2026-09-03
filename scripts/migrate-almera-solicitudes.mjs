@@ -13,6 +13,10 @@
 //
 // Uso: node --env-file=.env scripts/migrate-almera-solicitudes.mjs <ruta-al-json> [--commit]
 // Sin --commit corre en DRY-RUN: mapea y valida todo, no escribe nada.
+//
+// Modo extra --completar (no inserta nada): marca como COMPLETADA toda asistencia migrada
+// ([ALMERA-SOL-...]) que siga abierta o cancelada — decision del usuario para el consolidado:
+// la gestion documental del periodo ya se dio por cerrada aunque en ALMERA siguiera en tramite.
 
 import { readFileSync } from 'node:fs'
 import { query, pool } from '../server/db.mjs'
@@ -86,7 +90,19 @@ const STATUS_MAP = {
   Borrador: { status: 'RECIBIDA', percent: 0 },
 }
 
+async function completar() {
+  const result = await query(
+    `UPDATE technical_assistances
+        SET status='COMPLETADA', completion_percent=100, cancellation_reason=NULL,
+            closed_at=COALESCE(closed_at, received_at),
+            final_solution=COALESCE(NULLIF(final_solution, ''), 'Solicitud documental gestionada y cerrada en ALMERA.')
+      WHERE general_observations LIKE '%[ALMERA-SOL-%' AND status<>'COMPLETADA'`,
+  )
+  console.log(`Asistencias migradas marcadas como COMPLETADA: ${result.rowCount}`)
+}
+
 async function main() {
+  if (process.argv.includes('--completar')) return completar()
   const rows = JSON.parse(readFileSync(jsonPath, 'utf-8'))
   console.log(`Solicitudes en el JSON: ${rows.length}${commit ? '' : ' (DRY-RUN, no se escribe nada)'}`)
 

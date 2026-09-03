@@ -1576,6 +1576,22 @@ CROSS JOIN (VALUES
 ) AS v(nombre, order_index)
 ON CONFLICT (organization_id, nombre) DO NOTHING;
 
+-- Gestiones del periodo (Asistencias Tecnicas): actividades de administracion de la plataforma
+-- que NO son una solicitud puntual (acompanamientos, mediciones de indicadores, auditorias
+-- documentales, capacitaciones...) pero que el informe mensual GIN-GDO-FO-17 reporta aparte.
+-- Sin esta tabla el informe solo podia contar solicitudes y esa mitad del trabajo quedaba fuera.
+CREATE TABLE IF NOT EXISTS assistance_gestiones (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  performed_at DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_by_id BIGINT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS assistance_gestiones_scope_idx ON assistance_gestiones(organization_id, performed_at DESC);
+
 -- Coordinacion Enfermeria como opcion del campo Proceso al radicar: es un area que recibe y
 -- emite comunicaciones con frecuencia y no estaba en el mapa de procesos sembrado en el
 -- bootstrap. Se agrega al catalogo compartido (no hay catalogo propio de radicados para esto)

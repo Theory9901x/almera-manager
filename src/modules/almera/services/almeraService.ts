@@ -1,4 +1,4 @@
-import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AlmeraRecord } from '../types'
+import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AlmeraRecord, Gestion } from '../types'
 
 async function call<T>(path:string,init?:RequestInit):Promise<T>{
   const response=await fetch(`/api/almera${path}`,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(init?.headers||{})},...init})
@@ -55,6 +55,10 @@ export const almeraService={
     anchor.click()
     URL.revokeObjectURL(url)
   },
+  gestiones:(filters:{dateFrom?:string;dateTo?:string}={})=>call<Gestion[]>(`/gestiones${params(filters as AssistanceFilters)}`),
+  createGestion:(data:Record<string,unknown>)=>call<Gestion>('/gestiones',{method:'POST',body:JSON.stringify(data)}),
+  updateGestion:(id:string,data:Record<string,unknown>)=>call<Gestion>(`/gestiones/${id}`,{method:'PATCH',body:JSON.stringify(data)}),
+  deleteGestion:(id:string)=>call<{ok:boolean}>(`/gestiones/${id}`,{method:'DELETE'}),
   audits:()=>call<unknown[]>('/audits'),
   createAuditPlan:(data:Record<string,unknown>)=>call('/audit-plans',{method:'POST',body:JSON.stringify(data)}),
 }

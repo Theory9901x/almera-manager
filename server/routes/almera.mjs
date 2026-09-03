@@ -213,6 +213,60 @@ almeraRouter.get('/assistances/export.csv', assistanceModule, exportData, async 
 // Informe en PDF con el MISMO addFilters que la consulta y la exportacion: lo que se ve
 // filtrado en pantalla es exactamente lo que sale en el informe. Va ANTES de '/assistances/:id'
 // (CLAUDE.md §10): si quedara despues, Express capturaria "report.pdf" como si fuera un id.
+// Gestiones del periodo: el trabajo de administracion de la plataforma que no es una solicitud
+// puntual (acompanamientos, mediciones, auditorias documentales...). Se registran aqui para que
+// el informe PDF las reporte aparte, como lo hace el formato institucional GIN-GDO-FO-17.
+almeraRouter.get('/gestiones', assistanceModule, view, async (request, response, next) => {
+  try {
+    const params = [oid(request)]
+    const where = ['g.organization_id=$1']
+    if (request.query.dateFrom) { params.push(request.query.dateFrom); where.push(`g.performed_at >= $${params.length}::date`) }
+    if (request.query.dateTo) { params.push(request.query.dateTo); where.push(`g.performed_at <= $${params.length}::date`) }
+    const result = await query(
+      `SELECT g.*, u.full_name created_by_name FROM assistance_gestiones g JOIN users u ON u.id=g.created_by_id
+       WHERE ${where.join(' AND ')} ORDER BY g.performed_at DESC, g.id DESC`, params)
+    response.json(result.rows)
+  } catch (error) { next(error) }
+})
+
+almeraRouter.post('/gestiones', assistanceModule, create, async (request, response, next) => {
+  try {
+    const body = request.body || {}
+    if (!body.title || !String(body.title).trim()) return response.status(400).json({ error: 'El título de la gestión es obligatorio' })
+    const result = await query(
+      `INSERT INTO assistance_gestiones(organization_id,title,detail,performed_at,created_by_id)
+       VALUES($1,$2,$3,COALESCE($4::date,CURRENT_DATE),$5) RETURNING *`,
+      [oid(request), String(body.title).trim(), String(body.detail || '').trim(), body.performedAt || null, uid(request)])
+    response.status(201).json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
+almeraRouter.patch('/gestiones/:id', assistanceModule, edit, async (request, response, next) => {
+  try {
+    if (!/^\d+$/.test(request.params.id)) return response.status(404).json({ error: 'Gestión no encontrada' })
+    const body = request.body || {}
+    const result = await query(
+      `UPDATE assistance_gestiones SET
+         title=COALESCE(NULLIF(TRIM($3),''),title),
+         detail=COALESCE($4,detail),
+         performed_at=COALESCE($5::date,performed_at),
+         updated_at=NOW()
+       WHERE id=$1 AND organization_id=$2 RETURNING *`,
+      [request.params.id, oid(request), body.title ?? '', body.detail != null ? String(body.detail).trim() : null, body.performedAt || null])
+    if (!result.rows[0]) return response.status(404).json({ error: 'Gestión no encontrada' })
+    response.json(result.rows[0])
+  } catch (error) { next(error) }
+})
+
+almeraRouter.delete('/gestiones/:id', assistanceModule, edit, async (request, response, next) => {
+  try {
+    if (!/^\d+$/.test(request.params.id)) return response.status(404).json({ error: 'Gestión no encontrada' })
+    const result = await query('DELETE FROM assistance_gestiones WHERE id=$1 AND organization_id=$2 RETURNING id', [request.params.id, oid(request)])
+    if (!result.rows[0]) return response.status(404).json({ error: 'Gestión no encontrada' })
+    response.json({ ok: true })
+  } catch (error) { next(error) }
+})
+
 almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async (request, response, next) => {
   try {
     const params = [oid(request)]
@@ -223,7 +277,7 @@ almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async 
        FROM technical_assistances a
        JOIN institutional_processes p ON p.id=a.process_id AND p.organization_id=a.organization_id
        JOIN almera_catalog_modules am ON am.id=a.almera_module_id AND am.organization_id=a.organization_id`
-    const [rows, orgResult, summary, byModule, byProcess] = await Promise.all([
+    const [rows, orgResult, summary, byModule, byProcess, timeline, byPriority, dataKpis, gestiones] = await Promise.all([
       query(
         `SELECT a.code,a.subject,a.description,a.priority,a.received_at,a.commitment_at,a.closed_at,
                 a.completion_percent,a.requester_name,a.final_solution,a.general_observations,
@@ -248,6 +302,30 @@ almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async 
       query(
         `SELECT p.name,COUNT(*)::int total ${joins} WHERE ${filter}
          GROUP BY p.id,p.name ORDER BY total DESC,p.name`, params),
+      // Serie mensual de radicadas vs cerradas. Cada serie agrupa por SU fecha (radicacion vs
+      // cierre): agrupar las cerradas por mes de radicacion pintaria dos lineas identicas.
+      query(
+        `WITH r AS (SELECT to_char(date_trunc('month', a.received_at), 'YYYY-MM') AS month, COUNT(*)::int total
+                    ${joins} WHERE ${filter} GROUP BY 1),
+              c AS (SELECT to_char(date_trunc('month', a.closed_at), 'YYYY-MM') AS month, COUNT(*)::int total
+                    ${joins} WHERE ${filter} AND a.closed_at IS NOT NULL GROUP BY 1)
+         SELECT COALESCE(r.month, c.month) AS month, COALESCE(r.total, 0) received, COALESCE(c.total, 0) closed
+         FROM r FULL JOIN c ON c.month = r.month ORDER BY 1`, params),
+      query(`SELECT a.priority,COUNT(*)::int total ${joins} WHERE ${filter} GROUP BY a.priority`, params),
+      // KPIs de datos: dias promedio de cierre, procesos y solicitantes distintos atendidos.
+      query(
+        `SELECT COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (a.closed_at-a.received_at))/86400.0)::numeric,1),0) avg_close_days,
+                COUNT(DISTINCT a.process_id)::int distinct_processes,
+                COUNT(DISTINCT NULLIF(TRIM(a.requester_name),''))::int distinct_requesters
+         ${joins} WHERE ${filter}`, params),
+      // Gestiones del periodo: si el informe se pide con rango de fechas, se listan las de ese
+      // rango; sin rango van todas (mismo criterio que las asistencias del listado).
+      query(
+        `SELECT g.title,g.detail,g.performed_at FROM assistance_gestiones g
+         WHERE g.organization_id=$1
+           AND ($2::date IS NULL OR g.performed_at >= $2::date)
+           AND ($3::date IS NULL OR g.performed_at <= $3::date)
+         ORDER BY g.performed_at, g.id`, [oid(request), request.query.dateFrom || null, request.query.dateTo || null]),
     ])
     const filtered = ['q', 'status', 'processId', 'moduleId', 'dateFrom', 'dateTo'].some(key => Boolean(request.query[key]))
     const html = renderAlmeraReportHtml({
@@ -259,6 +337,12 @@ almeraRouter.get('/assistances/report.pdf', assistanceModule, exportData, async 
       summary: summary.rows[0],
       byModule: byModule.rows,
       byProcess: byProcess.rows,
+      timeline: timeline.rows,
+      byPriority: byPriority.rows,
+      dataKpis: dataKpis.rows[0],
+      gestiones: gestiones.rows,
+      dateFrom: request.query.dateFrom || null,
+      dateTo: request.query.dateTo || null,
     })
     const pdf = await renderPdf(html, { landscape: true })
     response.setHeader('Content-Type', 'application/pdf')

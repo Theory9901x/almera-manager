@@ -8,7 +8,7 @@ import {
 import { useAuth } from '@/platform/auth/AuthContext'
 import { DatePicker, Select } from '@/design-system'
 import { almeraService } from '../services/almeraService'
-import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AssistanceStatus } from '../types'
+import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail, AssistanceFilters, AssistanceStatus, Gestion } from '../types'
 
 // ---------------------------------------------------------------------------
 // Asistencias Tecnicas — reconstruccion completa de la capa de presentacion.
@@ -30,7 +30,7 @@ import type { AlmeraCatalogs, Assistance, AssistanceDashboard, AssistanceDetail,
 // index.css) y no toca las clases del resto del sistema.
 // ---------------------------------------------------------------------------
 
-type View = 'board' | 'database' | 'balance' | 'catalogs'
+type View = 'board' | 'database' | 'gestiones' | 'balance' | 'catalogs'
 type InspectorTab = 'resumen' | 'actividad' | 'evidencias' | 'gestion'
 
 const STATUS_LABELS: Record<AssistanceStatus, string> = {
@@ -135,6 +135,14 @@ export default function AlmeraPage() {
   const [completeSolution, setCompleteSolution] = useState('')
   const [completeFiles, setCompleteFiles] = useState<FileList | null>(null)
 
+  // Gestiones del periodo: lista propia, cargada al entrar a su vista. El formulario sirve para
+  // crear y editar (editingGestionId decide); performedAt en fecha simple, sin hora.
+  const [gestiones, setGestiones] = useState<Gestion[]>([])
+  const [gestionesLoading, setGestionesLoading] = useState(false)
+  const [showGestion, setShowGestion] = useState(false)
+  const [editingGestionId, setEditingGestionId] = useState<string | null>(null)
+  const [gestionForm, setGestionForm] = useState({ title: '', detail: '', performedAt: new Date().toISOString().slice(0, 10) })
+
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState(newForm)
   const [action, setAction] = useState({ description: '', result: '', completionPercent: 0 })
@@ -164,6 +172,45 @@ export default function AlmeraPage() {
       .catch(caught => setLoadError(caught instanceof Error ? caught.message : 'No fue posible cargar los catálogos'))
   }, [])
   useEffect(() => { void load() }, [filters.processId, filters.moduleId, filters.status, filters.dateFrom, filters.dateTo])
+
+  // Las gestiones respetan el rango de fechas de los filtros (mismo corte que el informe PDF).
+  const loadGestiones = async () => {
+    setGestionesLoading(true)
+    try { setGestiones(await almeraService.gestiones({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible cargar las gestiones') }
+    finally { setGestionesLoading(false) }
+  }
+  useEffect(() => { if (view === 'gestiones') void loadGestiones() }, [view, filters.dateFrom, filters.dateTo])
+
+  const openGestionDialog = (gestion?: Gestion) => {
+    setEditingGestionId(gestion?.id ?? null)
+    setGestionForm(gestion
+      ? { title: gestion.title, detail: gestion.detail, performedAt: gestion.performed_at.slice(0, 10) }
+      : { title: '', detail: '', performedAt: new Date().toISOString().slice(0, 10) })
+    setShowGestion(true)
+  }
+
+  const submitGestion = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    try {
+      const payload = { title: gestionForm.title, detail: gestionForm.detail, performedAt: gestionForm.performedAt }
+      if (editingGestionId) await almeraService.updateGestion(editingGestionId, payload)
+      else await almeraService.createGestion(payload)
+      setShowGestion(false)
+      setNotice(editingGestionId ? 'Gestión actualizada' : 'Gestión registrada')
+      await loadGestiones()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible guardar la gestión') }
+    finally { setBusy(false) }
+  }
+
+  const removeGestion = async (gestion: Gestion) => {
+    if (!window.confirm(`¿Eliminar la gestión "${gestion.title}"?`)) return
+    setBusy(true)
+    try { await almeraService.deleteGestion(gestion.id); setNotice('Gestión eliminada'); await loadGestiones() }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible eliminar la gestión') }
+    finally { setBusy(false) }
+  }
 
   // Cerrar con Escape: primero lo flotante (modal, popover), luego el inspector.
   useEffect(() => {
@@ -397,6 +444,7 @@ export default function AlmeraPage() {
               {([
                 ['database', 'Base de datos', LayoutList],
                 ['board', 'Tablero', Columns3],
+                ['gestiones', 'Gestiones', ListTodo],
                 ['balance', 'Balance', BarChart3],
                 ['catalogs', 'Catálogos', Settings],
               ] as [View, string, typeof Columns3][]).map(([key, label, Icon]) => (
@@ -505,6 +553,54 @@ export default function AlmeraPage() {
                     <div className="ats-empty"><ClipboardCheck size={28} /><h3>Sin resultados</h3><p>No hay asistencias para la búsqueda y los filtros actuales.</p></div>
                   </td></tr>
                 )}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {view === 'gestiones' && (
+          /* Gestiones del periodo: el trabajo de administracion de la plataforma que no es una
+             solicitud puntual. Salen en su propia seccion del informe PDF (GIN-GDO-FO-17). */
+          <section className="ats-listwrap" aria-label="Gestiones del periodo">
+            <div className="ats-db-caption">
+              <span>
+                <strong>{gestiones.length}</strong> gestión{gestiones.length === 1 ? '' : 'es'} del periodo
+                {filters.dateFrom || filters.dateTo ? ' (con el rango de fechas aplicado)' : ''}
+                {' · aparecen en su propia sección del informe PDF'}
+              </span>
+              {canCreate && (
+                <button className="ats-btn is-primary" onClick={() => openGestionDialog()}>
+                  <Plus size={14} /> Nueva gestión
+                </button>
+              )}
+            </div>
+            <table className="ats-table is-db">
+              <thead>
+                <tr><th style={{ width: 110 }}>Fecha</th><th style={{ width: 260 }}>Gestión</th><th>Desarrollo</th><th style={{ width: 130 }}>Registrada por</th>{canEdit && <th style={{ width: 90 }} />}</tr>
+              </thead>
+              <tbody>
+                {gestiones.map(gestion => (
+                  <tr key={gestion.id}>
+                    <td className="ats-cell-date">{new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(gestion.performed_at))}</td>
+                    <td><strong>{gestion.title}</strong></td>
+                    <td style={{ whiteSpace: 'pre-wrap' }}>{gestion.detail || '—'}</td>
+                    <td>{gestion.created_by_name || '—'}</td>
+                    {canEdit && (
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="ats-btn" title="Editar" onClick={() => openGestionDialog(gestion)}><PencilLine size={13} /></button>
+                          <button className="ats-btn" title="Eliminar" onClick={() => void removeGestion(gestion)} disabled={busy}><X size={13} /></button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                {!gestionesLoading && !gestiones.length && (
+                  <tr><td colSpan={canEdit ? 5 : 4}>
+                    <div className="ats-empty"><ListTodo size={28} /><h3>Sin gestiones registradas</h3><p>Registra aquí las actividades del periodo (acompañamientos, mediciones, auditorías documentales…) para que salgan en el informe.</p></div>
+                  </td></tr>
+                )}
+                {gestionesLoading && <tr><td colSpan={canEdit ? 5 : 4}><div className="ats-empty"><Loader2 size={22} /><p>Cargando gestiones…</p></div></td></tr>}
               </tbody>
             </table>
           </section>
@@ -641,6 +737,26 @@ export default function AlmeraPage() {
               <div className="ats-modal-actions span-2">
                 <button type="button" className="ats-btn" onClick={() => setShowCreate(false)}>Cancelar</button>
                 <button className="ats-btn is-primary" disabled={busy}>{busy ? 'Registrando…' : 'Registrar asistencia'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showGestion && (
+        <div className="ats-overlay" onClick={() => !busy && setShowGestion(false)}>
+          <div className="ats-modal" role="dialog" aria-modal="true" aria-labelledby="ats-gestion-title" onClick={event => event.stopPropagation()}>
+            <header className="ats-modal-head">
+              <h2 id="ats-gestion-title">{editingGestionId ? 'Editar gestión del periodo' : 'Nueva gestión del periodo'}</h2>
+              <button aria-label="Cerrar" onClick={() => setShowGestion(false)}><X size={16} /></button>
+            </header>
+            <form onSubmit={submitGestion} className="ats-form is-single">
+              <label><span>Gestión / actividad *</span><input required value={gestionForm.title} onChange={event => setGestionForm({ ...gestionForm, title: event.target.value })} placeholder="Ej. Medición trimestral del indicador de oportunidad documental" /></label>
+              <label><span>Fecha de la gestión</span><DatePicker value={gestionForm.performedAt} onChange={value => setGestionForm({ ...gestionForm, performedAt: value })} /></label>
+              <label><span>Desarrollo / resultado</span><textarea rows={5} value={gestionForm.detail} onChange={event => setGestionForm({ ...gestionForm, detail: event.target.value })} placeholder="Qué se hizo, con qué resultado y qué queda pendiente" /></label>
+              <div className="ats-modal-actions span-2">
+                <button type="button" className="ats-btn" onClick={() => setShowGestion(false)}>Cancelar</button>
+                <button className="ats-btn is-primary" disabled={busy}>{busy ? 'Guardando…' : editingGestionId ? 'Guardar cambios' : 'Registrar gestión'}</button>
               </div>
             </form>
           </div>
