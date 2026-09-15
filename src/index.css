@@ -1127,6 +1127,18 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Login */
 .login-screen {
+  /* El login queda fuera del tema oscuro a proposito (el panel izquierdo es papel), pero los
+     tokens de tinta son globales: con el tema oscuro del sistema, --ink se remapea a claro y el
+     titulo "Accede a tu espacio" salia casi blanco sobre blanco. Mismo arreglo que la encuesta
+     publica: el opt-out fija su propia tinta, no solo su fondo. */
+  color-scheme: light;
+  color: #161922;
+  --ink: #161922;
+  --ink-soft: #344054;
+  --muted: #6B7488;
+  --muted-light: #9AA1B2;
+  --line: #EAEDF3;
+  --line-strong: #D8DEEA;
   display: grid;
   width: calc(100% - 28px);
   max-width: 1540px;
@@ -2326,6 +2338,19 @@ h1, h2, h3, strong, th { text-wrap: balance; }
      no --survey-accent, para theming. Sin este puente heredarian el indigo generico en vez del
      color de marca de la encuesta. */
   --ds-accent: var(--survey-accent, #0F7A54);
+  /* La encuesta publica es SIEMPRE de papel (queda fuera del tema oscuro a proposito), pero los
+     tokens de tinta son globales: con el tema oscuro del sistema, --ink/--muted se remapean a
+     claros y aqui heredaban texto casi blanco sobre tarjeta blanca (titulo y checkbox de la
+     politica de datos invisibles). El opt-out tiene que fijar TAMBIEN su propia tinta, no solo
+     su fondo. color-scheme: light evita ademas que el navegador oscurezca los controles nativos. */
+  color-scheme: light;
+  color: #161922;
+  --ink: #161922;
+  --ink-soft: #344054;
+  --muted: #6B7488;
+  --muted-light: #9AA1B2;
+  --line: #EAEDF3;
+  --line-strong: #D8DEEA;
 }
 
 /* Fondo vivo: formas grandes muy difuminadas que se desplazan despacio (18-26s), sin competir
