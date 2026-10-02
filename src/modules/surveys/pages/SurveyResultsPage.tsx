@@ -53,6 +53,7 @@ function SurveyResultsContent() {
   const [segmentValue, setSegmentValue] = useState('')
   const [loading, setLoading] = useState(true)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingZip, setExportingZip] = useState(false)
 
   const questions = useMemo(() => survey?.pages.flatMap(page => page.questions) || [], [survey])
   const segmentCandidates = useMemo(() => questions.filter(question => SEGMENT_TYPES.has(question.type) && segmentOptions(question).length > 0), [questions])
@@ -84,12 +85,40 @@ function SurveyResultsContent() {
 
   useEffect(() => { void load() }, [surveyId, month, quarterKey, dateFrom, dateTo, respondentId, segmentQuestionId, segmentValue])
 
+  // Filtros del corte que comparten el informe individual y la exportacion por opcion: lo que se
+  // ve en pantalla es lo que sale en el PDF.
+  const cutFilters = {
+    month: quarterKey ? undefined : (month || undefined), quarter: quarterNumber, year: quarterYear,
+    dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, respondentMembershipId: respondentId || undefined,
+  }
+
   async function handleExportPdf() {
     if (!survey) return
     setExportingPdf(true)
-    try { await surveysService.exportPdf(survey.id, survey.code, { dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, quarter: quarterNumber, year: quarterYear }) }
+    try {
+      const segmentLabel = segmentQuestion && segmentValue ? segmentOptions(segmentQuestion).find(option => option.id === segmentValue)?.label : undefined
+      const suffix = segmentLabel ? `-${segmentLabel.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}` : ''
+      await surveysService.exportPdf(survey.id, survey.code, {
+        ...cutFilters, segmentQuestionId: segmentValue ? segmentQuestionId : undefined, segmentValue: segmentValue || undefined,
+      }, suffix)
+    }
     catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar el informe') }
     finally { setExportingPdf(false) }
+  }
+
+  // "Exportar todas": un informe detallado por cada opcion de la pregunta de cruce (ej. uno por
+  // linea de beneficio), en un ZIP. Si solo hay una pregunta segmentable no hace falta elegirla.
+  async function handleExportBySegment() {
+    if (!survey) return
+    const target = segmentQuestion || (segmentCandidates.length === 1 ? segmentCandidates[0] : null)
+    if (!target) { toast.push('error', 'Elige primero en «Cruzar por» la pregunta por la que quieres separar los informes (por ejemplo, la línea)'); return }
+    setExportingZip(true)
+    try {
+      await surveysService.exportSegmentZip(survey.id, survey.code, { ...cutFilters, segmentQuestionId: target.id })
+      toast.push('success', `Informes generados: uno por cada opción de «${target.prompt}»`)
+    }
+    catch (cause) { toast.push('error', cause instanceof Error ? cause.message : 'No fue posible exportar los informes') }
+    finally { setExportingZip(false) }
   }
 
   // Contador en vivo: sondeo liviano mientras la encuesta esta publicada, independiente de los
@@ -124,6 +153,11 @@ function SurveyResultsContent() {
             <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/constructor`)}><Pencil size={15} /> Constructor</Button>
             <Button variant="secondary" onClick={() => navigate(`/app/encuestas/${survey.id}/respuestas`)}><ListChecks size={15} /> Respuestas</Button>
             <Button variant="secondary" disabled={exportingPdf} onClick={handleExportPdf}><FileText size={15} /> {exportingPdf ? 'Generando...' : 'Informe PDF'}</Button>
+            {segmentCandidates.length > 0 && (
+              <Button variant="secondary" disabled={exportingZip} onClick={handleExportBySegment} title="Genera un informe detallado por cada opción de la pregunta elegida en «Cruzar por» (por ejemplo, uno por línea) y los descarga juntos en un ZIP">
+                <FileDown size={15} /> {exportingZip ? 'Generando informes...' : 'Exportar todas por separado'}
+              </Button>
+            )}
             <Button identity={identity} onClick={() => surveysService.exportCsv(survey.id, survey.code, { month: quarterKey ? undefined : (month || undefined), quarter: quarterNumber, year: quarterYear })}><Download size={15} /> Exportar CSV</Button>
           </div>
         }

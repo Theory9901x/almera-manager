@@ -12,6 +12,7 @@ import { requireAnyModuleAccess, requirePermission } from '../auth.mjs'
 import { renderPdf } from '../pdf.mjs'
 import { renderSurveyReportHtml } from '../templates/surveyReport.mjs'
 import { aggregateScores, computeResponseScore, hasScoredQuestions } from '../surveyScoring.mjs'
+import { buildZip } from '../zip.mjs'
 
 export const surveysRouter = Router()
 
@@ -1077,6 +1078,29 @@ function buildDemographics(questions, itemsByResponse) {
   return crosses
 }
 
+// Opciones por las que se puede segmentar una pregunta: las de seleccion (con sus etiquetas) y
+// Si/No. Es la misma lista que ofrece el selector "Cruzar por" de la pantalla de resultados.
+function segmentOptionsOf(question) {
+  if (!question) return []
+  if (question.type === 'YES_NO') return [{ id: 'SI', label: 'Sí' }, { id: 'NO', label: 'No' }]
+  if (!CHOICE_TYPES.has(question.type)) return []
+  return (question.config?.options || []).map(option => ({ id: String(option.id), label: option.label }))
+}
+
+// Describe en palabras el filtro de segmento activo ("¿De qué línea...?" = "Plan Padrino") para
+// que el informe diga de QUE corte habla; sin esto un PDF filtrado es indistinguible del general.
+function describeSegment(questions, queryParams) {
+  if (!queryParams.segmentQuestionId || !queryParams.segmentValue) return null
+  const question = questions.find(item => String(item.id) === String(queryParams.segmentQuestionId))
+  if (!question) return null
+  const option = segmentOptionsOf(question).find(item => item.id === String(queryParams.segmentValue))
+  return { prompt: question.prompt, label: option ? option.label : String(queryParams.segmentValue) }
+}
+
+function fileSlug(text) {
+  return String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'opcion'
+}
+
 async function buildStatsPayload(survey, request) {
   const pages = await loadStructure(survey.id)
   const questions = pages.flatMap(page => page.questions)
@@ -1188,6 +1212,7 @@ async function buildStatsPayload(survey, request) {
     questions: questionStats,
     scoring: hasScoredQuestions(pages) ? buildScoringAggregate(pages, itemsByResponse) : null,
     participants: buildParticipants(pages, questions, respondentsResult.rows, itemsByResponse),
+    segment: describeSegment(questions, request.query),
   }
 }
 
@@ -1433,6 +1458,38 @@ surveysRouter.get('/:id/export.csv', surveysModule, exportPerm, async (request, 
     response.setHeader('Content-Type', 'text/csv; charset=utf-8')
     response.setHeader('Content-Disposition', `attachment; filename="encuesta-${survey.code}.csv"`)
     response.send(csv)
+  } catch (error) { next(error) }
+})
+
+// Un informe PDF DETALLADO por cada opcion de una pregunta (ej. por cada linea de beneficio), en
+// un solo ZIP. Cada PDF es el informe completo —KPIs, participantes, desglose por pregunta—
+// calculado solo con las respuestas de esa opcion, y respeta los demas filtros del corte (fechas,
+// trimestre...). Las opciones sin respuestas se omiten: un informe vacio no le sirve a nadie.
+surveysRouter.get('/:id/report-by-segment.zip', surveysModule, exportPerm, async (request, response, next) => {
+  try {
+    const survey = await assertSurvey(request)
+    const pages = await loadStructure(survey.id)
+    const question = pages.flatMap(page => page.questions).find(item => String(item.id) === String(request.query.segmentQuestionId))
+    const options = segmentOptionsOf(question)
+    if (!question || !options.length) fail(400, 'Elige una pregunta de selección para generar un informe por cada opción')
+
+    const generatedAt = new Date().toISOString()
+    const entries = []
+    for (const option of options) {
+      // Misma peticion, con el valor de segmento de ESTA opcion: asi cada informe pasa por
+      // exactamente el mismo calculo que el informe individual filtrado en pantalla.
+      const scoped = Object.create(request)
+      Object.defineProperty(scoped, 'query', { value: { ...request.query, segmentValue: option.id } })
+      const payload = await buildStatsPayload(survey, scoped)
+      if (!payload.totals.totalResponses) continue
+      const html = renderSurveyReportHtml({ ...payload, dateFrom: request.query.dateFrom || null, dateTo: request.query.dateTo || null, generatedAt })
+      entries.push({ name: `informe-${survey.code}-${fileSlug(option.label)}.pdf`, data: Buffer.from(await renderPdf(html)) })
+    }
+    if (!entries.length) fail(404, 'Ninguna opción tiene respuestas en el corte seleccionado')
+
+    response.setHeader('Content-Type', 'application/zip')
+    response.setHeader('Content-Disposition', `attachment; filename="informes-${survey.code}-${fileSlug(question.prompt).slice(0, 40)}.zip"`)
+    response.send(buildZip(entries))
   } catch (error) { next(error) }
 })
 

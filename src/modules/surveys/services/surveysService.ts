@@ -107,14 +107,29 @@ export const surveysService = {
     anchor.click()
     URL.revokeObjectURL(url)
   },
-  exportPdf: async (surveyId: string, code: string, filters: { dateFrom?: string; dateTo?: string; quarter?: string; year?: string } = {}) => {
+  // El informe respeta EXACTAMENTE el corte de la pantalla (mes, trimestre, fechas y cruce por
+  // pregunta): antes solo viajaban las fechas y un PDF "filtrado por linea" salia con todo.
+  // `suffix` distingue el archivo cuando hay cruce (ej. "-plan-padrino").
+  exportPdf: async (surveyId: string, code: string, filters: StatsFilters = {}, suffix = '') => {
     const response = await fetch(`/api/surveys/${surveyId}/report.pdf${toQueryString(filters)}`, { credentials: 'same-origin' })
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
     const blob = await response.blob()
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `informe-encuesta-${code}.pdf`
+    anchor.download = `informe-encuesta-${code}${suffix}.pdf`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
+  // Un informe detallado por CADA opcion de la pregunta de cruce, en un solo ZIP.
+  exportSegmentZip: async (surveyId: string, code: string, filters: StatsFilters) => {
+    const response = await fetch(`/api/surveys/${surveyId}/report-by-segment.zip${toQueryString(filters)}`, { credentials: 'same-origin' })
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No fue posible exportar') }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `informes-${code}-por-opcion.zip`
     anchor.click()
     URL.revokeObjectURL(url)
   },

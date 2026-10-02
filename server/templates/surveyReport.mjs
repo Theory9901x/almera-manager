@@ -96,6 +96,19 @@ function questionSection(stat, color) {
 // calificable (solo perfil), no que haya incumplido.
 function participantsSection(participants) {
   if (!participants || !participants.length) return ''
+  // Encuesta sin preguntas calificables (ej. satisfaccion de beneficiarios): la adherencia seria
+  // "N/A · Sin dato" en TODAS las filas. Dos columnas enteras de N/A no informan nada y hacen
+  // parecer que el informe esta roto: se listan solo los participantes.
+  if (!participants.some(participant => participant.adherencePercent != null)) {
+    const plainRows = participants.map((participant, index) => `<tr>
+      <td class="num">${index + 1}</td>
+      <td>${escapeHtml(participant.name)}</td>
+      <td>${formatDate(participant.submittedAt)}</td>
+    </tr>`).join('')
+    return `<h2>Participantes</h2>
+  <p class="muted">${participants.length} participante${participants.length === 1 ? '' : 's'} con respuesta completa</p>
+  <table><thead><tr><th class="num">#</th><th>Participante</th><th>Fecha</th></tr></thead><tbody>${plainRows}</tbody></table>`
+  }
   const rows = participants.map((participant, index) => {
     const level = complianceLevel(participant.adherencePercent)
     const badge = level
@@ -116,7 +129,7 @@ function participantsSection(participants) {
   <table><thead><tr><th class="num">#</th><th>Participante</th><th>Fecha</th><th class="num">Adherencia</th><th>Concepto</th></tr></thead><tbody>${rows}</tbody></table>`
 }
 
-export function renderSurveyReportHtml({ survey, totals, compliance, timeline, avgCompletionSeconds, demographics, questions, participants, dateFrom, dateTo, generatedAt }) {
+export function renderSurveyReportHtml({ survey, totals, compliance, timeline, avgCompletionSeconds, demographics, questions, participants, segment, dateFrom, dateTo, generatedAt }) {
   const level = complianceLevel(compliance.percent)
   const rangeLabel = dateFrom || dateTo
     ? `${dateFrom ? formatDate(dateFrom) : 'inicio'} — ${dateTo ? formatDate(dateTo) : 'hoy'}`
@@ -166,6 +179,7 @@ export function renderSurveyReportHtml({ survey, totals, compliance, timeline, a
   .bar-value { width: 90px; flex: none; text-align: right; font-size: 10px; font-variant-numeric: tabular-nums; }
   .obs-list { margin: 0; padding-left: 16px; }
   .obs-list li { margin-bottom: 4px; }
+  .segment-chip { display: inline-block; margin-top: 6px; padding: 3px 12px; border-radius: 999px; background: #0F7A54; color: #fff; font-weight: 700; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -173,6 +187,7 @@ export function renderSurveyReportHtml({ survey, totals, compliance, timeline, a
     <div>
       <h1>Informe de Encuesta: ${escapeHtml(survey.title)}</h1>
       <div>${escapeHtml(survey.code || '')}</div>
+      ${segment ? `<div class="segment-chip">${escapeHtml(segment.label)}</div>` : ''}
     </div>
     <div class="format-meta">
       Formato: ${FORMAT_CODE} · Versión ${FORMAT_VERSION}<br />
@@ -186,6 +201,7 @@ export function renderSurveyReportHtml({ survey, totals, compliance, timeline, a
     <div><b>Estado</b>${escapeHtml(survey.status)}</div>
     <div><b>Rango del corte</b>${rangeLabel}</div>
     <div><b>Respuestas incluidas</b>${totals.totalResponses} (${totals.completedResponses} completas)</div>
+    ${segment ? `<div style="grid-column: 1 / -1;"><b>Filtro aplicado</b>${escapeHtml(segment.prompt)}: <strong>${escapeHtml(segment.label)}</strong></div>` : ''}
   </div>
 
   <div class="summary-box">
