@@ -1097,6 +1097,24 @@ function describeSegment(questions, queryParams) {
   return { prompt: question.prompt, label: option ? option.label : String(queryParams.segmentValue) }
 }
 
+// Periodo del corte en palabras (trimestre o mes), con la misma precedencia que
+// buildResponseFilters: trimestre manda sobre mes. El informe filtraba bien por periodo pero
+// seguia rotulandose "historico completo" si no habia fechas, y dos informes de trimestres
+// distintos se descargaban con el mismo nombre.
+const QUARTER_MONTHS = ['Ene-Mar', 'Abr-Jun', 'Jul-Sep', 'Oct-Dic']
+function describePeriod(queryParams) {
+  if (queryParams.quarter && queryParams.year) {
+    const quarter = Number(queryParams.quarter)
+    return { label: `Trimestre ${quarter} de ${queryParams.year} (${QUARTER_MONTHS[quarter - 1] || ''})`, slug: `t${quarter}-${queryParams.year}` }
+  }
+  if (queryParams.month && /^d{4}-d{2}$/.test(String(queryParams.month))) {
+    const [year, month] = String(queryParams.month).split('-').map(Number)
+    const name = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, 1)))
+    return { label: name.charAt(0).toUpperCase() + name.slice(1), slug: String(queryParams.month) }
+  }
+  return null
+}
+
 function fileSlug(text) {
   return String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'opcion'
 }
@@ -1213,6 +1231,7 @@ async function buildStatsPayload(survey, request) {
     scoring: hasScoredQuestions(pages) ? buildScoringAggregate(pages, itemsByResponse) : null,
     participants: buildParticipants(pages, questions, respondentsResult.rows, itemsByResponse),
     segment: describeSegment(questions, request.query),
+    period: describePeriod(request.query),
   }
 }
 
@@ -1474,6 +1493,8 @@ surveysRouter.get('/:id/report-by-segment.zip', surveysModule, exportPerm, async
     if (!question || !options.length) fail(400, 'Elige una pregunta de selección para generar un informe por cada opción')
 
     const generatedAt = new Date().toISOString()
+    const period = describePeriod(request.query)
+    const periodSuffix = period ? `-${period.slug}` : ''
     const entries = []
     for (const option of options) {
       // Misma peticion, con el valor de segmento de ESTA opcion: asi cada informe pasa por
@@ -1483,12 +1504,12 @@ surveysRouter.get('/:id/report-by-segment.zip', surveysModule, exportPerm, async
       const payload = await buildStatsPayload(survey, scoped)
       if (!payload.totals.totalResponses) continue
       const html = renderSurveyReportHtml({ ...payload, dateFrom: request.query.dateFrom || null, dateTo: request.query.dateTo || null, generatedAt })
-      entries.push({ name: `informe-${survey.code}-${fileSlug(option.label)}.pdf`, data: Buffer.from(await renderPdf(html)) })
+      entries.push({ name: `informe-${survey.code}-${fileSlug(option.label)}${periodSuffix}.pdf`, data: Buffer.from(await renderPdf(html)) })
     }
     if (!entries.length) fail(404, 'Ninguna opción tiene respuestas en el corte seleccionado')
 
     response.setHeader('Content-Type', 'application/zip')
-    response.setHeader('Content-Disposition', `attachment; filename="informes-${survey.code}-${fileSlug(question.prompt).slice(0, 40)}.zip"`)
+    response.setHeader('Content-Disposition', `attachment; filename="informes-${survey.code}-${fileSlug(question.prompt).slice(0, 40)}${periodSuffix}.zip"`)
     response.send(buildZip(entries))
   } catch (error) { next(error) }
 })

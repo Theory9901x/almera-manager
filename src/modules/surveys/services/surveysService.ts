@@ -129,7 +129,7 @@ export const surveysService = {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `informes-${code}-por-opcion.zip`
+    anchor.download = `informes-${code}-por-opcion${filters.quarter && filters.year ? `-t${filters.quarter}-${filters.year}` : filters.month ? `-${filters.month}` : ''}.zip`
     anchor.click()
     URL.revokeObjectURL(url)
   },

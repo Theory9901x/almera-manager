@@ -19,7 +19,11 @@ function escapeHtml(value) {
 
 function formatDate(value) {
   if (!value) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'long' }).format(new Date(value))
+  // Una fecha SIN hora ("2026-09-01", los cortes del filtro) se interpreta como medianoche UTC;
+  // formateada en la zona local (UTC-5) retrocedia un dia y el corte "1 de septiembre" salia
+  // impreso como "31 de agosto". Las fechas puras se formatean en UTC; los instantes, en local.
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(value))
+  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', ...(dateOnly ? { timeZone: 'UTC' } : {}) }).format(new Date(value))
 }
 
 function formatPercent(value) {
@@ -129,11 +133,13 @@ function participantsSection(participants) {
   <table><thead><tr><th class="num">#</th><th>Participante</th><th>Fecha</th><th class="num">Adherencia</th><th>Concepto</th></tr></thead><tbody>${rows}</tbody></table>`
 }
 
-export function renderSurveyReportHtml({ survey, totals, compliance, timeline, avgCompletionSeconds, demographics, questions, participants, segment, dateFrom, dateTo, generatedAt }) {
+export function renderSurveyReportHtml({ survey, totals, compliance, timeline, avgCompletionSeconds, demographics, questions, participants, segment, period, dateFrom, dateTo, generatedAt }) {
   const level = complianceLevel(compliance.percent)
-  const rangeLabel = dateFrom || dateTo
+  // El periodo (trimestre/mes) y el rango de fechas pueden combinarse: se muestran los dos.
+  const datesLabel = dateFrom || dateTo
     ? `${dateFrom ? formatDate(dateFrom) : 'inicio'} — ${dateTo ? formatDate(dateTo) : 'hoy'}`
-    : 'Todas las respuestas (histórico completo)'
+    : ''
+  const rangeLabel = [period?.label, datesLabel].filter(Boolean).join(' · ') || 'Todas las respuestas (histórico completo)'
 
   const timelineRows = timeline.map(row => `<tr><td>${row.date}</td><td class="num">${row.count}</td></tr>`).join('')
   const demographicsBlocks = (demographics || []).map(cross => `

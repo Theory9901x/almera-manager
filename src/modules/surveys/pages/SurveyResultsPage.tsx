@@ -97,7 +97,8 @@ function SurveyResultsContent() {
     setExportingPdf(true)
     try {
       const segmentLabel = segmentQuestion && segmentValue ? segmentOptions(segmentQuestion).find(option => option.id === segmentValue)?.label : undefined
-      const suffix = segmentLabel ? `-${segmentLabel.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}` : ''
+      const periodSuffix = quarterKey ? `-t${quarterNumber}-${quarterYear}` : month ? `-${month}` : ''
+      const suffix = (segmentLabel ? `-${segmentLabel.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}` : '') + periodSuffix
       await surveysService.exportPdf(survey.id, survey.code, {
         ...cutFilters, segmentQuestionId: segmentValue ? segmentQuestionId : undefined, segmentValue: segmentValue || undefined,
       }, suffix)
