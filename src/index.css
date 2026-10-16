@@ -7909,9 +7909,10 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Zonas, tipos y niveles */
 .rsk-zone { --zone: #94a3b8; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap;
-  background: color-mix(in srgb, var(--zone) 16%, var(--surface)); color: color-mix(in srgb, var(--zone) 62%, #111); border: 1px solid color-mix(in srgb, var(--zone) 38%, transparent); }
-.rsk-zone i { width: 8px; height: 8px; border-radius: 50%; background: var(--zone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--zone) 25%, transparent); }
-.rsk-zone.is-moderado { color: #6b4b00; }
+  background: var(--zone); color: #fff; border: 1px solid color-mix(in srgb, var(--zone) 70%, #000); text-shadow: 0 1px 1px rgba(0,0,0,.18); }
+.rsk-zone i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.9); }
+.rsk-zone.is-moderado { color: #3f2d00; text-shadow: none; }
+.rsk-zone.is-moderado i { background: #3f2d00; }
 .rsk-zone.is-sm { font-size: 11px; padding: 2px 8px 2px 6px; }
 .rsk-zone.is-lg { font-size: 14px; padding: 6px 14px 6px 11px; }
 .rsk-zone.is-empty { color: var(--muted); background: var(--surface-soft); border-color: var(--border-hairline); }
@@ -7941,8 +7942,13 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 .rsk-heat-label.is-row { text-align: right; align-items: flex-end; padding-right: 4px; }
 .rsk-heat-label.is-col { text-align: center; align-items: center; padding-top: 3px; }
 .rsk-heat-cell { --zone: #94a3b8; position: relative; aspect-ratio: 1.45; border: 0; border-radius: 11px; padding: 0; cursor: default; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px;
-  background: color-mix(in srgb, var(--zone) 34%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--zone) 30%, transparent); transition: transform .16s ease, box-shadow .16s ease; }
-.rsk-heat-cell.has-risks { cursor: pointer; background: linear-gradient(145deg, color-mix(in srgb, var(--zone) 82%, #fff), var(--zone)); box-shadow: 0 6px 16px color-mix(in srgb, var(--zone) 35%, transparent), inset 0 1px 0 rgba(255,255,255,.35); }
+  background: var(--zone); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); transition: transform .16s ease, box-shadow .16s ease; }
+/* Color PLENO en todas las celdas, como el formato institucional: un pastel hacia ver las zonas
+   vacias como "menos graves". Las celdas con riesgos se distinguen por relieve y burbuja. */
+.rsk-heat-cell.has-risks { cursor: pointer; background: var(--zone); box-shadow: 0 8px 18px color-mix(in srgb, var(--zone) 50%, transparent), inset 0 0 0 3px rgba(255,255,255,.75); }
+/* Las celdas vacias son botones deshabilitados (no hay nada que filtrar) y la regla global de
+   :disabled les bajaba la opacidad: el color pleno salia lavado. La celda se ve siempre al 100 %. */
+.rsk-heat-cell:disabled { opacity: 1; cursor: default; }
 .rsk-heat-cell.has-risks:hover { transform: translateY(-2px) scale(1.04); z-index: 1; }
 .rsk-heat-cell.is-selected { outline: 3px solid var(--ink); outline-offset: 2px; }
 .rsk-heat-count { min-width: 30px; height: 30px; padding: 0 8px; display: grid; place-items: center; border-radius: 999px; background: rgba(255,255,255,.94); color: color-mix(in srgb, var(--zone) 70%, #000); font-family: var(--font-display); font-weight: 700; font-size: 15px; box-shadow: 0 3px 10px rgba(0,0,0,.18); }
@@ -8293,11 +8299,8 @@ h1, h2, h3, strong, th { text-wrap: balance; }
 
 /* Tema oscuro: las zonas conservan su color (es dato); se aclara el texto que va encima. */
 :root[data-theme="dark"] .rsk-page { --rsk: #f0a14c; --rsk-2: #f7c07e; }
-:root[data-theme="dark"] .rsk-zone { color: color-mix(in srgb, var(--zone) 55%, #fff); background: color-mix(in srgb, var(--zone) 20%, var(--surface)); }
-:root[data-theme="dark"] .rsk-zone.is-moderado { color: #fde68a; }
 :root[data-theme="dark"] .rsk-type { color: color-mix(in srgb, var(--type) 45%, #fff); background: color-mix(in srgb, var(--type) 22%, var(--surface)); }
-:root[data-theme="dark"] .rsk-heat-cell { background: color-mix(in srgb, var(--zone) 26%, var(--surface)); }
-:root[data-theme="dark"] .rsk-heat-cell.has-risks { background: linear-gradient(145deg, color-mix(in srgb, var(--zone) 88%, #fff), var(--zone)); }
+:root[data-theme="dark"] .rsk-heat-cell { background: var(--zone); }
 :root[data-theme="dark"] .rsk-heat-cell.is-selected { outline-color: #fff; }
 :root[data-theme="dark"] .rsk-heat-marker.is-inherent { background: #f8fafc; color: #0b1220; }
 :root[data-theme="dark"] .rsk-heat-marker.is-residual { background: #0b1220; color: #f8fafc; border-color: #f8fafc; }
