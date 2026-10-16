@@ -308,6 +308,9 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
   const [checklistFn, setChecklistFn] = useState<'AUDITOR' | 'COLABORADOR' | ''>('')
   // Radicados: Radicador (genera y anula) o Consulta (solo ve la base). Mismo patron que Listas.
   const [radicadosFn, setRadicadosFn] = useState<'RADICADOR' | 'GENERADOR' | 'CONSULTA' | ''>('')
+  // Gestion del Riesgo: por linea de defensa. Lider de proceso (primera), Control Interno
+  // (tercera, seguimiento y pruebas de controles) o Consulta.
+  const [risksFn, setRisksFn] = useState<'LIDER' | 'CONTROL_INTERNO' | 'CONSULTA' | ''>('')
 
   const load = () => api.userModules(user.membership_id).then(setGrants).catch(cause => setError(cause instanceof Error ? cause.message : 'No fue posible cargar los modulos'))
   useEffect(() => { void load() }, [user.membership_id])
@@ -324,7 +327,7 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
         await api.revokeUserModule(user.membership_id, moduleKey)
         await load(); await reload()
         done('Modulo retirado')
-      } else if (moduleKey !== 'adherence-matrix' && moduleKey !== 'checklists' && moduleKey !== 'radicados') {
+      } else if (moduleKey !== 'adherence-matrix' && moduleKey !== 'checklists' && moduleKey !== 'radicados' && moduleKey !== 'risks') {
         await api.grantUserModule(user.membership_id, moduleKey)
         await load(); await reload()
         done('Modulo habilitado')
@@ -374,6 +377,19 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
     finally { setBusyKey(null) }
   }
 
+  async function grantRisks() {
+    if (!risksFn) return
+    setBusyKey('risks'); setError('')
+    try {
+      await api.grantUserModule(user.membership_id, 'risks', { function: risksFn })
+      setRisksFn('')
+      await load(); await reload()
+      done('Gestión del Riesgo habilitado')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No fue posible habilitar el modulo') }
+    finally { setBusyKey(null) }
+  }
+
+  const risksGrant = grants.find(item => item.module_key === 'risks')
   const matrixGrant = grants.find(item => item.module_key === 'adherence-matrix')
   const checklistGrant = grants.find(item => item.module_key === 'checklists')
   const radicadosGrant = grants.find(item => item.module_key === 'radicados')
@@ -387,16 +403,24 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
           const isMatrix = module.key === 'adherence-matrix'
           const isChecklists = module.key === 'checklists'
           const isRadicados = module.key === 'radicados'
+          const isRisks = module.key === 'risks'
           return (
             <div key={module.id} className="rounded-xl border border-[var(--border-hairline)] p-3">
               <button
                 type="button"
-                disabled={busyKey === module.key || ((isMatrix || isChecklists || isRadicados) && !granted)}
+                disabled={busyKey === module.key || ((isMatrix || isChecklists || isRadicados || isRisks) && !granted)}
                 onClick={() => void toggle(module.key)}
                 className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-60"
               >
                 <span>
                   <span className="block text-sm font-bold">{module.name}</span>
+                  {isRisks && granted && (
+                    <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                      {risksGrant?.function_key === 'CONTROL_INTERNO' ? 'Control Interno (seguimiento y pruebas de controles)'
+                        : risksGrant?.function_key === 'CONSULTA' ? 'Consulta (solo ve y exporta)'
+                        : 'Líder de proceso (gestiona sus riesgos)'}
+                    </span>
+                  )}
                   {isRadicados && granted && (
                     <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {radicadosGrant?.function_key === 'CONSULTA' ? 'Consulta (solo ve la base)'
@@ -437,6 +461,23 @@ function UserModulesPanel({ user, data, done, reload }: { user: AdminUser; data:
                     disabled={busyKey === 'checklists' || !checklistFn}
                     onClick={() => void grantChecklists()}
                   >
+                    Habilitar
+                  </Button>
+                </div>
+              )}
+              {isRisks && !granted && (
+                <div className="mt-3 space-y-2 border-t border-[var(--border-hairline)] pt-3">
+                  <Select
+                    value={risksFn}
+                    onChange={value => setRisksFn(value as 'LIDER' | 'CONTROL_INTERNO' | 'CONSULTA' | '')}
+                    placeholder="Función..."
+                    options={[
+                      { value: 'LIDER', label: 'Líder de proceso (identifica, valora, controles, planes y materializaciones)' },
+                      { value: 'CONTROL_INTERNO', label: 'Control Interno (seguimiento cuatrimestral y pruebas de controles)' },
+                      { value: 'CONSULTA', label: 'Consulta (solo ve y exporta)' },
+                    ]}
+                  />
+                  <Button identity={identity} className="w-full" disabled={busyKey === 'risks' || !risksFn} onClick={() => void grantRisks()}>
                     Habilitar
                   </Button>
                 </div>

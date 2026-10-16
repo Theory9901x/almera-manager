@@ -2273,3 +2273,253 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ============================================================================
+-- Gestion del Riesgo — mapas de riesgo por proceso, metodologia DAFP version 6
+-- ("Guia para la administracion del riesgo y el diseno de controles en entidades
+-- publicas", 2022; MIPG, Decreto 1499 de 2017). Cubre riesgos de gestion, de
+-- corrupcion (Ley 1474 de 2011), de seguridad digital y fiscales.
+--
+-- Lo que no hace el sistema anterior y aqui SI: la MATERIALIZACION del riesgo como
+-- evento propio (que paso, que controles fallaron, a quien se reporto, acciones
+-- correctivas y la revaluacion obligatoria del riesgo), la prueba de efectividad de
+-- cada control (un control que la tercera linea encuentra no efectivo deja de
+-- reducir el residual) y el seguimiento por lineas de defensa por cuatrimestre.
+--
+-- Las zonas, el residual y la reduccion NO se guardan: se calculan siempre con el
+-- motor compartido shared/riskScoring.mjs a partir de los niveles inherentes y los
+-- controles. Guardarlos daria dos verdades en cuanto alguien edita un control.
+-- ============================================================================
+INSERT INTO modules (key, name, description, route, icon, position, active) VALUES
+  ('risks', 'Gestión del Riesgo', 'Mapas de riesgo por proceso con la metodología DAFP: valoración, controles, tratamiento, materialización y seguimiento por líneas de defensa', '/app/riesgos', 'alert-triangle', 19, TRUE)
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, route = EXCLUDED.route,
+  icon = EXCLUDED.icon, position = EXCLUDED.position, active = EXCLUDED.active;
+
+INSERT INTO organization_modules (organization_id, module_id, enabled)
+SELECT o.id, m.id, TRUE FROM organizations o, modules m WHERE m.key = 'risks'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO permissions (key, name, description) VALUES
+  ('risks.view', 'Ver riesgos', 'Consultar los mapas de riesgo, la valoración, los controles y el tablero'),
+  ('risks.edit', 'Gestionar riesgos', 'Identificar y valorar riesgos, registrar causas, controles y planes de tratamiento'),
+  ('risks.materialize', 'Reportar materializaciones', 'Reportar un riesgo materializado y gestionar su análisis y acciones correctivas'),
+  ('risks.review', 'Seguimiento de riesgos', 'Registrar el seguimiento de las líneas de defensa y las pruebas de efectividad de los controles'),
+  ('risks.export', 'Exportar riesgos', 'Descargar el mapa de riesgos en PDF y la matriz en CSV'),
+  ('risks.manage', 'Administrar riesgos', 'Crear mapas, duplicarlos a otra vigencia, configurar clases y eliminar riesgos')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+CREATE TABLE IF NOT EXISTS risk_maps (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, name)
+);
+
+-- Clase de riesgo (el "factor"): catalogo propio de cada entidad. Se siembra con las del sector
+-- salud; cada entidad renombra, agrega o desactiva las suyas.
+CREATE TABLE IF NOT EXISTS risk_classes (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#64748b',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (organization_id, name)
+);
+
+INSERT INTO risk_classes (organization_id, name, color, order_index)
+SELECT o.id, v.name, v.color, v.order_index
+FROM organizations o
+CROSS JOIN (VALUES
+  ('Asistencial', '#0ea5e9', 1), ('Clínico', '#8b5cf6', 2), ('Reputacional', '#f59e0b', 3),
+  ('Pérdidas económicas', '#ef4444', 4), ('Cumplimiento normativo', '#14b8a6', 5), ('Oportunidad', '#22c55e', 6)
+) AS v(name, color, order_index)
+ON CONFLICT (organization_id, name) DO NOTHING;
+
+-- Un mapa vigente de arranque por entidad, para que el modulo no abra vacio sin donde registrar.
+INSERT INTO risk_maps (organization_id, name, year, description)
+SELECT o.id, 'Mapa de riesgos institucional 2026', 2026, 'Mapa de riesgos por proceso de la vigencia 2026 (metodología DAFP v6).'
+FROM organizations o
+WHERE NOT EXISTS (SELECT 1 FROM risk_maps rm WHERE rm.organization_id = o.id);
+
+CREATE TABLE IF NOT EXISTS risks (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  map_id BIGINT NOT NULL REFERENCES risk_maps(id) ON DELETE CASCADE,
+  process_id BIGINT NOT NULL REFERENCES institutional_processes(id),
+  code TEXT NOT NULL,
+  sequence INTEGER NOT NULL,
+  risk_type TEXT NOT NULL DEFAULT 'GESTION' CHECK (risk_type IN ('GESTION', 'CORRUPCION', 'SEGURIDAD_DIGITAL', 'FISCAL')),
+  class_id BIGINT REFERENCES risk_classes(id) ON DELETE SET NULL,
+  typology TEXT NOT NULL DEFAULT '',
+  -- Redaccion guiada de la guia: "Posibilidad de <impacto> por <causa inmediata> debido a <causa
+  -- raiz>". Las tres piezas se guardan sueltas para poder recomponer y filtrar; description es el
+  -- enunciado final (editable).
+  impact_statement TEXT NOT NULL DEFAULT '',
+  cause_immediate TEXT NOT NULL DEFAULT '',
+  cause_root TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL,
+  consequences TEXT NOT NULL DEFAULT '',
+  process_objective TEXT NOT NULL DEFAULT '',
+  -- Seguridad digital: activo de informacion, amenaza, vulnerabilidad y que pierde (C/I/D).
+  asset TEXT NOT NULL DEFAULT '',
+  threat TEXT NOT NULL DEFAULT '',
+  vulnerability TEXT NOT NULL DEFAULT '',
+  cia TEXT[] NOT NULL DEFAULT '{}',
+  exposure_per_year NUMERIC,
+  inherent_probability SMALLINT CHECK (inherent_probability BETWEEN 1 AND 5),
+  inherent_impact SMALLINT CHECK (inherent_impact BETWEEN 1 AND 5),
+  impact_criterion TEXT NOT NULL DEFAULT '' CHECK (impact_criterion IN ('', 'ECONOMICO', 'REPUTACIONAL', 'SALUD')),
+  corruption_answers JSONB NOT NULL DEFAULT '[]'::jsonb,
+  treatment TEXT CHECK (treatment IN ('ACEPTAR', 'REDUCIR_MITIGAR', 'REDUCIR_TRANSFERIR', 'EVITAR')),
+  treatment_justification TEXT NOT NULL DEFAULT '',
+  owner_membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL,
+  owner_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'ACTIVO' CHECK (status IN ('ACTIVO', 'RETIRADO')),
+  created_by_id BIGINT REFERENCES users(id),
+  updated_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  deleted_by_id BIGINT REFERENCES users(id),
+  UNIQUE (map_id, code)
+);
+CREATE INDEX IF NOT EXISTS risks_scope_idx ON risks(organization_id, map_id, process_id) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS risk_causes (
+  id BIGSERIAL PRIMARY KEY,
+  risk_id BIGINT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'RAIZ' CHECK (kind IN ('RAIZ', 'INMEDIATA')),
+  description TEXT NOT NULL,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_causes_risk_idx ON risk_causes(risk_id, order_index);
+
+-- El control se asocia a la causa que ataca (matriz control-causa). Atributos de eficiencia
+-- (tipo, implementacion) pesan en el calculo; los informativos (documentacion, frecuencia,
+-- evidencia) no, pero la guia exige registrarlos.
+CREATE TABLE IF NOT EXISTS risk_controls (
+  id BIGSERIAL PRIMARY KEY,
+  risk_id BIGINT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
+  cause_id BIGINT REFERENCES risk_causes(id) ON DELETE SET NULL,
+  description TEXT NOT NULL,
+  responsible TEXT NOT NULL DEFAULT '',
+  control_type TEXT NOT NULL CHECK (control_type IN ('PREVENTIVO', 'DETECTIVO', 'CORRECTIVO')),
+  implementation TEXT NOT NULL CHECK (implementation IN ('AUTOMATICO', 'MANUAL')),
+  documentation TEXT NOT NULL DEFAULT 'DOCUMENTADO' CHECK (documentation IN ('DOCUMENTADO', 'SIN_DOCUMENTAR')),
+  frequency TEXT NOT NULL DEFAULT 'CONTINUA' CHECK (frequency IN ('CONTINUA', 'ALEATORIA')),
+  evidence TEXT NOT NULL DEFAULT 'CON_REGISTRO' CHECK (evidence IN ('CON_REGISTRO', 'SIN_REGISTRO')),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_controls_risk_idx ON risk_controls(risk_id, order_index);
+
+-- Prueba de efectividad: el diseno del control (su peso) no garantiza que se ejecute. La ULTIMA
+-- prueba manda: NO_EFECTIVO saca al control del calculo del residual hasta una nueva prueba.
+CREATE TABLE IF NOT EXISTS risk_control_tests (
+  id BIGSERIAL PRIMARY KEY,
+  control_id BIGINT NOT NULL REFERENCES risk_controls(id) ON DELETE CASCADE,
+  tested_at DATE NOT NULL DEFAULT CURRENT_DATE,
+  result TEXT NOT NULL CHECK (result IN ('EFECTIVO', 'PARCIAL', 'NO_EFECTIVO')),
+  defense_line TEXT NOT NULL DEFAULT 'TERCERA' CHECK (defense_line IN ('PRIMERA', 'SEGUNDA', 'TERCERA')),
+  observations TEXT NOT NULL DEFAULT '',
+  tester_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_control_tests_control_idx ON risk_control_tests(control_id, tested_at DESC, id DESC);
+
+-- Materializacion: el riesgo OCURRIO. Es un evento propio, con su ciclo (reportada -> en analisis
+-- -> en tratamiento -> cerrada). No se cierra sin revaluar el riesgo: si se materializo, la
+-- valoracion anterior subestimaba algo, y la guia exige revisar el mapa.
+CREATE TABLE IF NOT EXISTS risk_materializations (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT GENERATED ALWAYS AS ('MAT-' || lpad(id::text, 5, '0')) STORED,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  risk_id BIGINT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
+  occurred_at DATE NOT NULL,
+  detected_at DATE,
+  description TEXT NOT NULL,
+  consequences TEXT NOT NULL DEFAULT '',
+  economic_loss NUMERIC,
+  affected_people INTEGER,
+  actual_impact SMALLINT CHECK (actual_impact BETWEEN 1 AND 5),
+  root_cause TEXT NOT NULL DEFAULT '',
+  failed_control_ids BIGINT[] NOT NULL DEFAULT '{}',
+  immediate_correction TEXT NOT NULL DEFAULT '',
+  notified_parties TEXT[] NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'REPORTADA' CHECK (status IN ('REPORTADA', 'EN_ANALISIS', 'EN_TRATAMIENTO', 'CERRADA')),
+  prev_probability SMALLINT,
+  prev_impact SMALLINT,
+  new_probability SMALLINT,
+  new_impact SMALLINT,
+  revalued_at TIMESTAMPTZ,
+  revaluation_note TEXT NOT NULL DEFAULT '',
+  closure_notes TEXT NOT NULL DEFAULT '',
+  closed_at TIMESTAMPTZ,
+  closed_by_id BIGINT REFERENCES users(id),
+  reported_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_materializations_scope_idx ON risk_materializations(organization_id, status, occurred_at DESC);
+
+-- Plan de accion: de TRATAMIENTO (reduce el riesgo antes de que pase) o CORRECTIVA (atiende una
+-- materializacion concreta). Mismo modelo, distinto origen.
+CREATE TABLE IF NOT EXISTS risk_actions (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT GENERATED ALWAYS AS ('ACR-' || lpad(id::text, 5, '0')) STORED,
+  organization_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  risk_id BIGINT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
+  materialization_id BIGINT REFERENCES risk_materializations(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL DEFAULT 'TRATAMIENTO' CHECK (kind IN ('TRATAMIENTO', 'CORRECTIVA')),
+  description TEXT NOT NULL,
+  responsible_membership_id BIGINT REFERENCES memberships(id) ON DELETE SET NULL,
+  responsible_name TEXT NOT NULL DEFAULT '',
+  start_date DATE,
+  due_date DATE,
+  status TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (status IN ('PENDIENTE', 'EN_CURSO', 'TERMINADA', 'CANCELADA')),
+  progress SMALLINT NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+  evidence TEXT NOT NULL DEFAULT '',
+  completed_at TIMESTAMPTZ,
+  created_by_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_actions_scope_idx ON risk_actions(organization_id, status, due_date);
+CREATE INDEX IF NOT EXISTS risk_actions_risk_idx ON risk_actions(risk_id);
+
+-- Seguimiento por lineas de defensa (primera: lider del proceso; segunda: planeacion/calidad;
+-- tercera: control interno, con corte cuatrimestral).
+CREATE TABLE IF NOT EXISTS risk_reviews (
+  id BIGSERIAL PRIMARY KEY,
+  risk_id BIGINT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
+  defense_line TEXT NOT NULL CHECK (defense_line IN ('PRIMERA', 'SEGUNDA', 'TERCERA')),
+  period_label TEXT NOT NULL,
+  conclusion TEXT NOT NULL CHECK (conclusion IN ('ADECUADO', 'REQUIERE_AJUSTES', 'CRITICO')),
+  observations TEXT NOT NULL DEFAULT '',
+  author_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_reviews_risk_idx ON risk_reviews(risk_id, created_at DESC);
+
+-- Bitacora inmutable de cada riesgo: quien cambio que y cuando (la app nunca la edita).
+CREATE TABLE IF NOT EXISTS risk_activity (
+  id BIGSERIAL PRIMARY KEY,
+  risk_id BIGINT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  actor_id BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS risk_activity_risk_idx ON risk_activity(risk_id, created_at DESC);

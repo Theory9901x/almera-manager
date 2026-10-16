@@ -15,6 +15,7 @@ import { environmentalRouter } from './routes/environmental.mjs'
 import { checklistsRouter } from './routes/checklists.mjs'
 import { plansRouter } from './routes/plans.mjs'
 import { radicadosRouter } from './routes/radicados.mjs'
+import { risksRouter } from './routes/risks.mjs'
 
 const isDev = process.argv.includes('--dev')
 if (isDev) process.env.NODE_ENV = 'development'
@@ -60,6 +61,7 @@ app.use('/api/carbon', requireAuth, carbonRouter)
 app.use('/api/environmental', requireAuth, environmentalRouter)
 app.use('/api/checklists', requireAuth, checklistsRouter)
 app.use('/api/radicados', requireAuth, radicadosRouter)
+app.use('/api/risks', requireAuth, risksRouter)
 // Directorio transversal de planes de mejora: LEE de cada modulo, no sustituye su circuito.
 app.use('/api/plans', requireAuth, plansRouter)
 // Sin requireAuth: es la unica superficie publica del sistema, para que cualquiera con el

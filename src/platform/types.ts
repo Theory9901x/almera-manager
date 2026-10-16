@@ -48,7 +48,7 @@ export interface UserModuleGrant {
   module_name: string
   /** Matrices: AUDITOR/PROFESIONAL. Listas de Chequeo: AUDITOR/COLABORADOR (nulo = auditor).
    *  Radicados: RADICADOR/GENERADOR/CONSULTA (nulo = radicador). */
-  function_key: 'AUDITOR' | 'PROFESIONAL' | 'COLABORADOR' | 'RADICADOR' | 'GENERADOR' | 'CONSULTA' | null
+  function_key: 'AUDITOR' | 'PROFESIONAL' | 'COLABORADOR' | 'RADICADOR' | 'GENERADOR' | 'CONSULTA' | 'LIDER' | 'CONTROL_INTERNO' | null
   area_id: string | null
   area_name: string | null
   auditor_areas: { id: string; name: string }[]

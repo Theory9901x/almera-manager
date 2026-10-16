@@ -40,6 +40,8 @@ import ChecklistWindowPage from '@/modules/checklists/pages/ChecklistWindowPage'
 import ChecklistPreviewPage from '@/modules/checklists/pages/ChecklistPreviewPage'
 import ChecklistPlansPage from '@/modules/checklists/pages/ChecklistPlansPage'
 import { RadicadosDashboardPage } from '@/modules/radicados/pages/RadicadosDashboardPage'
+import RisksPage from '@/modules/risks/pages/RisksPage'
+import RiskDetailPage from '@/modules/risks/pages/RiskDetailPage'
 
 function ProtectedApp() {
   const { session, ready } = useAuth()
@@ -192,6 +194,12 @@ function RadicadosRoute() {
   )
 }
 
+function RisksRoute({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (!session?.permissions.includes('risks.view')) return <Navigate to="/app" replace />
+  return <>{children}</>
+}
+
 function AppRoutes() {
   const { session, ready } = useAuth()
   return (
@@ -244,6 +252,8 @@ function AppRoutes() {
         <Route path="indicadores-ambientales/informes" element={<EnvironmentalRoute><EnvironmentalReportsPage /></EnvironmentalRoute>} />
         <Route path="indicadores-ambientales/historial" element={<EnvironmentalRoute><EnvironmentalHistoryPage /></EnvironmentalRoute>} />
         <Route path="radicados" element={<RadicadosRoute />} />
+        <Route path="riesgos" element={<RisksRoute><RisksPage /></RisksRoute>} />
+        <Route path="riesgos/:riskId" element={<RisksRoute><RiskDetailPage /></RisksRoute>} />
         <Route path="modulos/:moduleKey" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/app' : '/login'} replace />} />

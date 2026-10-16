@@ -54,6 +54,18 @@ const RADICADOS_FUNCTION_PERMISSIONS = {
   CONSULTA: ['radicados.view'],
 }
 
+// Gestion del Riesgo, por linea de defensa: LIDER (primera linea, lider de proceso) identifica,
+// valora, registra controles y planes, y reporta materializaciones; CONTROL_INTERNO (tercera
+// linea) consulta, hace el seguimiento cuatrimestral y prueba la efectividad de los controles,
+// sin reescribir la valoracion que audita; CONSULTA solo ve y exporta. risks.manage (mapas,
+// clases, eliminar) queda fuera a proposito: es de la segunda linea (calidad/planeacion), que es
+// admin-tier. Sin funcion explicita se asume LIDER.
+const RISKS_FUNCTION_PERMISSIONS = {
+  LIDER: ['risks.view', 'risks.edit', 'risks.materialize', 'risks.export'],
+  CONTROL_INTERNO: ['risks.view', 'risks.review', 'risks.materialize', 'risks.export'],
+  CONSULTA: ['risks.view', 'risks.export'],
+}
+
 export async function getSessionContext(request) {
   const token = readCookie(request, SESSION_COOKIE)
   if (!token) return null
@@ -110,6 +122,9 @@ export async function getSessionContext(request) {
       }
       if (module.key === 'radicados') {
         return RADICADOS_FUNCTION_PERMISSIONS[module.function_key] || RADICADOS_FUNCTION_PERMISSIONS.RADICADOR
+      }
+      if (module.key === 'risks') {
+        return RISKS_FUNCTION_PERMISSIONS[module.function_key] || RISKS_FUNCTION_PERMISSIONS.LIDER
       }
       return USUARIO_MODULE_PERMISSIONS[module.key] || []
     }))]

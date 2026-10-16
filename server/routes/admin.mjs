@@ -238,6 +238,16 @@ adminRouter.put('/users/:membershipId/modules/:moduleKey', requireAnyPermission(
          ON CONFLICT (membership_id, module_id) DO UPDATE SET function_key=EXCLUDED.function_key`,
         [membershipId, module.rows[0].id, functionKey],
       )
+    } else if (moduleKey === 'risks') {
+      // LIDER (primera linea) gestiona sus riesgos; CONTROL_INTERNO (tercera linea) hace
+      // seguimiento y prueba controles; CONSULTA solo ve. Sin funcion se asume LIDER.
+      const functionKey = String(request.body?.function || 'LIDER').trim().toUpperCase()
+      if (!['LIDER', 'CONTROL_INTERNO', 'CONSULTA'].includes(functionKey)) fail(400, 'Elige la función: Líder de proceso, Control Interno o Consulta')
+      await client.query(
+        `INSERT INTO membership_modules (membership_id, module_id, function_key) VALUES ($1,$2,$3)
+         ON CONFLICT (membership_id, module_id) DO UPDATE SET function_key=EXCLUDED.function_key`,
+        [membershipId, module.rows[0].id, functionKey],
+      )
     } else {
       await client.query(
         'INSERT INTO membership_modules (membership_id, module_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',

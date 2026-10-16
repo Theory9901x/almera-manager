@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck, ClipboardList,
+  AlertTriangle, Archive, BarChart3, Blocks, Building2, CheckSquare, ChevronDown, ClipboardCheck, ClipboardList,
   Droplets, FileBarChart2, Gauge, Headphones, Inbox, LayoutDashboard, Leaf, ListChecks, LogOut, Menu, Moon, Search,
   Settings, ShieldCheck, Sparkles, Sun, Users, X,
 } from 'lucide-react'
@@ -28,6 +28,7 @@ const icons = {
   inbox: Inbox,
   gauge: Gauge,
   droplets: Droplets,
+  'alert-triangle': AlertTriangle,
 }
 
 export default function AppLayout() {

@@ -164,7 +164,7 @@ tono, para que **ningún módulo pese visualmente más que otro**.
 | `--m-planes` | 130 | **libre** (`#518200`) |
 | `--m-listas` | 230 | Listas de Chequeo (`#007fbc`) |
 | `--m-seguridad` | 40 | **libre** (`#bb4717`) |
-| `--m-riesgos` | 70 | **libre** (`#aa5b00`) |
+| `--m-riesgos` | 70 | Gestión del Riesgo (`#aa5b00`) |
 | `--m-indicadores` | 330 | **libre** (`#a3489d`) |
 
 Cada uno tiene su `-soft` (`oklch(0.95 0.03 <tono>)`) para fondos.
@@ -314,6 +314,7 @@ guardar algo sensible.
 | Encuestas | `surveys` | `/app/encuestas/*` + público `/e/:slug` | Operativo, rediseñado |
 | Huella de Carbono | `carbon-footprint` | `/app/huella-carbono/*` | Operativo, rediseñado |
 | Listas de Chequeo | `checklists` | `/app/listas-chequeo/*` | Operativo en produccion; 13 listas publicadas y en uso |
+| Gestión del Riesgo | `risks` | `/app/riesgos`, `/app/riesgos/:riskId` | Nuevo (§16): DAFP v6, materialización, líneas de defensa |
 | Administración | `admin`, `users`, `roles`, `entity`, `settings`, `reports` | `/app/administracion/*` | Operativo |
 
 **Matrices de Adherencia** es el hermano conceptual del módulo pendiente: mide
@@ -683,3 +684,35 @@ de `.ds-select-content`/`.ds-datepicker-content` no sirviera del todo: quedó un
 duplicada** — `z-index: var(--z-portal)` seguida, en el mismo bloque, de un `z-index: 90` residual
 que la anulaba en silencio (la última declaración gana). Verificado con capturas en los dos temas:
 sin el arreglo el diálogo de confirmación no aparecía en pantalla; con él, sí.
+
+## 16. Gestión del Riesgo (metodología DAFP v6)
+
+Mapas de riesgo por proceso según la *Guía para la administración del riesgo y el diseño de
+controles en entidades públicas* (DAFP, v6 2022 — MIPG). Riesgos de gestión, corrupción
+(Ley 1474/2011), seguridad digital y fiscales. Piezas:
+
+- **`shared/riskScoring.mjs`** es EL motor (con tipos en `riskScoring.d.mts`): escalas, mapa de
+  calor 5×5, peso de controles (preventivo 25 / detectivo 15 / correctivo 10; automático 25 /
+  manual 15), residual aplicando cada control sobre el valor ya reducido, cuestionario de
+  corrupción (19 preguntas → Moderado/Mayor/Catastrófico). Lo usan servidor, pantalla y PDF.
+  **Zonas y residual nunca se guardan**: se calculan siempre a partir de los niveles inherentes y
+  los controles; guardarlos daría dos verdades al editar un control.
+- Probabilidad **por exposición** (veces/año). Si hay `exposure_per_year`, manda sobre el nivel
+  manual; para elegir nivel a mano el formulario manda `exposurePerYear: null`.
+- **Prueba de efectividad**: la ÚLTIMA prueba manda. `NO_EFECTIVO` saca al control del cálculo
+  del residual (un control que no opera no mitiga).
+- **Materialización** (lo que no tenía ALMERA): evento propio con ciclo REPORTADA → EN_ANALISIS →
+  EN_TRATAMIENTO → CERRADA. El servidor NO deja cerrar sin causa raíz, sin revaluar el riesgo y
+  con acciones correctivas abiertas; un hecho de **corrupción** exige reportarlo a una autoridad
+  externa. La revaluación reescribe los niveles inherentes del riesgo y lo deja en la bitácora.
+- Reglas: corrupción nunca se acepta; una acción no se termina sin evidencia; la primera línea
+  se autoevalúa y la segunda/tercera requieren `risks.review`.
+- Funciones de USUARIO (`RISKS_FUNCTION_PERMISSIONS`): LIDER (primera línea), CONTROL_INTERNO
+  (seguimiento y pruebas), CONSULTA. `risks.manage` (mapas, clases, eliminar) es solo admin-tier.
+- Duplicar un mapa a la siguiente vigencia copia riesgos, causas y controles; NO pruebas,
+  acciones, materializaciones ni seguimientos (son historia de la vigencia anterior).
+- Rutas bajo `/api/risks`: el listado es `/api/risks/risks` (el router se monta en `/api/risks`).
+- Estilos encapsulados en `.rsk-*` (index.css). El hero del módulo NO debe declarar
+  `background-image` propio: reemplaza el degradado oscuro de `.module-hero` y el texto blanco
+  queda sobre fondo claro (pasó en el primer render).
+- Pendiente opcional: sumar las acciones de riesgo al directorio transversal de Planes de mejora (§14).
